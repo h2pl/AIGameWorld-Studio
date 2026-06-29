@@ -12,6 +12,9 @@ venv/
 .idea/
 .vscode/
 
+# Generated
+output/
+
 # Build
 dist/
 *.egg-info/

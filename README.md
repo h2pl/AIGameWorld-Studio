@@ -6,7 +6,8 @@
 ## 快速开始 / Quick Start
 
 ```bash
-git clone <repo> && cd AIGameWorld-Studio
+git clone git@github.com:h2pl/AIGameWorld-Studio.git
+cd AIGameWorld-Studio
 uv sync
 python -m src.cli generate --preset forgotten_realm   # 生成模板
 python -m src.cli validate output/forgotten_realm      # 校验模板

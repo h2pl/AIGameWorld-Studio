@@ -7,8 +7,15 @@ from pathlib import Path
 import yaml
 
 
-def generate_preset(preset_name: str, output_dir: Path) -> Path:
-    """根据内置模板名生成 YAML 文件树 / Generate YAML tree from preset."""
+def generate_preset(preset_name: str, output_dir: Path | None = None) -> Path:
+    """根据内置模板名生成 YAML 文件树 / Generate YAML tree from preset.
+
+    Args:
+        preset_name: 内置模板名
+        output_dir: 输出根目录（默认 output/）
+    """
+    if output_dir is None:
+        output_dir = Path("output")
     from src.generator import presets
 
     data = presets.PRESETS.get(preset_name)

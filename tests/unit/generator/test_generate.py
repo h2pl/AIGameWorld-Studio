@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from src.generator.generate import GeneratorParams, generate_manual, generate_preset
+from src.generator.generate import generate_preset
 
 
 def test_generate_forgotten_realm(tmp_path: Path):
@@ -39,16 +39,6 @@ def test_unknown_preset_raises(tmp_path: Path):
     """未知 preset 抛出 ValueError / Unknown preset raises ValueError."""
     with pytest.raises(ValueError, match="Unknown preset"):
         generate_preset("non_existent", tmp_path)
-
-
-def test_manual_mode_generates_dirs(tmp_path: Path):
-    """手动模式生成目录结构 / Manual mode generates directories."""
-    params = GeneratorParams(world_name="test_world", output_dir=tmp_path)
-    out = generate_manual(params)
-    assert (out / "meta.yaml").exists()
-    assert (out / "lore").is_dir()
-    assert (out / "scenes").is_dir()
-    assert (out / "story_setup.yaml").exists()
 
 
 def test_output_overwrite_ok(tmp_path: Path):

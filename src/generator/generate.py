@@ -1,35 +1,17 @@
 # 生成器 / Generator
-# 读 YAML 模板 → 填充预设数据 → 写输出目录
-# Reads YAML templates, fills with preset data, writes to output
+# 预设模式：内置数据 → YAML 文件树（P1 唯一模式）
+# Phase 2 加手动模式，Phase 3 加 AI 推导模式
 
-from dataclasses import dataclass, field
 from pathlib import Path
 
 import yaml
 
-TEMPLATE_DIR = Path("templates")
 
-
-@dataclass
-class GeneratorParams:
-    """生成器输入参数 / Generator input parameters."""
-
-    world_name: str
-    ruleset: str = "d20"
-    num_pcs: int = 2
-    num_actors: int = 2
-    num_scenes: int = 2
-    num_items: int = 5
-    num_scene_objects: int = 2
-    lore_categories: list[str] = field(default_factory=lambda: ["geography", "history"])
-    output_dir: Path = Path("output")
-
-
-def generate_preset(preset_name: str, output_dir: Path, presets_module=None) -> Path:
+def generate_preset(preset_name: str, output_dir: Path) -> Path:
     """根据内置模板名生成 YAML 文件树 / Generate YAML tree from preset."""
-    if presets_module is None:
-        from src.generator import presets as presets_module
-    data = presets_module.PRESETS.get(preset_name)
+    from src.generator import presets
+
+    data = presets.PRESETS.get(preset_name)
     if data is None:
         raise ValueError(f"Unknown preset: {preset_name}")
     out = output_dir / preset_name
@@ -44,28 +26,6 @@ def generate_preset(preset_name: str, output_dir: Path, presets_module=None) -> 
     _write_resource(out, "scene_objects", data.get("scene_objects", []))
     _write_story_setup(out, data.get("story_setup", {}))
 
-    return out
-
-
-def generate_manual(params: GeneratorParams) -> Path:
-    """手动模式：按数量生成骨架 YAML（占位符） / Manual mode: skeleton YAML."""
-    out = params.output_dir / params.world_name
-    out.mkdir(parents=True, exist_ok=True)
-
-    _write_meta(
-        out,
-        {
-            "id": params.world_name,
-            "name": params.world_name,
-            "ruleset": params.ruleset,
-            "starting_scene": "",
-        },
-    )
-
-    for tpl_name in ["lore", "scenes", "player_characters", "actors", "items", "scene_objects"]:
-        (out / tpl_name).mkdir(exist_ok=True)
-
-    _write_story_setup(out, {"arcs": [], "hooks": []})
     return out
 
 

@@ -1,0 +1,15 @@
+arcs:
+- type: main
+  title: 失踪的商队
+  stage: hook
+  main_cast:
+  - warrior
+  - mage
+  branching_points:
+  - trigger: 追踪痕迹
+    next: 森林遭遇
+hooks:
+- description: 旅店老板提到最近森林里有奇怪的声音
+  urgency: medium
+- description: 铁匠收到了一个神秘的订单
+  urgency: low

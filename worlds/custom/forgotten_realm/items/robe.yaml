@@ -1,0 +1,8 @@
+id: robe
+name: 法师长袍
+item_type: armor
+rarity: common
+weight: 2.0
+value: 5
+data:
+  ac_bonus: 1

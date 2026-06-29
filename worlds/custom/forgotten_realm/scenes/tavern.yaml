@@ -1,0 +1,11 @@
+id: tavern
+name: 酒馆
+type: indoor
+description: 温暖喧闹的酒馆，炉火烧得正旺，角落里有吟游诗人在弹琴。
+exits:
+- target_scene: forest
+  condition: ''
+landmarks:
+- id: bar
+  name: 吧台
+  desc: 旅店老板在此招待客人

@@ -1,0 +1,10 @@
+id: tavern_chest
+name: 酒馆宝箱
+object_type: chest
+scene_id: tavern
+interact_data:
+  locked: false
+  dc: 10
+  loot_table:
+  - item_id: healing_potion
+    qty: 1

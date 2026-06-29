@@ -15,9 +15,6 @@ venv/
 # Generated
 output/
 
-# World templates
-worlds/custom/
-
 # Build
 dist/
 *.egg-info/

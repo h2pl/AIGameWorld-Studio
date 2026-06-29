@@ -1,0 +1,30 @@
+id: blacksmith
+name: 铁匠
+role: blacksmith
+race: dwarf
+personality: 勤奋、沉默寡言、对陌生人警惕
+attributes:
+  str: 16
+  dex: 10
+  con: 16
+  int: 10
+  wis: 12
+  cha: 8
+combat:
+  hp: 30
+  ac: 15
+  attack_bonus: 5
+  damage_bonus: 3
+functions:
+- dialogue
+- merchant
+function_data:
+  merchant:
+    gold: 500
+    shop_inventory:
+    - item_id: longsword
+      qty: 2
+    - item_id: shield
+      qty: 1
+equipment:
+  weapon: war_hammer

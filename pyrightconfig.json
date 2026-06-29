@@ -1,0 +1,7 @@
+{
+  "typeCheckingMode": "basic",
+  "include": ["src", "tests"],
+  "exclude": ["**/__pycache__", ".venv"],
+  "reportMissingTypeStubs": false,
+  "reportUnknownMemberType": "warning"
+}

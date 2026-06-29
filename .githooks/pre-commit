@@ -1,0 +1,47 @@
+#!/bin/bash
+# Pre-commit 质量门禁 / Quality Gate
+# 密钥扫描 + 注释率 + lint + format + type check
+
+set -e
+
+echo "=== Pre-commit Check ==="
+
+# 1. 密钥扫描 / Secret scan
+echo "[1/5] Secret scan..."
+if grep -rEq "(sk-[A-Za-z0-9]{20,}|xox[baprs]-[A-Za-z0-9]+)" src/ tests/ 2>/dev/null; then
+    echo "  FAIL: Hardcoded API keys found"
+    exit 1
+fi
+echo "  OK"
+
+# 2. 注释率 / Comment rate (>= 5%)
+echo "[2/5] Comment rate..."
+for f in $(find src/ -name "*.py" -not -path "*/__pycache__/*"); do
+    total=$(wc -l < "$f")
+    comments=$(grep -cE "^\s*#" "$f" || true)
+    if [ "$total" -gt 0 ]; then
+        rate=$(( comments * 100 / total ))
+        if [ "$rate" -lt 5 ]; then
+            echo "  FAIL: $f comment rate ${rate}% < 5%"
+            exit 1
+        fi
+    fi
+done
+echo "  OK"
+
+# 3. ruff lint
+echo "[3/5] ruff lint..."
+uv run ruff check --fix .
+echo "  OK"
+
+# 4. ruff format
+echo "[4/5] ruff format..."
+uv run ruff format --check .
+echo "  OK"
+
+# 5. pyright
+echo "[5/5] pyright..."
+uv run pyright src/ tests/
+echo "  OK"
+
+echo "=== All checks passed ==="

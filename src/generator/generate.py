@@ -15,7 +15,7 @@ def generate_preset(preset_name: str, output_dir: Path | None = None) -> Path:
         output_dir: 输出根目录（默认 output/）
     """
     if output_dir is None:
-        output_dir = Path("output")
+        output_dir = Path("worlds") / "custom"
     from src.generator import presets
 
     data = presets.PRESETS.get(preset_name)

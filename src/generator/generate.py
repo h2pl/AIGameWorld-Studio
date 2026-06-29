@@ -1,5 +1,6 @@
 # 生成器 / Generator
 # 预设模式：内置数据 → YAML 文件树（P1 唯一模式）
+# 模板只声明字段名，值由预设数据填充（RimWorld Def 模式）
 # Phase 2 加手动模式，Phase 3 加 AI 推导模式
 
 from pathlib import Path

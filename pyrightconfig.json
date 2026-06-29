@@ -2,6 +2,7 @@
   "typeCheckingMode": "basic",
   "include": ["src", "tests"],
   "exclude": ["**/__pycache__", ".venv"],
+  "extraPaths": ["src"],
   "reportMissingTypeStubs": false,
   "reportUnknownMemberType": "warning"
 }

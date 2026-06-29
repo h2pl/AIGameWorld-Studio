@@ -1,0 +1,13 @@
+# story_setup 初始剧情模板 / story setup template
+# 字段名约定: 与 AIGameWorld domain StoryArc/StoryHook 模型 + SQLite 表一致
+
+arcs: # 主线弧 / Story arcs
+  - type: "main" # 类型 {main, side} / Arc type
+    title: "" # 标题 / Title
+    stage: "hook" # 阶段 / Stage
+    main_cast: [] # 主角团 PC ids / Main cast PC IDs
+    branching_points: [] # 分支点 [{trigger: "", next: ""}]
+
+hooks: # 初始伏笔 / Story hooks
+  - description: "" # 描述 / Description
+    urgency: "medium" # 紧迫度 {low, medium, high}

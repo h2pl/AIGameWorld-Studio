@@ -1,0 +1,8 @@
+# lore 条目模板 / lore entry template
+# 每条设定一个 YAML 文件 / One YAML file per lore entry
+# 字段名约定: 与 ChromaDB collection 元数据字段一致
+
+id: "" # 设定条目唯一标识 / Unique lore ID
+category: "" # 设定类别 {geography, history, race, faction, culture, magic, religion}
+content: "" # 设定正文（全文灌 ChromaDB）/ Full text for ChromaDB
+references: [] # 关联实体 id 列表 / Referenced entity IDs

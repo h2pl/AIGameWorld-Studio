@@ -1,0 +1,16 @@
+# item 物品模板 / item template
+# 字段名约定: 与 AIGameWorld domain Item 模型 + SQLite items 表一致
+
+id: "" # 物品唯一标识 / Item unique ID (defName)
+name: "" # 名称 / Name
+item_type: "" # 物品类型 {weapon, armor, shield, potion, scroll, key, consumable, misc}
+rarity: "common" # 稀有度 {common, uncommon, rare, legendary}
+weight: 0.0 # 重量 / Weight
+value: 0 # 价值（金币）/ Value in gold
+description: "" # 描述 / Description
+data: # 按类型扩展 / Type-specific extended data
+  damage_dice: "" # 武器: 伤害骰 / Weapon: damage dice (e.g. "1d8")
+  damage_type: "" # 武器: 伤害类型 / Weapon: damage type
+  ac_bonus: 0 # 护甲: AC 加值 / Armor: AC bonus
+  effect: "" # 药水: 效果 / Potion: effect
+  amount: "" # 药水: 效果量 / Potion: effect amount

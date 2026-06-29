@@ -1,0 +1,13 @@
+# scene 场景模板 / scene template
+# 字段名约定: 与 AIGameWorld domain Scene 模型 + SQLite scenes 表一致
+
+id: "" # 场景唯一标识 / Scene unique ID
+name: "" # 场景名称 / Scene name
+type: "" # 场景类型 {indoor, outdoor, dungeon, urban, wilderness}
+description: "" # 场景描述（灌 ChromaDB）/ Scene description for ChromaDB
+environment: # 环境属性 / Environment attributes
+  light: "day" # 光照 / Lighting
+  weather: "clear" # 天气 / Weather
+  temperature: 20 # 温度 / Temperature
+exits: [] # 出口列表 [{target_scene: "", condition: ""}]
+landmarks: [] # 地标列表 [{id: "", name: "", desc: ""}]

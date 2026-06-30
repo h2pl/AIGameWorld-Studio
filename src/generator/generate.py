@@ -159,7 +159,3 @@ def _label(entity_type: str) -> str:
         "item": "Item",
         "scene_object": "SceneObj",
     }.get(entity_type, entity_type)
-
-
-# ---- 兼容旧接口（测试用）/ Keep for test compatibility ----
-generate_preset = None  # 测试用，直接引用 presets.generate_preset

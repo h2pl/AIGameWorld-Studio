@@ -94,6 +94,7 @@ def write_template(db_path: str, data: dict, pack_name: str = "forgotten_realm")
     return written
 
 
+# 清空旧数据 / Clear existing rows
 def clear_existing(conn: sqlite3.Connection):
     for t in ["story_hooks", "story_arcs", "actors", "player_characters", "scene_objects", "items", "scenes"]:
         conn.execute(f"DELETE FROM {t}")
@@ -326,7 +327,6 @@ def _get_first(conn, table):
     return row[0] if row else ""
 
 
-# JSON 序列化辅助 / JSON serialization helpers
 def _json(obj):
     if obj is None:
         return None

@@ -1,0 +1,19 @@
+# 锁妖塔 / Demon Sealing Tower
+
+id: demon_sealing_tower
+name: 锁妖塔
+type: dungeon
+description: >
+  九层高塔矗立于玉衡峰之巅，塔身通体漆黑，缠绕着金光锁链。塔周布有八卦阵，
+  每层镇压着不同等级的妖魔。塔顶悬浮着一枚拳头大的五灵珠，缓缓旋转。
+  塔内阴风阵阵，隐约可闻妖魔咆哮。越往上层，封印越强，妖魔越凶。
+exits:
+  - target_scene: shushan
+    condition: ""
+landmarks:
+  - id: sealing_array
+    name: 八卦封印阵
+    desc: 塔基的巨型法阵，八个方位各有一盏长明灯，灯火万年不熄
+  - id: top_spirit_pearl
+    name: 五灵珠·火
+    desc: 锁妖塔阵眼，赤红灵珠散发灼热光芒，镇压第九层

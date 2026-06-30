@@ -1,0 +1,14 @@
+# 爆裂符 / Explosive Talisman
+
+id: explosive_talisman
+name: 爆裂符
+item_type: consumable
+rarity: uncommon
+weight: 0.02
+value: 50
+description: 朱砂绘于黄纸上的攻击符箓，掷出后爆裂造成范围火焰伤害
+data:
+  effect: area_damage
+  damage_dice: 3d6
+  damage_type: fire
+  radius: 10

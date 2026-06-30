@@ -1,0 +1,19 @@
+# 清风镇 / Qingfeng Town
+
+id: qingfeng_town
+name: 清风镇
+type: urban
+description: >
+  蜀山脚下的小镇，因常有蜀山弟子往来而繁荣。青石板街道两旁是茶馆、药铺、
+  铁匠铺和客栈。镇民多为蜀山弟子的家眷，对修仙之事见怪不怪。
+  镇口有座土地庙，庙前老槐树下总坐着说书人，讲着蜀山弟子的传奇故事。
+exits:
+  - target_scene: shushan
+    condition: ""
+landmarks:
+  - id: tavern
+    name: 仙客来客栈
+    desc: 镇上最大的客栈，掌柜老张头消息灵通，常为蜀山弟子传递密信
+  - id: forge
+    name: 百兵阁
+    desc: 铁匠铺，专为修仙者打造法器，店主老李原是蜀山外门弟子

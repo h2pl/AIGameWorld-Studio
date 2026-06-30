@@ -1,0 +1,15 @@
+# 菩提树宝箱 / Bodhi Tree Chest
+
+id: spirit_chest
+name: 菩提宝箱
+object_type: container
+scene_id: xianling_island
+interactable: true
+interact_data:
+  locked: true
+  dc: 14
+  loot_table:
+    - item_id: five_spirit_pearls
+      qty: 1
+      condition: 获得女娲后裔认可
+  trap: null

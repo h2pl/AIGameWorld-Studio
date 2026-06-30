@@ -1,0 +1,12 @@
+# 灵丹 / Healing Pill
+
+id: healing_pill
+name: 回春丹
+item_type: potion
+rarity: common
+weight: 0.1
+value: 30
+description: 蜀山丹房以百年灵芝配三七草炼制，服下后缓缓恢复气血
+data:
+  effect: heal
+  amount: 3d6

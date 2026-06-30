@@ -1,0 +1,13 @@
+# 封印祭坛 / Sealing Altar
+
+id: sealing_altar
+name: 封印祭坛
+object_type: mechanism
+scene_id: demon_sealing_tower
+interactable: true
+interact_data:
+  description: 锁妖塔底部的古老祭坛，八个方位各嵌入一枚灵石
+  trigger: examine
+  dc: 15
+  effect: 感知到封印有微弱裂痕，需要五灵珠之力才能完全修复
+  hint: 集齐五灵珠可在此修复封印

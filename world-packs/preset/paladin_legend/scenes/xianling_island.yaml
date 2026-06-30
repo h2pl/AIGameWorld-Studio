@@ -1,0 +1,19 @@
+# 仙灵岛 / Xianling Island
+
+id: xianling_island
+name: 仙灵岛
+type: wilderness
+description: >
+  东海之中的仙岛，四季如春，遍地奇花异草。岛中央有一棵万年菩提树，
+  树下有座石台，台上放着一个古朴的木盒。仙灵岛女娲后裔世代守护此地，
+  传说岛上有通往仙界的入口。岛上灵兽出没，不少是上古异种。
+exits:
+  - target_scene: shushan
+    condition: 御剑飞行
+landmarks:
+  - id: bodhi_tree
+    name: 万年菩提
+    desc: 仙灵岛圣树，树下有一汪清泉，泉水可解百毒
+  - id: goddess_altar
+    name: 女娲祭坛
+    desc: 供奉女娲神像的古老祭坛，刻满上古符文

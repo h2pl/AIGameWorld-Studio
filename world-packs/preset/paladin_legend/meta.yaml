@@ -1,0 +1,11 @@
+# 仙剑传说 / Paladin Legend — 世界元信息
+# 基于仙剑世界观的修仙武侠世界 / Xianxia wuxia world inspired by Chinese Paladin
+
+id: paladin_legend
+name: 仙剑传说
+ruleset: immortal_cultivation  # 修仙规则集 / Immortal cultivation ruleset
+starting_scene: shushan  # 蜀山
+description: >
+  上古时期，盘古开天辟地，三界分立——仙界、人界、魔界。
+  蜀山派镇守锁妖塔千年，维系三界平衡。然魔尊蚩尤残魂不灭，
+  伺机破封而出。一场关乎三界存亡的冒险，就此展开。

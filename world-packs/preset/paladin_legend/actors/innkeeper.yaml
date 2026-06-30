@@ -1,0 +1,42 @@
+# 客栈掌柜 / Innkeeper
+
+id: innkeeper
+name: 老张头
+role: innkeeper
+race: human
+personality: 热情好客、消息灵通，年轻时曾在蜀山当外门弟子，因资质不足回了俗世
+attributes:
+  str: 10
+  dex: 10
+  con: 12
+  int: 12
+  wis: 14
+  cha: 16
+combat:
+  hp: 15
+  ac: 10
+  attack_bonus: 2
+  damage_dice: 1d4
+  damage_bonus: 0
+scene_id: qingfeng_town
+functions:
+  - dialogue
+  - merchant
+  - information_broker
+function_data:
+  merchant:
+    gold: 200
+    shop_inventory:
+      - item_id: healing_pill
+        qty: 10
+      - item_id: spirit_stone
+        qty: 5
+  dialogue:
+    topics:
+      - 镇子上的新鲜事
+      - 蜀山弟子的消息
+      - 附近的妖怪传闻
+  information_broker:
+    known_rumors:
+      - 最近锁妖塔方向有异动
+      - 仙灵岛上出现了陌生人

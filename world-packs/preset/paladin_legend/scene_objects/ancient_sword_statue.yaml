@@ -1,0 +1,13 @@
+# 石剑雕像 / Stone Sword Statue
+
+id: ancient_sword_statue
+name: 石剑碑
+object_type: mechanism
+scene_id: shushan
+interactable: true
+interact_data:
+  description: 广场中央的巨型石剑，剑身上刻有蜀山剑诀的心法口诀
+  trigger: examine
+  dc: 0
+  effect: 阅读后获得剑诀感悟，下次攻击+1
+  reuse: 每人限一次

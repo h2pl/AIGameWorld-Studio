@@ -1,0 +1,12 @@
+# 蜀山道袍 / Silk Robe
+
+id: silk_robe
+name: 蜀山道袍
+item_type: armor
+rarity: uncommon
+weight: 2.0
+value: 100
+description: 蜀山弟子标配，以天蚕丝织成，轻便坚韧，绣有护身符箓
+data:
+  ac_bonus: 2
+  special: 防御暗器+1

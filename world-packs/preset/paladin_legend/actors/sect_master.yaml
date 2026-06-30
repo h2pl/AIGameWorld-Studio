@@ -1,0 +1,40 @@
+# 蜀山掌门 / Shushan Sect Master
+
+id: sect_master
+name: 清虚道长
+role: sect_master
+race: human
+personality: 威严而不失慈祥，守护蜀山千年，对弟子严苛但心怀慈悲
+attributes:
+  str: 18
+  dex: 18
+  con: 18
+  int: 18
+  wis: 20
+  cha: 16
+combat:
+  hp: 80
+  max_hp: 80
+  ac: 20
+  attack_bonus: 10
+  damage_dice: 2d12
+  damage_bonus: 6
+equipment:
+  weapon: taiyi_sword  # 太乙剑
+  armor: celestial_robe
+scene_id: shushan
+functions:
+  - dialogue
+  - quest_giver
+  - trainer
+function_data:
+  dialogue:
+    topics:
+      - 蜀山历史
+      - 锁妖塔封印
+      - 五灵珠传说
+      - 御剑术修炼
+  quest_giver:
+    quests:
+      - seal_investigation  # 调查封印松动
+      - retrieve_spirit_pearl  # 取回五灵珠

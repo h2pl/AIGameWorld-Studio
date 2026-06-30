@@ -1,8 +1,0 @@
-id: chain_mail
-name: 锁子甲
-item_type: armor
-rarity: uncommon
-weight: 25.0
-value: 75
-data:
-  ac_bonus: 5

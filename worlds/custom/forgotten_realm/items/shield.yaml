@@ -1,8 +1,0 @@
-id: shield
-name: 盾牌
-item_type: armor
-rarity: common
-weight: 6.0
-value: 10
-data:
-  ac_bonus: 2

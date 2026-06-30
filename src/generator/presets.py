@@ -1,15 +1,18 @@
 # 内置模板数据 / Preset Template Data
 # forgotten_realm 预设——2 PC + 2 Actor + 2 场景 + 7 物品 + 剧情
+# 可用做默认世界示例和测试基准 / Default world example and test baseline
 
 PRESETS = {
     "forgotten_realm": {
         "meta": {
+            # 世界基本元信息 / World metadata
             "id": "forgotten_realm",
             "name": "遗忘国度",
             "ruleset": "d20",
             "starting_scene": "tavern",
             "description": "一个充满冒险与传说的中世纪奇幻世界",
         },
+        # 世界观设定 / World lore
         "lore": [
             {
                 "id": "forest_history",
@@ -24,6 +27,7 @@ PRESETS = {
                 "references": ["blacksmith"],
             },
         ],
+        # 场景 / Scenes
         "scenes": [
             {
                 "id": "tavern",
@@ -42,6 +46,7 @@ PRESETS = {
                 "landmarks": [{"id": "ancient_oak", "name": "古橡树", "desc": "树干上刻着古老的符文"}],
             },
         ],
+        # 玩家角色 / Player characters
         "player_characters": [
             {
                 "id": "warrior",
@@ -66,6 +71,7 @@ PRESETS = {
                 "character_arc": {"goal": "解开古老魔法奥秘", "flaw": "对未知的痴迷", "turning_point": "失控的实验"},
             },
         ],
+        # NPC 角色 / Actors
         "actors": [
             {
                 "id": "blacksmith",
@@ -95,6 +101,7 @@ PRESETS = {
                 "function_data": {"dialogue": {"topics": ["rumors", "quests", "local_info"]}},
             },
         ],
+        # 物品 / Items
         "items": [
             {
                 "id": "longsword",
@@ -160,6 +167,7 @@ PRESETS = {
                 "data": {"ac_bonus": 1},
             },
         ],
+        # 场景内交互对象 / Scene interactive objects
         "scene_objects": [
             {
                 "id": "tavern_chest",
@@ -176,6 +184,7 @@ PRESETS = {
                 "interact_data": {"dc": 13, "damage": "1d6"},
             },
         ],
+        # 剧情设置 / Story setup
         "story_setup": {
             "arcs": [
                 {

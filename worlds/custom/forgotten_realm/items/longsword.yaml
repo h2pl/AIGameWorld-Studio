@@ -1,9 +1,0 @@
-id: longsword
-name: 长剑
-item_type: weapon
-rarity: common
-weight: 3.0
-value: 15
-data:
-  damage_dice: 1d8
-  damage_type: slashing

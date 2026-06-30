@@ -1,11 +1,13 @@
 # YAML 读取 / YAML Reader
 # 解析模板目录下所有 YAML 文件 → dict 集合
+# 输出结构: {entity_type: [dict, ...]}
 
 from pathlib import Path
 
 import yaml
 
 
+# 入口 / Entry: 递归加载模板目录
 def load_all(template_dir: Path) -> dict:
     """加载模板目录下所有 YAML / Load all YAML from template directory.
 

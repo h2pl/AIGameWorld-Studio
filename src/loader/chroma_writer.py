@@ -2,7 +2,6 @@
 # lore + scene 描述向量化灌入
 
 
-
 def write_lore(client, lore_items: list[dict], world_name: str):
     """灌入设定集到 ChromaDB / Load lore into ChromaDB."""
     if not lore_items:
@@ -31,6 +30,9 @@ def write_scenes(client, scenes: list[dict], world_name: str):
             metadatas=[{"scene_id": scene.get("id", ""), "name": scene.get("name", ""), "type": scene.get("type", "")}],
             ids=[scene.get("id", "")],
         )
+
+
+# 工具函数 / Utility functions
 
 
 def _chunk_text(text: str, chunk_size: int = 256) -> list[str]:

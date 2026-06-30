@@ -16,9 +16,11 @@ def _write(tmp: Path, rel: str, data: dict):
 def test_load_all(tmp_path: Path):
     _write(tmp_path, "meta.yaml", {"id": "test", "name": "Test", "ruleset": "d20", "starting_scene": "s1"})
     _write(tmp_path, "scenes/tavern.yaml", {"id": "s1", "name": "Tavern", "type": "indoor", "description": "A tavern"})
-    _write(tmp_path, "player_characters/pc1.yaml",
-           {"id": "pc1", "name": "PC", "role": "warrior", "race": "human",
-            "personality": "", "attributes": {}})
+    _write(
+        tmp_path,
+        "player_characters/pc1.yaml",
+        {"id": "pc1", "name": "PC", "role": "warrior", "race": "human", "personality": "", "attributes": {}},
+    )
     _write(tmp_path, "story_setup.yaml", {"arcs": [], "hooks": []})
 
     data = load_all(tmp_path)

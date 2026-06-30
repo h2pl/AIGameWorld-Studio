@@ -1,9 +1,11 @@
 # Validator / YAML dict field check (RimWorld Def, no Pydantic)
+# 检查必填字段 + 枚举值 + 跨文件引用 / Check required fields, enum values, cross-references
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import yaml
 
+# 各实体类型的必填字段 / Required fields per entity type
 REQUIRED_FIELDS = {
     "meta": ["id", "name", "ruleset", "starting_scene"],
     "lore": ["id", "category", "content"],
@@ -15,6 +17,7 @@ REQUIRED_FIELDS = {
     "story_setup": ["arcs", "hooks"],
 }
 
+# 枚举字段的允许值 / Valid enum values
 VALID_VALUES = {
     "type": ["indoor", "outdoor", "dungeon", "urban", "wilderness"],
     "category": ["geography", "history", "race", "faction", "culture", "magic", "religion"],
@@ -36,6 +39,7 @@ class ValidationResult:
         return self.failed == 0
 
 
+# 主校验入口 / Main validation entry
 def validate_template(template_dir):
     errors = []
     passed = 0
@@ -54,6 +58,7 @@ def validate_template(template_dir):
     return ValidationResult(passed=passed, failed=failed, errors=errors)
 
 
+# 加载目录下所有 YAML 文件 / Load all YAML files
 def _load_all(d):
     r = {}
     if not d.exists():

@@ -1,9 +1,0 @@
-id: staff
-name: 法杖
-item_type: weapon
-rarity: common
-weight: 4.0
-value: 5
-data:
-  damage_dice: 1d6
-  damage_type: bludgeoning

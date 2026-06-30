@@ -1,9 +1,0 @@
-id: war_hammer
-name: 战锤
-item_type: weapon
-rarity: common
-weight: 5.0
-value: 20
-data:
-  damage_dice: 1d10
-  damage_type: bludgeoning

@@ -1,0 +1,9 @@
+# meta.yaml 模板 / meta.yaml template
+# 世界元信息 / World metadata
+# 字段名约定 / Field name convention: 与 AIGameWorld domain 模型字段名及 SQLite 列名一致
+
+id: "test" # 世界唯一标识 / World unique ID
+name: "test" # 显示名称 / Display name
+ruleset: "d20" # 规则集 / Ruleset
+starting_scene: "scene_1" # 起始场景 id / Starting scene ID
+description: "待编辑 / TBD" # 一句话描述 / One-line description

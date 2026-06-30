@@ -58,8 +58,17 @@ def test_write_full_template(tmp_path):
         "scenes": [{"id": "s1", "name": "T", "type": "indoor", "description": "x"}],
         "items": [{"id": "sword", "name": "S", "item_type": "weapon"}],
         "scene_objects": [{"id": "c1", "name": "C", "object_type": "chest", "scene_id": "s1"}],
-        "player_characters": [{"id": "p1", "name": "Hero", "role": "warrior", "race": "human",
-                                "personality": "", "scene_id": "s1", "attributes": {}}],
+        "player_characters": [
+            {
+                "id": "p1",
+                "name": "Hero",
+                "role": "warrior",
+                "race": "human",
+                "personality": "",
+                "scene_id": "s1",
+                "attributes": {},
+            }
+        ],
         "actors": [{"id": "a1", "name": "NPC", "role": "guard", "race": "human", "personality": ""}],
         "story_setup": {"arcs": [{"title": "Arc"}], "hooks": [{"description": "Hook"}]},
     }

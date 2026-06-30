@@ -1,9 +1,0 @@
-id: healing_potion
-name: 治疗药水
-item_type: potion
-rarity: common
-weight: 0.5
-value: 50
-data:
-  effect: heal
-  amount: 2d4+2

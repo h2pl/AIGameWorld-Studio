@@ -1,7 +1,0 @@
-id: forest_trap
-name: 森林陷阱
-object_type: trap
-scene_id: forest
-interact_data:
-  dc: 13
-  damage: 1d6

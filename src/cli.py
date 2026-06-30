@@ -1,71 +1,171 @@
 # CLI 入口 / CLI Entry
-# argparse 命令路由，零业务逻辑
+# 模板驱动：templates/ 定义结构 × CLI 参数控制数量 → 生成世界
+# Template-driven: templates/ define structure × CLI params control counts → generate world
 
 import argparse
 import sys
 from pathlib import Path
 
+_DEFAULTS = {"pc": 2, "actor": 2, "scene": 2, "item": 5, "scene_object": 2, "lore": 1}
+
+_EXAMPLES = """
+示例 / Examples:
+  aw-studio generate                              # 全部默认
+  aw-studio generate --name my_world              # 指定世界名
+  aw-studio generate --pc 4 --actor 6 --scene 3   # 指定数量
+  aw-studio generate --pc 4 --actor 6 --scene 3   # 指定数量
+  aw-studio validate worlds/custom/my_world       # 校验
+  aw-studio load worlds/custom/my_world --db worlds.db     # 加载
+"""
+
 
 def main():
     """主入口 / Main entry point."""
+    try:
+        return _main()
+    except KeyboardInterrupt:
+        print("", file=sys.stderr)
+        return 130
+
+
+def _main() -> int:
     parser = argparse.ArgumentParser(
         prog="aw-studio",
-        description="AIGameWorld Studio - 世界创作工坊 / World Creation Workshop",
+        description="AIGameWorld Studio — 世界创作工坊 / World Creation Workshop",
+        epilog=_EXAMPLES,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    subparsers = parser.add_subparsers(dest="command", required=True)
+    sub = parser.add_subparsers(dest="command", metavar="COMMAND")
+    sub.required = True
 
-    # generate 子命令 / generate subcommand
-    gen = subparsers.add_parser("generate", help="生成世界模板 / Generate world template")
-    mode = gen.add_mutually_exclusive_group(required=True)
-    mode.add_argument("--preset", type=str, help="内置模板名 / Preset template name")
-    mode.add_argument("--world", type=str, help="自然语言描述 / Natural language description (Phase 3)")
-    gen.add_argument("--pc", type=int, help="主角数量 / Number of PCs")
-    gen.add_argument("--actor", type=int, help="配角数量 / Number of actors")
-    gen.add_argument("--scene", type=int, help="场景数量 / Number of scenes")
-    gen.add_argument("--lore", type=str, help="设定类别 / Lore categories")
-    gen.add_argument("-o", "--output", type=Path, default=Path("output"))
-    gen.add_argument("--dry-run", action="store_true", help="只生成不加载 / Generate only, skip load")
+    # --- generate ---
+    gen = sub.add_parser(
+        "generate",
+        help="生成世界 / Generate world from templates",
+        epilog="示例: aw-studio generate --name 遗忘国度 --pc 2 --actor 3",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    gen.add_argument("--name", type=str, default="my_world", help="世界名 / World name")
+    gen.add_argument("--pc", type=int, default=_DEFAULTS["pc"], help=f"主角数量 (default: {_DEFAULTS['pc']})")
+    gen.add_argument("--actor", type=int, default=_DEFAULTS["actor"], help=f"配角数量 (default: {_DEFAULTS['actor']})")
+    gen.add_argument("--scene", type=int, default=_DEFAULTS["scene"], help=f"场景数量 (default: {_DEFAULTS['scene']})")
+    gen.add_argument("--item", type=int, default=_DEFAULTS["item"], help=f"物品数量 (default: {_DEFAULTS['item']})")
+    gen.add_argument(
+        "--scene-object",
+        type=int,
+        default=_DEFAULTS["scene_object"],
+        help=f"场景对象数量 (default: {_DEFAULTS['scene_object']})",
+    )
+    gen.add_argument("--lore", type=int, default=_DEFAULTS["lore"], help=f"设定条数 (default: {_DEFAULTS['lore']})")
+    gen.add_argument(
+        "-o", "--output", type=Path, default=Path("worlds/custom"), help="输出目录 (default: worlds/custom/)"
+    )
 
-    # validate 子命令 / validate subcommand
-    val = subparsers.add_parser("validate", help="校验模板 / Validate template")
-    val.add_argument("template_path", type=Path, help="模板目录路径 / Template directory path")
+    # --- validate ---
+    val = sub.add_parser(
+        "validate",
+        help="校验模板 / Validate template",
+        epilog="示例: aw-studio validate worlds/custom/my_world",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    val.add_argument("path", type=Path, help="模板目录 / Template directory")
 
-    # load 子命令 / load subcommand
-    ld = subparsers.add_parser("load", help="加载到 AIGameWorld / Load to AIGameWorld")
-    ld.add_argument("template_path", type=Path, help="模板目录路径 / Template directory path")
-    ld.add_argument("--db", type=Path, help="SQLite 数据库路径 / SQLite DB path")
-    ld.add_argument("--chroma", type=Path, help="ChromaDB 实例路径 / ChromaDB instance path")
+    # --- load ---
+    ld = sub.add_parser(
+        "load",
+        help="加载到数据库 / Load to database",
+        epilog="示例: aw-studio load worlds/custom/my_world --db worlds.db",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    ld.add_argument("path", type=Path, help="模板目录 / Template directory")
+    ld.add_argument("--db", type=Path, help="SQLite 路径 (default: <pack>.db)")
+    ld.add_argument("--chroma", type=Path, help="ChromaDB 路径 (optional)")
 
     args = parser.parse_args()
+    return {"generate": _generate, "validate": _validate, "load": _load}[args.command](args)
 
-    if args.command == "generate":
-        return _handle_generate(args)
-    elif args.command == "validate":
-        return _handle_validate(args)
-    elif args.command == "load":
-        return _handle_load(args)
 
+# ---- handlers ----
+
+
+def _generate(args) -> int:
+    """Generate world from templates based on CLI parameters."""
+    from src.generator.generate import GenerateParams, generate
+
+    # Build params from CLI args
+    params = GenerateParams(
+        world_name=args.name,
+        num_pcs=args.pc,
+        num_actors=args.actor,
+        num_scenes=args.scene,
+        num_items=args.item,
+        num_scene_objects=args.scene_object,
+        num_lore=args.lore,
+        output_dir=args.output,
+    )
+    out = generate(params)
+    print(f"[OK] {out}")
+    print(f"     {args.pc} PC + {args.actor} Actor + {args.scene} Scene")
+    print(f"     Next: aw-studio validate {out}")
     return 0
 
 
-def _handle_generate(args) -> int:
-    """处理 generate 命令 / Handle generate command."""
-    # TODO: 实现 generator 调用 / Implement generator call
-    print("generate: not implemented yet / 尚未实现")
-    return 0
+def _validate(args) -> int:
+    """Validate YAML template files under the given directory."""
+    if not args.path.exists():
+        print(f"Error: not found: {args.path}", file=sys.stderr)
+        return 1
+    # Run validator and format report
+    from src.validator.validate import format_report, validate_template
+
+    result = validate_template(args.path)
+    print(format_report(result))
+    if result.is_valid:
+        print("[OK] Validation passed")
+    return 0 if result.is_valid else 1
 
 
-def _handle_validate(args) -> int:
-    """处理 validate 命令 / Handle validate command."""
-    # TODO: 实现 validator 调用 / Implement validator call
-    print("validate: not implemented yet / 尚未实现")
-    return 0
+def _load(args) -> int:
+    """Load validated template data into SQLite and optionally ChromaDB."""
+    if not args.path.exists():
+        print(f"Error: not found: {args.path}", file=sys.stderr)
+        return 1
+    # Import for reading YAML and writing to DB
+    from src.loader.db_writer import write_template
+    from src.loader.yaml_reader import load_all
+    from src.validator.validate import validate_template
 
+    vr = validate_template(args.path)
+    if not vr.is_valid:
+        print(f"Validation failed ({vr.failed} errors):", file=sys.stderr)
+        for e in vr.errors:
+            print(f"  {e}", file=sys.stderr)
+        return 1
 
-def _handle_load(args) -> int:
-    """处理 load 命令 / Handle load command."""
-    # TODO: 实现 loader 调用 / Implement loader call
-    print("load: not implemented yet / 尚未实现")
+    data = load_all(args.path)
+    pack_name = args.path.name
+    db_path = args.db or (args.path.parent / f"{pack_name}.db")
+    try:
+        written = write_template(str(db_path), data, pack_name=pack_name)
+        print(f"[OK] SQLite: {written} records → {db_path}")
+    except Exception as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 2
+
+    if args.chroma:
+        try:
+            import chromadb
+
+            from src.loader.chroma_writer import write_lore, write_scenes
+
+            client = chromadb.PersistentClient(path=str(args.chroma))
+            write_lore(client, data.get("lore", []), pack_name)
+            write_scenes(client, data.get("scenes", []), pack_name)
+            print(f"[OK] ChromaDB → {args.chroma}")
+        except ImportError:
+            print("Warning: chromadb not installed, skipped", file=sys.stderr)
+        except Exception as e:
+            print(f"Warning: ChromaDB failed ({e}), SQLite OK", file=sys.stderr)
     return 0
 
 

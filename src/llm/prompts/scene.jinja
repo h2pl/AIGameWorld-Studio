@@ -4,32 +4,25 @@
 {% if theme %}
 世界主题：{{ theme }}
 {% endif %}
-{% if existing_scenes %}
-已有场景：{{ existing_scenes }}
-{% endif %}
 
-要求：
-- description 至少 5 句话，有视觉细节、环境氛围、声音气味、历史痕迹
-- type 从以下选：indoor, outdoor, dungeon, urban, wilderness
-- exits 中的 target_scene 用已有场景的 id 或 scene_N 占位
-- landmarks 提供可交互的地标，让玩家有探索动力
+要求：type 从以下选：indoor, outdoor, dungeon, urban, wilderness。description 至少 5 句话，有视觉细节和氛围。
 
-输出格式（严格的 YAML 序列）：
+输出示例：
 # scene_1
 id: scene_1
-name: 断剑崖
-type: outdoor
+name: 暴风城旧城区
+type: urban
 description: >
-  悬崖边斜插着一柄半截的巨剑，剑身锈迹斑斑却仍有三丈高，剑柄没入岩层深处。
-  传说千年前两位剑仙在此决战，落败者以毕生修为将佩剑钉入山体，化作剑冢守护残魂。
-  崖下云海翻涌，时有剑鸣声自谷底传来。每逢月圆之夜，断剑的锈迹会泛起淡淡青光。
-  崖壁上的刻字已模糊难辨，但依稀可见"剑道无止"四字。
+  石板路在雨后泛着油光，两侧木屋的屋檐滴着水珠。铁匠铺传来叮当声，空气中混杂着煤烟和烤面包香。
+  几个孩子在街角踢着破皮球，老乞丐蜷在酒馆门口打盹。远处大教堂钟声悠扬，宣告午后三时。
+environment:
+  light: day
+  weather: clear
+  temperature: 22
 exits:
   - target_scene: scene_2
-    condition: 沿着山路下行
+    condition: 沿着石板路向北
 landmarks:
-  - id: broken_sword
-    name: 断剑
-    desc: 三丈高的半截巨剑，剑身刻有失传的剑诀符文，触碰时会听到剑鸣
-
-{# 输出 {{ count }} 个场景 #}
+  - id: old_tavern
+    name: 猪与哨声旅店
+    desc: 挂着歪斜招牌的老旅店，门口马槽里永远有半桶麦酒

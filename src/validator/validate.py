@@ -14,7 +14,7 @@ REQUIRED_FIELDS = {
     "actors": ["id", "name", "role", "race", "personality", "attributes"],
     "items": ["id", "name", "item_type"],
     "scene_objects": ["id", "name", "object_type", "scene_id"],
-    "story_setup": ["arcs", "hooks"],
+    "story_setup": ["arcs"],
 }
 
 # 枚举字段的允许值 / Valid enum values

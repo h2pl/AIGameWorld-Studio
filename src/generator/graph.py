@@ -153,10 +153,7 @@ async def node_generate_story_setup(state: GenState) -> GenState:
         f'    title: "主线标题"\n'
         f"    stage: hook\n"
         f"    main_cast: []\n"
-        f"    branching_points: []\n"
-        f"hooks:\n"
-        f'  - description: "初始伏笔描述"\n'
-        f"    urgency: medium"
+        f"    branching_points: []"
     )
     model = get_model()
     sys_msg = "你是世界创作助手，输出严格的 YAML 格式。"

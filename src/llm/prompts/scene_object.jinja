@@ -5,19 +5,30 @@
 世界主题：{{ theme }}
 {% endif %}
 
-关键约束：
-- scene_id 只能使用 scene_1（只有 1 个场景）
-- object_type 从以下选：chest, door, trap, mechanism, decoration
-- 至少一个宝箱(chest)包含物品掉落
+要求：scene_id 只能用 scene_1。object_type 从以下选：chest, door, trap, mechanism, decoration。
+门(door)设 locked+dc，宝箱(chest)设 dc+loot_table，陷阱(trap)设 dc+damage，其他设 dc。
 
-输出格式（严格 YAML）：
+输出示例：
 # scene_object_1
 id: scene_object_1
-name: 远古石门
+name: 上锁的木门
 object_type: door
 scene_id: scene_1
 interact_data:
   locked: true
   dc: 15
+  loot_table: []
+  damage: ""
 
-{# 输出恰好 {{ count }} 个 #}
+# scene_object_2
+id: scene_object_2
+name: 老旧铁箱
+object_type: chest
+scene_id: scene_1
+interact_data:
+  locked: false
+  dc: 12
+  loot_table:
+    - item_id: item_1
+      qty: 1
+  damage: ""

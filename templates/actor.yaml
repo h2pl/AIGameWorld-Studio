@@ -3,7 +3,7 @@
 
 id: "" # Actor 唯一标识 / Actor unique ID (defName)
 name: "" # 名称 / Name
-role: "" # 身份 {blacksmith, guard, merchant, innkeeper, ...} / Role
+role: "" # 身份 {innkeeper, blacksmith, guard, merchant, healer, ...} / Role
 race: "" # 种族 / Race
 personality: "" # 性格描述 / Personality description
 attributes: # 六维属性 / Six attributes
@@ -13,18 +13,19 @@ attributes: # 六维属性 / Six attributes
   int: 10
   wis: 10
   cha: 10
-combat: # 战斗数值（敌人必填）/ Combat stats (required for enemies)
+combat: # 战斗数值 / Combat stats
   hp: 10
   ac: 10
   attack_bonus: 0
-  damage_bonus: 0
-functions: [] # 功能标签 [{dialogue, merchant, quest_giver, combat}]
-function_data: # 按功能扩展数据（可选）/ Extended data per function (optional)
+  damage_dice: "1d4" # 伤害骰 / Damage dice
+  damage_bonus: 0 # 伤害加值 / Damage bonus
+functions: [] # 功能标签 [dialogue, merchant, quest_giver, combat]
+function_data: # 按功能扩展数据 / Extended data per function
+  dialogue:
+    topics: []
   merchant:
     gold: 0
     shop_inventory: []
-  dialogue:
-    topics: []
 equipment: # 装备（可选）/ Equipment (optional)
   weapon: ""
   armor: ""

@@ -1,25 +1,19 @@
 {# 主角团生成 / Player Characters Generation #}
-为「{{ world_name }}」世界生成 {{ count }} 个主角团成员（PC）。
+为「{{ world_name }}」世界生成 {{ count }} 个主角团成员。
 
 {% if theme %}
 世界主题：{{ theme }}
 {% endif %}
-{% if existing_pcs %}
-已有角色：{{ existing_pcs }}
-{% endif %}
 
-要求：
-- 角色各有所长、互补配合（战/法/牧/贼等不同定位）
-- 性格有成长空间：设定长远目标 + 缺陷 + 可能的转折点
-- 装备与角色定位匹配，不要千篇一律
+要求：角色各有所长、互补配合，性格有成长空间。
 
-输出格式（严格的 YAML 序列）：
+输出示例：
 # pc_1
 id: pc_1
 name: 凌风
 role: sword_cultivator
 race: human
-personality: 出身蜀山外门，因资质平平被同门轻视，却从不服输。白天练剑到天黑，夜里偷偷研读失传的《天罡剑谱》。表面沉默寡言，实则心思细腻，对弱者总忍不住伸手相助。
+personality: 出身蜀山外门，因资质平平被同门轻视，却从不服输。白天练剑到天黑，夜里偷研失传剑谱。表面沉默寡言，对弱者总忍不住伸手相助。
 attributes:
   str: 16
   dex: 14
@@ -34,12 +28,12 @@ combat:
   attack_bonus: 5
   damage_dice: 1d10
   damage_bonus: 3
-equipment:
-  weapon: sword_1
-  armor: robe_1
 character_arc:
-  goal: 以凡人之躯比肩剑仙，证道天罡剑诀
+  goal: 以凡人之躯比肩剑仙
   flaw: 过于执着，不撞南墙不回头
-  turning_point: 发现《天罡剑谱》最后一页被撕去的秘密
-
-{# 输出 {{ count }} 个 PC #}
+  turning_point: 发现剑谱最后一页被撕去的秘密
+equipment:
+  weapon: 无名铁剑
+  armor: 布衣
+  accessories: []
+inventory: []

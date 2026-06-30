@@ -56,7 +56,7 @@ def test_validate_on_hand_built_world(tmp_path: Path):
     )
 
     (world / "story_setup.yaml").write_text(
-        yaml.dump({"arcs": [{"title": "A"}], "hooks": [{"description": "H"}]}, allow_unicode=True),
+        yaml.dump({"arcs": [{"title": "A"}]}, allow_unicode=True),
         encoding="utf-8",
     )
 

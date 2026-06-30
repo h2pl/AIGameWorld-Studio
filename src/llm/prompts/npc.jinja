@@ -5,19 +5,15 @@
 世界主题：{{ theme }}
 {% endif %}
 
-要求：
-- 涵盖不同社会角色（商人、守卫、医师、村老、流浪艺人等）
-- 每个 NPC 有独立的动机和秘密
-- function_data 要具体可交互：dialogue 列出话题，merchant 列出商品
-- 数值合理：平民 hp 10-20，武人 hp 20-40
+要求：涵盖不同社会角色，每个 NPC 有独立的动机和秘密。数值合理：平民 hp 10-20、ac 10-13，武人 hp 20-40、ac 14-18。
 
-输出格式（严格的 YAML 序列）：
+输出示例：
 # actor_1
 id: actor_1
 name: 铁匠老陈
 role: blacksmith
 race: human
-personality: 年轻时是走镖的刀客，手臂上有三十七道刀疤。后来厌倦了江湖纷争，在镇上开了这家铁匠铺。说话粗声大气，但对孩子很温柔。偶尔有江湖人来访，会拿出藏在柜台下的好酒。
+personality: 年轻时走镖，手臂有刀疤。厌倦江湖后在镇上开了铁匠铺。粗声大气但对孩子温柔。
 attributes:
   str: 16
   dex: 10
@@ -30,6 +26,7 @@ combat:
   ac: 14
   attack_bonus: 5
   damage_dice: 1d8
+  damage_bonus: 3
 functions:
   - dialogue
   - merchant
@@ -38,13 +35,12 @@ function_data:
     topics:
       - 江湖往事
       - 最近来了什么可疑的人
-      - 某个古老武器的传说
   merchant:
     gold: 300
     shop_inventory:
       - item_id: item_1
         qty: 2
-      - item_id: item_2
-        qty: 1
-
-{# 输出 {{ count }} 个 NPC #}
+equipment:
+  weapon: 铁匠锤
+  armor: 皮围裙
+inventory: []

@@ -100,6 +100,7 @@ async def _main() -> int:
     srv.add_argument(
         "path", type=str, nargs="?", default="world-packs/custom", help="pack 目录 (default: world-packs/custom/)"
     )
+    srv.add_argument("--db", type=str, default=None, help="SQLite DB 路径（读取导入后的运行时数据）")
     srv.add_argument("--port", type=int, default=8888, help="端口 (default: 8888)")
 
     args = parser.parse_args()
@@ -247,7 +248,7 @@ async def _serve(args) -> int:
     """启动 Web 查看器 / Launch web viewer."""
     from src.serve import run
 
-    run(args.path, port=args.port)
+    run(args.path, db_path=args.db, port=args.port)
     return 0
 
 

@@ -23,7 +23,7 @@ def test_validate_ok_exits_zero(tmp_path):
     world = tmp_path / "test_world"
     world.mkdir()
     (world / "meta.yaml").write_text(
-        yaml.dump({"id": "test", "name": "Test", "ruleset": "d20", "starting_scene": "s1"}, allow_unicode=True),
+        yaml.dump({"id": "test", "name": "Test", "rule_set": "d20", "starting_scene": "s1"}, allow_unicode=True),
         encoding="utf-8",
     )
     (world / "scenes").mkdir()

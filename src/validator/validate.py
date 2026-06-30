@@ -7,7 +7,7 @@ import yaml
 
 # 各实体类型的必填字段 / Required fields per entity type
 REQUIRED_FIELDS = {
-    "meta": ["id", "name", "ruleset", "starting_scene"],
+    "meta": ["id", "name", "rule_set", "starting_scene"],
     "lore": ["id", "category", "content"],
     "scenes": ["id", "name", "type", "description"],
     "player_characters": ["id", "name", "role", "race", "personality", "attributes"],
@@ -22,7 +22,7 @@ VALID_VALUES = {
     "type": ["indoor", "outdoor", "dungeon", "urban", "wilderness"],
     "category": ["geography", "history", "race", "faction", "culture", "magic", "religion"],
     "item_type": ["weapon", "armor", "shield", "potion", "scroll", "key", "consumable", "misc"],
-    "object_type": ["chest", "door", "trap", "mechanism", "decoration"],
+    "object_type": ["container", "door", "trap", "mechanism", "decoration", "animal", "item_drop"],
     "rarity": ["common", "uncommon", "rare", "legendary"],
     "urgency": ["low", "medium", "high"],
 }

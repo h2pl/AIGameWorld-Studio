@@ -17,7 +17,7 @@ def test_valid_template_all_pass(tmp_path: Path):
     """合法模板全部通过 / Valid template passes all."""
     _write_yaml(
         tmp_path / "meta.yaml",
-        {"id": "test", "name": "Test", "ruleset": "d20", "starting_scene": "s1"},
+        {"id": "test", "name": "Test", "rule_set": "d20", "starting_scene": "s1"},
     )
     _write_yaml(
         tmp_path / "lore" / "history.yaml",
@@ -55,11 +55,11 @@ def test_valid_template_all_pass(tmp_path: Path):
     )
     _write_yaml(
         tmp_path / "scene_objects" / "chest.yaml",
-        {"id": "chest1", "name": "Chest", "object_type": "chest", "scene_id": "s1"},
+        {"id": "chest1", "name": "Chest", "object_type": "container", "scene_id": "s1"},
     )
     _write_yaml(
         tmp_path / "story_setup.yaml",
-        {"arcs": [{"title": "Arc"}], "hooks": [{"description": "Hook"}]},
+        {"arcs": [{"title": "Arc"}]},
     )
 
     result = validate_template(tmp_path)
@@ -89,7 +89,7 @@ def test_invalid_enum_value(tmp_path: Path):
 
 def test_cross_ref_broken_scene(tmp_path: Path):
     """交叉引用断裂被检出 / Broken cross-reference detected."""
-    _write_yaml(tmp_path / "meta.yaml", {"id": "test", "name": "Test", "ruleset": "d20", "starting_scene": "void"})
+    _write_yaml(tmp_path / "meta.yaml", {"id": "test", "name": "Test", "rule_set": "d20", "starting_scene": "void"})
     result = validate_template(tmp_path)
     assert not result.is_valid
     assert any("starting_scene" in e for e in result.errors)

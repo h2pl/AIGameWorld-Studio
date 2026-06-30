@@ -59,11 +59,10 @@ def _fill_entity(data: dict, entity_type: str, prefix: str, idx: int, params: Ge
         data["name"] = params.world_name
         data["starting_scene"] = "scene_1"
     elif entity_type == "story_setup":
-        return  # arcs/hooks 骨架保留模板结构
+        return
     else:
         data["id"] = f"{prefix}_{idx}"
         data["name"] = f"{_label(entity_type)} {idx}"
-        # 枚举字段 → 有效默认值 / Enum → valid default
         _fill_if_empty(data, "type", {"scene": "indoor"}.get(entity_type, ""))
         _fill_if_empty(data, "category", "history")
         _fill_if_empty(data, "item_type", "misc")
@@ -71,7 +70,6 @@ def _fill_entity(data: dict, entity_type: str, prefix: str, idx: int, params: Ge
         _fill_if_empty(data, "role", "warrior" if entity_type == "pc" else "npc")
         _fill_if_empty(data, "race", "human")
         _fill_if_empty(data, "scene_id", "scene_1")
-        # 必填文案字段 → 占位（确保校验通过）/ Required text → placeholder
         _fill_if_empty(data, "personality", "待 LLM 生成 / TBD")
         _fill_if_empty(data, "description", "待 LLM 生成 / TBD")
         _fill_if_empty(data, "content", "待 LLM 生成 / TBD")
@@ -79,6 +77,7 @@ def _fill_entity(data: dict, entity_type: str, prefix: str, idx: int, params: Ge
 
 def _write_entity(target_dir: Path, entity_type: str, prefix: str, idx: int, data: dict):
     """写入单个实体 YAML 文件 / Write single entity YAML file."""
+    # 文件名规则: meta → meta.yaml, story_setup → story_setup.yaml, 其他 → {prefix}_{idx}.yaml
     if entity_type == "meta":
         filepath = target_dir / "meta.yaml"
     elif entity_type == "story_setup":

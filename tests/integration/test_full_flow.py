@@ -51,7 +51,7 @@ def test_validate_on_hand_built_world(tmp_path: Path):
     world.mkdir()
 
     (world / "meta.yaml").write_text(
-        yaml.dump({"id": "test", "name": "Test", "ruleset": "d20", "starting_scene": "s1"}, allow_unicode=True),
+        yaml.dump({"id": "test", "name": "Test", "rule_set": "d20", "starting_scene": "s1"}, allow_unicode=True),
         encoding="utf-8",
     )
 

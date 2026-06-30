@@ -1,10 +1,11 @@
 # actor 配角模板 / actor template (NPC)
-# 字段名约定: 与 AIGameWorld domain Actor 模型 + SQLite actors 表一致
+# 对齐 AIGameWorld domain character.py Actor + deserialize.py
 
 id: "" # Actor 唯一标识 / Actor unique ID (defName)
 name: "" # 名称 / Name
-role: "" # 身份 {innkeeper, blacksmith, guard, merchant, healer, ...} / Role
+role: "" # 身份 / Role
 race: "" # 种族 / Race
+scene_id: "" # 所属场景 id / Starting scene ID
 personality: "" # 性格描述 / Personality description
 attributes: # 六维属性 / Six attributes
   str: 10
@@ -16,6 +17,8 @@ attributes: # 六维属性 / Six attributes
 combat: # 战斗数值 / Combat stats
   hp: 10
   ac: 10
+  initiative: 0 # 先攻加值 / Initiative bonus
+  speed: 30 # 速度 / Speed
   attack_bonus: 0
   damage_dice: "1d4" # 伤害骰 / Damage dice
   damage_bonus: 0 # 伤害加值 / Damage bonus
@@ -26,7 +29,8 @@ function_data: # 按功能扩展数据 / Extended data per function
   merchant:
     gold: 0
     shop_inventory: []
-equipment: # 装备（可选）/ Equipment (optional)
+equipment: # 装备 / Equipment (weapon→weapon_id, armor→armor_id)
   weapon: ""
   armor: ""
-inventory: [] # 背包 [{item_id: "", qty: 1}]
+  shield: "" # 盾牌 / Shield
+inventory: [] # 背包

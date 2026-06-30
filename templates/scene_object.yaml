@@ -1,12 +1,15 @@
 # scene_object 场景对象模板 / scene object template
-# 字段名约定: 与 AIGameWorld domain SceneObject 模型 + SQLite scene_objects 表一致
+# 对齐 AIGameWorld domain scene_object.py SceneObject + deserialize.py
 
 id: "" # 对象唯一标识 / Object unique ID (defName)
 name: "" # 名称 / Name
-object_type: "" # 对象类型 {chest, door, trap, mechanism, decoration}
-scene_id: "" # 所属场景 id / Parent scene ID (FK → scenes.id)
-interact_data: # 交互数据（可选）/ Interaction data (optional)
-  locked: false # 门: 是否上锁 / Door: lock status
-  dc: 10 # 锁/陷阱: 难度等级 / DC
+object_type: "" # 对象类型 {container, door, trap, mechanism, decoration, animal, item_drop}
+scene_id: "" # 所属场景 id / Parent scene ID
+position_x: 0 # X 坐标
+position_y: 0 # Y 坐标
+interactable: true # 是否可交互 / Interactable
+interact_data: # 交互数据 / Interaction data
+  locked: false # 门: 是否上锁 / Locked
+  dc: 10 # 难度等级 / DC
   loot_table: [] # 宝箱: 掉落 [{item_id: "", qty: 1}]
-  damage: "" # 陷阱: 伤害 / Trap: damage (e.g. "1d6")
+  damage: "" # 陷阱: 伤害 / Trap damage (e.g. "1d6")

@@ -1,12 +1,13 @@
 # player_character 主角团模板 / player character template
-# 字段名约定: 与 AIGameWorld domain PlayerCharacter 模型 + SQLite player_characters 表一致
+# 对齐 AIGameWorld domain character.py PlayerCharacter + deserialize.py
 
 id: "" # PC 唯一标识 / PC unique ID (defName)
 name: "" # 名称 / Name
-role: "" # 职业 {warrior, mage, rogue, cleric, paladin, ranger, ...} / Class
+role: "" # 职业 / Class
 race: "" # 种族 / Race
+scene_id: "" # 所属场景 id / Starting scene ID
 personality: "" # 性格描述 / Personality description
-attributes: # 六维属性 / Six attributes
+attributes: # 六维属性 / Six attributes (deserializer 同时支持 str/dex 和 strength/dexterity)
   str: 10
   dex: 10
   con: 10
@@ -17,15 +18,17 @@ combat: # 战斗数值 / Combat stats
   hp: 20
   max_hp: 20
   ac: 10
+  initiative: 0 # 先攻加值 / Initiative bonus
+  speed: 30 # 速度 / Speed
   attack_bonus: 0
   damage_dice: "1d6" # 伤害骰 / Damage dice
   damage_bonus: 0 # 伤害加值 / Damage bonus
 character_arc: # 角色弧 / Character arc
-  goal: ""
+  goal: "" # → domain.long_term_goal
   flaw: ""
   turning_point: ""
-equipment: # 初始装备 / Starting equipment
+equipment: # 初始装备 / Starting equipment (deserializer: weapon→weapon_id, armor→armor_id)
   weapon: ""
   armor: ""
-  accessories: []
-inventory: [] # 背包 [{item_id: "", qty: 1}]
+  shield: "" # 盾牌 / Shield
+inventory: [] # 背包

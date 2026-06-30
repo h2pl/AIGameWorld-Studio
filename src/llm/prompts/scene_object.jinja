@@ -5,8 +5,8 @@
 世界主题：{{ theme }}
 {% endif %}
 
-要求：scene_id 只能用 scene_1。object_type 从以下选：chest, door, trap, mechanism, decoration。
-门(door)设 locked+dc，宝箱(chest)设 dc+loot_table，陷阱(trap)设 dc+damage，其他设 dc。
+要求：scene_id 只能用 scene_1。object_type 从以下选：container, door, trap, mechanism, decoration。
+门(door)设 locked+dc，容器(container)设 dc+loot_table，陷阱(trap)设 dc+damage，其他设 dc。
 
 输出示例：
 # scene_object_1
@@ -14,6 +14,9 @@ id: scene_object_1
 name: 上锁的木门
 object_type: door
 scene_id: scene_1
+position_x: 0
+position_y: 0
+interactable: true
 interact_data:
   locked: true
   dc: 15
@@ -23,8 +26,11 @@ interact_data:
 # scene_object_2
 id: scene_object_2
 name: 老旧铁箱
-object_type: chest
+object_type: container
 scene_id: scene_1
+position_x: 1
+position_y: 2
+interactable: true
 interact_data:
   locked: false
   dc: 12

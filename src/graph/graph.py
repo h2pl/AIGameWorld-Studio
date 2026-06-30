@@ -56,7 +56,13 @@ async def generate_world_pack(params: GenerateParams) -> Path:
     # 编译并运行 / Compile and invoke
     graph = build_graph().compile()
     state = await graph.ainvoke(
-        {"params": params, "assets_method": params.assets_method},
+        {
+            "params": params,
+            "output_dir": "",
+            "world_name": params.world_name,
+            "theme": params.theme or params.world_name,
+            "assets_method": params.assets_method,
+        },
         config={"recursion_limit": 200},
     )
     return Path(state["output_dir"])

@@ -90,6 +90,18 @@ async def _main() -> int:
     )
     val.add_argument("path", type=Path, help="world-pack 目录 / World pack directory")
 
+    # --- serve world-pack viewer ---
+    srv = sub.add_parser(
+        "serve",
+        help="Web 查看器 / Launch web viewer",
+        epilog="示例: aw-studio serve  |  aw-studio serve world-packs/custom --port 9999",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    srv.add_argument(
+        "path", type=str, nargs="?", default="world-packs/custom", help="pack 目录 (default: world-packs/custom/)"
+    )
+    srv.add_argument("--port", type=int, default=8888, help="端口 (default: 8888)")
+
     args = parser.parse_args()
 
     if args.command == "generate" and args.interactive:
@@ -97,7 +109,7 @@ async def _main() -> int:
         if args is None:
             return 0  # 用户取消 / User cancelled
 
-    return await {"generate": _generate, "validate": _validate}[args.command](args)
+    return await {"generate": _generate, "validate": _validate, "serve": _serve}[args.command](args)
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -228,6 +240,14 @@ async def _generate(args) -> int:
             return 0
         print(f"Error: {e}", file=sys.stderr)
         return 1
+    return 0
+
+
+async def _serve(args) -> int:
+    """启动 Web 查看器 / Launch web viewer."""
+    from src.serve import run
+
+    run(args.path, port=args.port)
     return 0
 
 

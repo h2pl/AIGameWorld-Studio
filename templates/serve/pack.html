@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ meta.name }} — World Pack Viewer</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
+.back { display: inline-block; color: #64748b; text-decoration: none; padding: 1rem 1.5rem; font-size: .85rem; }
+.back:hover { color: #38bdf8; }
+header { padding: 0 1.5rem 1rem; border-bottom: 1px solid #334155; }
+header h1 { font-size: 1.4rem; color: #38bdf8; }
+header .sub { color: #94a3b8; font-size: .85rem; margin-top: .25rem; }
+
+nav { display: flex; gap: 0; padding: 0 1.5rem; border-bottom: 1px solid #334155; overflow-x: auto; }
+nav a { padding: .75rem 1.25rem; color: #94a3b8; text-decoration: none; font-size: .9rem; border-bottom: 2px solid transparent; white-space: nowrap; }
+nav a:hover, nav a.active { color: #38bdf8; border-bottom-color: #38bdf8; }
+nav a .badge { background: #334155; padding: 2px 6px; border-radius: 4px; font-size: .75rem; margin-left: 4px; }
+
+.tab { display: none; padding: 1.5rem; max-width: 960px; margin: 0 auto; }
+.tab:target { display: block; }
+.tab:first-of-type { display: block; }
+
+.field { display: grid; grid-template-columns: 160px 1fr; gap: .5rem; padding: .35rem 0; border-bottom: 1px solid #1e293b; font-size: .9rem; }
+.field label { color: #64748b; }
+.field span { color: #e2e8f0; }
+.field .desc { white-space: pre-wrap; line-height: 1.5; }
+
+.card { background: #1e293b; border-radius: 6px; padding: 1.25rem; margin-bottom: 1rem; border: 1px solid #334155; }
+.card h3 { color: #38bdf8; font-size: 1rem; margin-bottom: .75rem; }
+.card .tags { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: .5rem; }
+.card .tag { padding: 2px 8px; border-radius: 4px; font-size: .75rem; border: 1px solid #334155; }
+.tag-rarity { font-weight: 600; }
+.attr-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: .75rem; }
+.attr { text-align: center; background: #0f172a; border-radius: 4px; padding: .5rem; }
+.attr .val { font-size: 1.1rem; font-weight: 700; color: #e2e8f0; }
+.attr .lbl { font-size: .7rem; color: #64748b; text-transform: uppercase; }
+.combat-row { display: flex; gap: 1.5rem; flex-wrap: wrap; margin: .5rem 0; font-size: .85rem; }
+.empty { color: #64748b; padding: 2rem; text-align: center; }
+.topics { font-size: .85rem; padding-left: 1.25rem; }
+.topics li { padding: .15rem 0; }
+</style>
+</head>
+<body>
+
+<a href="/" class="back">← 返回 / Back</a>
+
+<header>
+  <h1>{{ meta.name }}</h1>
+  <div class="sub">{{ meta.get('id', '') }} · {{ meta.get('rule_set', meta.get('ruleset', 'd20')) }} · {{ meta.get('version', '1.0') }}</div>
+</header>
+
+<nav>
+  <a href="#meta" class="active">Meta</a>
+  <a href="#lore">Lore<span class="badge">{{ lore|length }}</span></a>
+  <a href="#pcs">PCs<span class="badge">{{ pcs|length }}</span></a>
+  <a href="#actors">NPCs<span class="badge">{{ actors|length }}</span></a>
+  <a href="#items">Items<span class="badge">{{ items|length }}</span></a>
+  <a href="#scenes">Scenes<span class="badge">{{ scenes|length }}</span></a>
+  <a href="#objects">Objects<span class="badge">{{ objects|length }}</span></a>
+  <a href="#story">Story</a>
+</nav>
+
+<!-- Meta -->
+<div id="meta" class="tab">
+  <div class="card">
+    <div class="field"><label>ID</label><span>{{ meta.get('id','') }}</span></div>
+    <div class="field"><label>显示名 / Name</label><span>{{ meta.get('name','') }}</span></div>
+    <div class="field"><label>描述 / Description</label><span class="desc">{{ meta.get('description','') }}</span></div>
+    <div class="field"><label>规则集 / Rule Set</label><span>{{ meta.get('rule_set', meta.get('ruleset','')) }}</span></div>
+    <div class="field"><label>起始场景</label><span>{{ meta.get('starting_scene','') }}</span></div>
+    <div class="field"><label>版本</label><span>{{ meta.get('version','') }}</span></div>
+    <div class="field"><label>作者</label><span>{{ meta.get('author','') }}</span></div>
+  </div>
+</div>
+
+<!-- Lore -->
+<div id="lore" class="tab">
+{% if lore %}
+{% for l in lore %}
+<div class="card">
+  <div class="tags">
+    <span class="tag">{{ l.get('category','') }}</span>
+    <span class="tag">{{ l.get('id','') }}</span>
+  </div>
+  <div class="desc">{{ l.get('content','') }}</div>
+</div>
+{% endfor %}
+{% else %}<div class="empty">暂无 / Empty</div>{% endif %}
+</div>
+
+<!-- PCs -->
+<div id="pcs" class="tab">
+{% if pcs %}
+{% for pc in pcs %}
+<div class="card">
+  <h3>{{ pc.get('name','') }}</h3>
+  <div class="tags">
+    <span class="tag">{{ pc.get('race','') }}</span>
+    <span class="tag">{{ pc.get('role','') }}</span>
+  </div>
+  <div class="attr-grid">
+    {% for a in ['str','dex','con','int','wis','cha'] %}
+    <div class="attr"><div class="val">{{ pc.attributes[a] }}</div><div class="lbl">{{ a }}</div></div>
+    {% endfor %}
+  </div>
+  <div class="combat-row">HP: {{ pc.combat.hp }}/{{ pc.combat.max_hp }} · AC: {{ pc.combat.ac }} · 🎲 {{ pc.combat.damage_dice }}</div>
+  <div class="desc" style="margin-top:.75rem">{{ pc.get('personality','') }}</div>
+  {% if pc.character_arc %}
+  <div class="desc" style="margin-top:.5rem; color:#94a3b8">
+    🎯 {{ pc.character_arc.goal }}<br>
+    ⚠️ {{ pc.character_arc.flaw }}<br>
+    🔄 {{ pc.character_arc.turning_point }}
+  </div>
+  {% endif %}
+</div>
+{% endfor %}
+{% else %}<div class="empty">暂无 / Empty</div>{% endif %}
+</div>
+
+<!-- NPCs -->
+<div id="actors" class="tab">
+{% if actors %}
+{% for a in actors %}
+<div class="card">
+  <h3>{{ a.get('name','') }}</h3>
+  <div class="tags">
+    <span class="tag">{{ a.get('race','') }}</span>
+    <span class="tag">{{ a.get('role','') }}</span>
+    {% for f in a.get('functions',[]) %}
+    <span class="tag">{{ f }}</span>
+    {% endfor %}
+  </div>
+  <div class="desc" style="margin:.5rem 0">{{ a.get('personality','') }}</div>
+  {% if a.function_data and a.function_data.dialogue and a.function_data.dialogue.topics %}
+  <div class="topics">
+    {% for t in a.function_data.dialogue.topics %}<li>{{ t }}</li>{% endfor %}
+  </div>
+  {% endif %}
+</div>
+{% endfor %}
+{% else %}<div class="empty">暂无 / Empty</div>{% endif %}
+</div>
+
+<!-- Items -->
+<div id="items" class="tab">
+{% if items %}
+{% for item in items %}
+<div class="card">
+  <h3>{{ item.get('name','') }}</h3>
+  <div class="tags">
+    <span class="tag">{{ item.get('item_type','') }}</span>
+    <span class="tag tag-rarity" style="color:{{ rarity_colors.get(item.get('rarity',''), '#9ca3af') }}">{{ item.get('rarity','common') }}</span>
+    <span class="tag">⚖️ {{ item.get('weight',0) }}</span>
+    <span class="tag">💰 {{ item.get('value',0) }}G</span>
+  </div>
+  <div class="desc" style="margin-top:.5rem">{{ item.get('description','') }}</div>
+</div>
+{% endfor %}
+{% else %}<div class="empty">暂无 / Empty</div>{% endif %}
+</div>
+
+<!-- Scenes -->
+<div id="scenes" class="tab">
+{% if scenes %}
+{% for s in scenes %}
+<div class="card">
+  <h3>{{ s.get('name','') }}</h3>
+  <div class="tags"><span class="tag">{{ s.get('type','') }}</span></div>
+  <div class="desc" style="margin-top:.5rem">{{ s.get('description','') }}</div>
+</div>
+{% endfor %}
+{% else %}<div class="empty">暂无 / Empty</div>{% endif %}
+</div>
+
+<!-- Objects -->
+<div id="objects" class="tab">
+{% if objects %}
+{% for o in objects %}
+<div class="card">
+  <h3>{{ o.get('name','') }}</h3>
+  <div class="tags">
+    <span class="tag">{{ o.get('object_type','') }}</span>
+    <span class="tag">scene: {{ o.get('scene_id','') }}</span>
+  </div>
+</div>
+{% endfor %}
+{% else %}<div class="empty">暂无 / Empty</div>{% endif %}
+</div>
+
+<!-- Story -->
+<div id="story" class="tab">
+{% if story and story.arcs %}
+<div class="card">
+  <h3>故事弧 / Story Arcs</h3>
+  {% for arc in story.arcs %}
+  <div class="field"><label>标题</label><span>{{ arc.title }}</span></div>
+  <div class="field"><label>阶段</label><span>{{ arc.stage }}</span></div>
+  {% endfor %}
+</div>
+{% else %}<div class="empty">暂无 / Empty</div>{% endif %}
+</div>
+
+<script>
+// Tab switching
+document.querySelectorAll('nav a').forEach(a => {
+  a.addEventListener('click', e => {
+    e.preventDefault();
+    document.querySelectorAll('nav a').forEach(n => n.classList.remove('active'));
+    a.classList.add('active');
+    document.querySelectorAll('.tab').forEach(t => t.style.display = 'none');
+    document.querySelector(a.getAttribute('href')).style.display = 'block';
+  });
+});
+</script>
+</body>
+</html>

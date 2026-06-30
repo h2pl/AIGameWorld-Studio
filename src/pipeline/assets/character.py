@@ -36,7 +36,7 @@ ROLE_COLORS = {
 }
 
 # 基础模板路径 / Base template path
-_BASE_TEMPLATE = Path(__file__).resolve().parent.parent / "templates" / "assets" / "character_base.png"
+_BASE_TEMPLATE = Path(__file__).resolve().parent.parent.parent.parent / "templates" / "assets" / "character_base.png"
 
 # 默认肤色 + 容差 / Default skin color + tolerance
 _DEFAULT_SKIN = (245, 203, 167)

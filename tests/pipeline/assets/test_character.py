@@ -17,11 +17,10 @@ def _create_test_image() -> Image.Image:
     """创建测试用 32×32 像素小人 / Create test 32x32 sprite."""
     img = Image.new("RGBA", (32, 32), (0, 0, 0, 0))
     pixels = img.load()
-    # 头（肤色区域）/ Head (skin area)
+    assert pixels is not None
     for y in range(4, 12):
         for x in range(12, 22):
-            pixels[x, y] = (245, 203, 167, 255)  # 默认肤色
-    # 身体（服装区域）/ Body (cloth area)
+            pixels[x, y] = (245, 203, 167, 255)
     for y in range(12, 24):
         for x in range(10, 24):
             pixels[x, y] = (100, 100, 100, 255)
@@ -29,39 +28,35 @@ def _create_test_image() -> Image.Image:
 
 
 def test_base_template_exists():
-    """基础模板存在 / Base template exists."""
     assert _BASE_TEMPLATE.exists()
 
 
 def test_recolor_changes_skin(tmp_path: Path):
-    """Recolor 替换肤色 / Recolor changes skin color."""
     img = _create_test_image()
     skin_color = SKIN_COLORS["dwarf"]
     cloth_color = ROLE_COLORS["fighter"]
     result = _recolor(img, skin_color, cloth_color)
-
-    # 检查皮肤区域 / Check skin area
-    pixel = result.getpixel((16, 8))  # 头部中心 / Head center
+    pixel = result.getpixel((16, 8))
+    assert isinstance(pixel, tuple)
     assert pixel[:3] == skin_color
 
 
 def test_recolor_changes_cloth(tmp_path: Path):
-    """Recolor 替换服装色 / Recolor changes cloth color."""
     img = _create_test_image()
     skin_color = SKIN_COLORS["human"]
     cloth_color = ROLE_COLORS["rogue"]
     result = _recolor(img, skin_color, cloth_color)
-
-    pixel = result.getpixel((16, 18))  # 身体中心 / Body center
-    assert pixel[0] < 80  # rogue = dark
+    pixel = result.getpixel((16, 18))
+    assert isinstance(pixel, tuple)
+    assert pixel[0] < 80
 
 
 def test_recolor_preserves_alpha(tmp_path: Path):
-    """Recolor 保持透明区域 / Recolor preserves transparent areas."""
     img = _create_test_image()
     result = _recolor(img, SKIN_COLORS["elf"], ROLE_COLORS["wizard"])
-    pixel = result.getpixel((0, 0))  # 角落 / Corner
-    assert pixel[3] == 0  # 透明 / Transparent
+    pixel = result.getpixel((0, 0))
+    assert isinstance(pixel, tuple)
+    assert pixel[3] == 0
 
 
 def test_generate_character_sprites(tmp_path: Path):

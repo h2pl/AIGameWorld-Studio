@@ -23,7 +23,7 @@ VALID_VALUES = {
     "category": ["geography", "history", "race", "faction", "culture", "magic", "religion"],
     "item_type": ["weapon", "armor", "shield", "potion", "scroll", "key", "consumable", "misc"],
     "object_type": ["container", "door", "trap", "mechanism", "decoration", "animal", "item_drop"],
-    "rarity": ["common", "uncommon", "rare", "legendary"],
+    "rarity": ["common", "uncommon", "rare", "epic", "legendary"],
     "urgency": ["low", "medium", "high"],
 }
 

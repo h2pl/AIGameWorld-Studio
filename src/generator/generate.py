@@ -1,5 +1,5 @@
-# 生成器 / Generator
-# 读 templates/ 下模板 YAML 蓝图，按参数生成 N 个实例骨架
+# world-pack 生成器 / World Pack Generator
+# 读 world-templates (templates/) 下 YAML 蓝图，按参数生成 world-pack（实例 YAML 合集）
 # 使用 ruamel.yaml 保留模板注释 / Uses ruamel.yaml to preserve template comments
 
 from dataclasses import dataclass

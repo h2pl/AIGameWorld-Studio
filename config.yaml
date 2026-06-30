@@ -1,0 +1,30 @@
+# AIGameWorld Studio 配置文件 / Studio Configuration
+# 切换 LLM Provider：环境变量 STUDIO_LLM_PROVIDER=glm|deepseek|zen-proxy
+
+# === 默认 provider / Default provider ===
+llm_provider: "deepseek"
+
+# === LLM Provider 配置 / Provider configs ===
+llm_providers:
+  zen-proxy:
+    model: "deepseek-v4-flash-free"
+    base_url: "http://localhost:6446/v1"
+    api_key_env: ""
+    client_backend: "requests"
+  glm:
+    model: "glm-5.1"
+    base_url: "https://open.bigmodel.cn/api/paas/v4"
+    api_key_env: "GLM_API_KEY"
+    client_backend: "langchain"
+  deepseek:
+    model: "deepseek-chat"
+    base_url: "https://api.deepseek.com/v1"
+    api_key_env: "DEEPSEEK_API_KEY"
+    client_backend: "langchain"
+
+# === LLM 调用参数 / LLM call parameters ===
+llm:
+  generate:
+    temperature: 0.8
+    timeout: 60
+    retries: 3

@@ -1,0 +1,23 @@
+{# 场景对象生成 / Scene Object Generation #}
+为「{{ world_name }}」世界生成 {{ count }} 个场景对象。
+
+{% if theme %}
+世界主题：{{ theme }}
+{% endif %}
+
+要求：
+- object_type 从以下选：chest, door, trap, mechanism, decoration
+- 至少一个宝箱(chest)包含物品掉落
+- 每个对象的 scene_id 对应已有场景
+
+输出格式（严格的 YAML 序列）：
+# scene_object_1
+id: scene_object_1
+name: 远古石门
+object_type: door
+scene_id: scene_1
+interact_data:
+  locked: true
+  dc: 15
+
+{# 输出 {{ count }} 个 #}

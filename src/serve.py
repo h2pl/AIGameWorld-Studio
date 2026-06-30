@@ -1,9 +1,6 @@
-# World Pack Viewer / 世界包查看器
-# 支持两种数据源：YAML 目录 / SQLite DB
+# YAML World Pack Viewer / YAML 世界包查看器（Studio 项目）
+# 仅浏览 YAML pack，DB 查看器已集成到主项目 AIGameWorld 的 /view 路由
 
-import json
-import sqlite3
-import webbrowser
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
@@ -13,10 +10,9 @@ from jinja2 import Environment, FileSystemLoader
 _TEMPLATES_DIR = Path(__file__).parent.parent / "templates" / "serve"
 _JINJA = Environment(loader=FileSystemLoader(str(_TEMPLATES_DIR)))
 
-SOURCE_DIR = Path("world-packs/custom")
-DB_PATH: str | None = None
+SOURCE_DIR: Path  # 运行时由 run() 设置
 
-RARITY_COLORS = {
+RARITY_COLORS = {  # 稀有度颜色映射
     "common": "#9ca3af",
     "uncommon": "#22c55e",
     "rare": "#3b82f6",
@@ -25,190 +21,66 @@ RARITY_COLORS = {
 }
 
 
-# ═══════════════════════════════════════════════════════════════
-# YAML 数据源
-# ═══════════════════════════════════════════════════════════════
-
-
 def _load_yaml(path: Path) -> dict | None:
+    """读取单个 YAML 文件."""
     if not path.exists():
         return None
     return yaml.safe_load(path.read_text("utf-8"))
 
 
 def _load_yaml_all(dir_path: Path) -> list[dict]:
+    """读取目录下所有 YAML 文件."""
     if not dir_path.exists():
         return []
     return [d for f in sorted(dir_path.glob("*.yaml")) if isinstance(d := yaml.safe_load(f.read_text("utf-8")), dict)]
 
 
-# ═══════════════════════════════════════════════════════════════
-# DB 数据源
-# ═══════════════════════════════════════════════════════════════
-
-
-def _db_query(sql: str, params: tuple = ()) -> list[dict]:
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    rows = conn.execute(sql, params).fetchall()
-    conn.close()
-    return [dict(r) for r in rows]
-
-
-def _db_meta():
-    rows = _db_query("SELECT key, value FROM world_meta")
-    return {
-        "id": "db",
-        "name": next((r["value"] for r in rows if r["key"] == "pack_name"), "DB View"),
-        "description": "Imported runtime data",
-    }
-
-
-def _db_chars(table: str) -> list[dict]:
-    rows = _db_query(
-        f"SELECT id, name, role, race, scene_id, personality, attributes_json, combat_json, character_arc_json, \
-        equipment_json, functions_json, function_data_json FROM {table}"
-    )
-    result = []
-    for r in rows:
-        # JSON 解析
-        d = dict(r)
-        for k in (
-            "attributes_json",
-            "combat_json",
-            "equipment_json",
-            "character_arc_json",
-            "functions_json",
-            "function_data_json",
-        ):
-            if d.get(k):
-                try:
-                    d[k.replace("_json", "")] = json.loads(d[k])
-                # items
-                except json.JSONDecodeError, TypeError:
-                    pass
-        d["attributes"] = d.get("attributes", {})
-        d["combat"] = d.get("combat", {})
-        d["equipment"] = d.get("equipment", {})
-        d["character_arc"] = d.get("character_arc", {})
-        d["functions"] = d.get("functions", [])
-        d["function_data"] = d.get("function_data", {})
-        result.append(d)
-    # scenes
-    return result
-
-
-def _db_items() -> list[dict]:
-    rows = _db_query("SELECT id, name, item_type, rarity, weight, value, description, data_json FROM items")
-    result = []
-    for r in rows:
-        d = dict(r)
-        if d.get("data_json"):
-            try:
-                d["data"] = json.loads(d["data_json"])
-            except json.JSONDecodeError, TypeError:
-                d["data"] = {}
-        result.append(d)
-    return result
-
-
-def _db_scenes() -> list[dict]:
-    rows = _db_query("SELECT id, name, type, description FROM scenes")
-    return [dict(r) for r in rows]
-
-
-def _db_objects() -> list[dict]:
-    rows = _db_query("SELECT id, name, object_type, scene_id, interactable, interact_data_json FROM scene_objects")
-    result = []
-    for r in rows:
-        d = dict(r)
-        if d.get("interact_data_json"):
-            try:
-                d["interact_data"] = json.loads(d["interact_data_json"])
-            except json.JSONDecodeError, TypeError:
-                pass
-        result.append(d)
-    return result
-
-
-def _db_story() -> dict | None:
-    rows = _db_query("SELECT id, type, title, stage, main_cast_json FROM story_arcs")
-    arcs = []
-    for r in rows:
-        d = dict(r)
-        if d.get("main_cast_json"):
-            try:
-                d["main_cast"] = json.loads(d["main_cast_json"])
-            except json.JSONDecodeError, TypeError:
-                d["main_cast"] = []
-        arcs.append(d)
-    return {"arcs": arcs} if arcs else None
-
-
-# ═══════════════════════════════════════════════════════════════
-# Viewer
-# ═══════════════════════════════════════════════════════════════
-
-
 class ViewerHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        path = self.path.rstrip("/") or "/"
-        if path == "/":
-            self._render_index()
-        elif path.startswith("/pack/"):
-            self._render_pack(path.split("/pack/")[1])
-        else:
-            self.send_error(404)
+    """HTTP 请求处理 — 路由 / 或 /pack/{id}."""
+
+    def do_GET(self):  # GET 路由分发
+        try:
+            path = self.path.rstrip("/") or "/"
+            if path == "/":
+                self._render_index()
+            elif path.startswith("/pack/"):
+                self._render_pack(path.split("/pack/")[1])
+            else:
+                self.send_error(404)
+        except Exception:
+            self.send_response(500)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.end_headers()
+            import traceback
+
+            self.wfile.write(traceback.format_exc().encode("utf-8"))
 
     def _render_index(self):
-        if DB_PATH:
-            meta = _db_meta()
-            packs = [
-                {
-                    "id": "db",
-                    "name": meta["name"],
-                    "desc": meta["description"],
-                    "total": sum(
-                        1
-                        for t in ("player_characters", "actors", "items", "scenes", "scene_objects")
-                        for r in _db_query(f"SELECT id FROM {t}")
-                    ),
-                }
-            ]
-        else:
-            packs = [
-                {
-                    "id": d.name,
-                    "name": (_load_yaml(d / "meta.yaml") or {}).get("name", d.name),
-                    "desc": (_load_yaml(d / "meta.yaml") or {}).get("description", ""),
-                    "total": max(0, sum(1 for _ in d.rglob("*.yaml")) - 1),
-                }
-                for d in sorted(SOURCE_DIR.iterdir())
-                if d.is_dir() and (d / "meta.yaml").exists()
-            ]
-        html = _JINJA.get_template("index.html").render(packs=packs)
+        # 遍历 world-packs/custom/ 目录，列出所有含 meta.yaml 的 pack
+        packs = [
+            {
+                "id": d.name,
+                "name": (_load_yaml(d / "meta.yaml") or {}).get("name", d.name),
+                "desc": (_load_yaml(d / "meta.yaml") or {}).get("description", ""),
+                "total": max(0, sum(1 for _ in d.rglob("*.yaml")) - 1),
+            }
+            for d in sorted(SOURCE_DIR.iterdir())
+            if d.is_dir() and (d / "meta.yaml").exists()
+        ]
+        html = _JINJA.get_template("index_yaml.html").render(packs=packs)
         self._respond(html)
 
     def _render_pack(self, pack_id: str):
-        if DB_PATH:
-            meta = _db_meta()
-            pcs = _db_chars("player_characters")
-            actors = _db_chars("actors")
-            items = _db_items()
-            scenes = _db_scenes()
-            objects = _db_objects()
-            story = _db_story()
-            lore = []
-        else:
-            pack_dir = SOURCE_DIR / pack_id
-            meta = _load_yaml(pack_dir / "meta.yaml") or {}
-            pcs = _load_yaml_all(pack_dir / "player_characters")
-            actors = _load_yaml_all(pack_dir / "actors")
-            items = _load_yaml_all(pack_dir / "items")
-            scenes = _load_yaml_all(pack_dir / "scenes")
-            objects = _load_yaml_all(pack_dir / "scene_objects")
-            story = _load_yaml(pack_dir / "story_setup.yaml")
-            lore = _load_yaml_all(pack_dir / "lore")
+        # 读取 pack 目录下所有实体 YAML 文件
+        pack_dir = SOURCE_DIR / pack_id
+        meta = _load_yaml(pack_dir / "meta.yaml") or {}
+        pcs = _load_yaml_all(pack_dir / "player_characters")
+        actors = _load_yaml_all(pack_dir / "actors")
+        items = _load_yaml_all(pack_dir / "items")
+        scenes = _load_yaml_all(pack_dir / "scenes")
+        objects = _load_yaml_all(pack_dir / "scene_objects")
+        story = _load_yaml(pack_dir / "story_setup.yaml")
+        lore = _load_yaml_all(pack_dir / "lore")
 
         html = _JINJA.get_template("pack.html").render(
             pack_id=pack_id,
@@ -225,6 +97,7 @@ class ViewerHandler(BaseHTTPRequestHandler):
         self._respond(html)
 
     def _respond(self, html: str):
+        """发送 HTML 响应."""
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.end_headers()
@@ -234,20 +107,20 @@ class ViewerHandler(BaseHTTPRequestHandler):
         pass
 
 
-def run(pack_dir: str = "world-packs/custom", db_path: str | None = None, host: str = "127.0.0.1", port: int = 8888):
-    global SOURCE_DIR, DB_PATH
-    if db_path:
-        DB_PATH = db_path
-        print(f"DB Mode: {db_path}")
-    else:
-        SOURCE_DIR = Path(pack_dir)
-        print(f"YAML Mode: {SOURCE_DIR.resolve()}")
+def run(pack_dir: str = "world-packs/custom", host: str = "127.0.0.1", port: int = 8888):
+    """启动 YAML 查看器 HTTP 服务."""
+    global SOURCE_DIR
+    # 基于 serve.py 位置解析项目根目录，不再依赖 CWD
+    _root = Path(__file__).parent.parent
+    SOURCE_DIR = (_root / pack_dir).resolve() if not Path(pack_dir).is_absolute() else Path(pack_dir)
+    print(f"YAML Packs: {SOURCE_DIR}")
 
+    # 打印启动信息
     url = f"http://{host}:{port}"
-    print(f"World Pack Viewer: {url}")
-    webbrowser.open(url)
+    print(f"YAML World Pack Viewer: {url}")
 
     server = HTTPServer((host, port), ViewerHandler)
+    # 阻塞运行直到 Ctrl+C
     try:
         server.serve_forever()
     except KeyboardInterrupt:

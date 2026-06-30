@@ -40,11 +40,13 @@ nav a .badge { background: #334155; padding: 2px 6px; border-radius: 4px; font-s
 .empty { color: #64748b; padding: 2rem; text-align: center; }
 .topics { font-size: .85rem; padding-left: 1.25rem; }
 .topics li { padding: .15rem 0; }
+.section-label { color: #64748b; font-size: .8rem; margin: .75rem 0 .35rem; }
+.json-block { background: #0f172a; border-radius: 4px; padding: .75rem; font-size: .8rem; white-space: pre-wrap; line-height: 1.4; color: #94a3b8; max-height: 160px; overflow-y: auto; }
 </style>
 </head>
 <body>
 
-<a href="/" class="back">← 返回 / Back</a>
+<a href="javascript:history.back()" class="back">← 返回 / Back</a>
 
 <header>
   <h1>{{ meta.name }}</h1>
@@ -99,20 +101,46 @@ nav a .badge { background: #334155; padding: 2px 6px; border-radius: 4px; font-s
   <div class="tags">
     <span class="tag">{{ pc.get('race','') }}</span>
     <span class="tag">{{ pc.get('role','') }}</span>
+    {% if pc.get('scene_id') %}<span class="tag">📍 {{ pc.scene_id }}</span>{% endif %}
+    {% if pc.get('long_term_goal') %}<span class="tag">🎯 {{ pc.long_term_goal }}</span>{% endif %}
   </div>
+  {% if pc.get('attributes') %}
   <div class="attr-grid">
     {% for a in ['str','dex','con','int','wis','cha'] %}
-    <div class="attr"><div class="val">{{ pc.attributes[a] }}</div><div class="lbl">{{ a }}</div></div>
+    <div class="attr"><div class="val">{{ pc.attributes.get(a, '?') }}</div><div class="lbl">{{ a }}</div></div>
     {% endfor %}
   </div>
-  <div class="combat-row">HP: {{ pc.combat.hp }}/{{ pc.combat.max_hp }} · AC: {{ pc.combat.ac }} · 🎲 {{ pc.combat.damage_dice }}</div>
-  <div class="desc" style="margin-top:.75rem">{{ pc.get('personality','') }}</div>
-  {% if pc.character_arc %}
-  <div class="desc" style="margin-top:.5rem; color:#94a3b8">
-    🎯 {{ pc.character_arc.goal }}<br>
-    ⚠️ {{ pc.character_arc.flaw }}<br>
-    🔄 {{ pc.character_arc.turning_point }}
+  {% endif %}
+  {% if pc.get('combat') and pc.combat is mapping %}
+  <div class="combat-row">
+    {% if pc.combat.get('hp') is not none %}HP: {{ pc.combat.hp }}/{{ pc.combat.get('max_hp','?') }}{% endif %}
+    {% if pc.combat.get('ac') is not none %} · AC: {{ pc.combat.ac }}{% endif %}
+    {% if pc.combat.get('damage_dice') %} · 🎲 {{ pc.combat.damage_dice }}{% endif %}
   </div>
+  {% endif %}
+  <div class="desc" style="margin-top:.75rem">{{ pc.get('personality','') }}</div>
+  {% if pc.get('character_arc') and pc.character_arc is mapping %}
+  <div class="desc" style="margin-top:.5rem; color:#94a3b8">
+    {% if pc.character_arc.get('goal') %}🎯 {{ pc.character_arc.goal }}<br>{% endif %}
+    {% if pc.character_arc.get('flaw') %}⚠️ {{ pc.character_arc.flaw }}<br>{% endif %}
+    {% if pc.character_arc.get('turning_point') %}🔄 {{ pc.character_arc.turning_point }}{% endif %}
+  </div>
+  {% endif %}
+  {% if pc.get('inventory') %}
+  <div class="section-label">🎒 背包 / Inventory ({{ pc.inventory|length }})</div>
+  <div class="tags">
+    {% for item in pc.inventory %}
+    <span class="tag">{% if item is string %}{{ item }}{% else %}{{ item.get('name', item) }}{% endif %}</span>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% if pc.get('values') and pc.values is mapping %}
+  <div class="section-label">💎 价值观 / Values</div>
+  <div class="json-block">{{ pc.values|tojson(indent=2) }}</div>
+  {% endif %}
+  {% if pc.get('equipment') and pc.equipment is mapping %}
+  <div class="section-label">⚔️ 装备 / Equipment</div>
+  <div class="json-block">{{ pc.equipment|tojson(indent=2) }}</div>
   {% endif %}
 </div>
 {% endfor %}
@@ -128,15 +156,23 @@ nav a .badge { background: #334155; padding: 2px 6px; border-radius: 4px; font-s
   <div class="tags">
     <span class="tag">{{ a.get('race','') }}</span>
     <span class="tag">{{ a.get('role','') }}</span>
+    {% if a.get('scene_id') %}<span class="tag">📍 {{ a.scene_id }}</span>{% endif %}
+    {% if a.get('dm_assigned') %}<span class="tag">DM</span>{% endif %}
     {% for f in a.get('functions',[]) %}
     <span class="tag">{{ f }}</span>
     {% endfor %}
   </div>
   <div class="desc" style="margin:.5rem 0">{{ a.get('personality','') }}</div>
-  {% if a.function_data and a.function_data.dialogue and a.function_data.dialogue.topics %}
+  {% if a.get('motivation_injected') %}
+  <div class="desc" style="color:#94a3b8">💬 {{ a.motivation_injected }}</div>
+  {% endif %}
+  {% if a.get('function_data') and a.function_data is mapping %}
+  {% set fd = a.function_data %}
+  {% if fd.get('dialogue') and fd.dialogue is mapping and fd.dialogue.get('topics') %}
   <div class="topics">
-    {% for t in a.function_data.dialogue.topics %}<li>{{ t }}</li>{% endfor %}
+    {% for t in fd.dialogue.topics %}<li>{{ t }}</li>{% endfor %}
   </div>
+  {% endif %}
   {% endif %}
 </div>
 {% endfor %}
@@ -156,6 +192,9 @@ nav a .badge { background: #334155; padding: 2px 6px; border-radius: 4px; font-s
     <span class="tag">💰 {{ item.get('value',0) }}G</span>
   </div>
   <div class="desc" style="margin-top:.5rem">{{ item.get('description','') }}</div>
+  {% if item.get('data') and item.data is mapping %}
+  <div class="json-block" style="margin-top:.5rem">{{ item.data|tojson(indent=2) }}</div>
+  {% endif %}
 </div>
 {% endfor %}
 {% else %}<div class="empty">暂无 / Empty</div>{% endif %}
@@ -169,6 +208,25 @@ nav a .badge { background: #334155; padding: 2px 6px; border-radius: 4px; font-s
   <h3>{{ s.get('name','') }}</h3>
   <div class="tags"><span class="tag">{{ s.get('type','') }}</span></div>
   <div class="desc" style="margin-top:.5rem">{{ s.get('description','') }}</div>
+  {% if s.get('exits') %}
+  <div class="section-label">🚪 出口 / Exits</div>
+  <div class="tags">
+    {% if s.exits is mapping %}
+      {% for k, v in s.exits.items() %}<span class="tag">{{ k }} → {{ v }}</span>{% endfor %}
+    {% else %}
+      {% for e in s.exits %}<span class="tag">{{ e }}</span>{% endfor %}
+    {% endif %}
+  </div>
+  {% endif %}
+  {% if s.get('landmarks') %}
+  <div class="section-label">📍 地标 / Landmarks</div>
+  <div class="tags">
+    {% for lm in s.landmarks %}<span class="tag">{{ lm }}</span>{% endfor %}
+  </div>
+  {% endif %}
+  {% if s.get('environment') %}
+  <div class="json-block" style="margin-top:.5rem">{{ s.environment|tojson(indent=2) }}</div>
+  {% endif %}
 </div>
 {% endfor %}
 {% else %}<div class="empty">暂无 / Empty</div>{% endif %}
@@ -183,7 +241,14 @@ nav a .badge { background: #334155; padding: 2px 6px; border-radius: 4px; font-s
   <div class="tags">
     <span class="tag">{{ o.get('object_type','') }}</span>
     <span class="tag">scene: {{ o.get('scene_id','') }}</span>
+    {% if o.get('position_x') is not none %}
+    <span class="tag">({{ o.position_x }}, {{ o.position_y }})</span>
+    {% endif %}
+    {% if o.get('interactable') %}<span class="tag">👆 可交互</span>{% endif %}
   </div>
+  {% if o.get('interact_data') %}
+  <div class="json-block" style="margin-top:.5rem">{{ o.interact_data|tojson(indent=2) }}</div>
+  {% endif %}
 </div>
 {% endfor %}
 {% else %}<div class="empty">暂无 / Empty</div>{% endif %}
@@ -192,13 +257,35 @@ nav a .badge { background: #334155; padding: 2px 6px; border-radius: 4px; font-s
 <!-- Story -->
 <div id="story" class="tab">
 {% if story and story.arcs %}
+{% for arc in story.arcs %}
 <div class="card">
-  <h3>故事弧 / Story Arcs</h3>
-  {% for arc in story.arcs %}
-  <div class="field"><label>标题</label><span>{{ arc.title }}</span></div>
-  <div class="field"><label>阶段</label><span>{{ arc.stage }}</span></div>
-  {% endfor %}
+  <h3>{{ arc.get('title','') }}</h3>
+  <div class="tags">
+    <span class="tag">{{ arc.get('type','') }}</span>
+    <span class="tag">{{ arc.get('stage','') }}</span>
+    {% if arc.get('status') %}<span class="tag">{{ arc.status }}</span>{% endif %}
+  </div>
+  {% if arc.get('main_cast') %}
+  <div class="section-label">🎭 主角 / Main Cast</div>
+  <div class="tags">
+    {% for c in arc.main_cast %}<span class="tag">{{ c }}</span>{% endfor %}
+  </div>
+  {% endif %}
+  {% if arc.get('supporting_actors') %}
+  <div class="section-label">👥 配角 / Supporting</div>
+  <div class="tags">
+    {% for c in arc.supporting_actors %}<span class="tag">{{ c }}</span>{% endfor %}
+  </div>
+  {% endif %}
+  {% if arc.get('key_event_ticks') %}
+  <div class="json-block" style="margin-top:.5rem">{{ arc.key_event_ticks|tojson(indent=2) }}</div>
+  {% endif %}
+  {% if arc.get('branching_points') %}
+  <div class="section-label">🔀 分支点 / Branching</div>
+  <div class="json-block">{{ arc.branching_points|tojson(indent=2) }}</div>
+  {% endif %}
 </div>
+{% endfor %}
 {% else %}<div class="empty">暂无 / Empty</div>{% endif %}
 </div>
 

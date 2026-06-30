@@ -76,7 +76,15 @@ async def _llm_fill(state: GenState, template_name: str, subdir: str | None, fil
         count=count,
         theme=state["theme"],
     )
-    write_yaml_entities(target_dir, result, file_prefix)
+    n = write_yaml_entities(target_dir, result, file_prefix)
+
+    # 截断多余文件 / Truncate extra files beyond count
+    for i in range(count + 1, 20):
+        extra = target_dir / f"{file_prefix}_{i}.yaml"
+        if extra.exists():
+            extra.unlink()
+
+    print(f"  [LLM] {file_prefix}: wrote {min(n, count)}/{count} files (output {len(result)} chars)")
     return state
 
 
@@ -102,6 +110,67 @@ async def node_generate_scenes(state: GenState) -> GenState:
 
 async def node_generate_scene_objects(state: GenState) -> GenState:
     return await _llm_fill(state, "scene_object", "scene_objects", "scene_object")
+
+
+async def node_generate_meta(state: GenState) -> GenState:
+    """LLM 填充 meta 描述 / Fill meta description with LLM."""
+    import yaml
+    from langchain_core.messages import HumanMessage, SystemMessage
+
+    from src.llm.client import get_model
+
+    meta_path = state["output_dir"] / "meta.yaml"
+    data = yaml.safe_load(meta_path.read_text("utf-8")) or {}
+    prompt = (
+        f"为「{data['name']}」世界的 meta.yaml 填写 description 字段。\n"
+        f"主题：{state['theme']}\n"
+        f"要求：一句话概括这个世界，有吸引力。只输出纯文本，不要 YAML 格式。"
+    )
+    model = get_model()
+    sys_msg = "你是世界创作助手，输出纯文本。"
+    result = await model._agenerate([SystemMessage(content=sys_msg), HumanMessage(content=prompt)])
+    desc = str(result.generations[0].message.content).strip().strip('"').strip("'")
+    data["description"] = desc
+    meta_path.write_text(yaml.dump(data, allow_unicode=True), encoding="utf-8")
+    return state
+
+
+async def node_generate_story_setup(state: GenState) -> GenState:
+    """LLM 填充故事框架 / Fill story setup with LLM."""
+    import yaml
+    from langchain_core.messages import HumanMessage, SystemMessage
+
+    from src.llm.client import get_model
+
+    sp_path = state["output_dir"] / "story_setup.yaml"
+    data = yaml.safe_load(sp_path.read_text("utf-8")) or {}
+    prompt = (
+        f"为「{state['world_name']}」世界编写初始剧情框架。\n"
+        f"主题：{state['theme']}\n"
+        f"请输出严格的 YAML 格式：\n"
+        f"arcs:\n"
+        f"  - type: main\n"
+        f'    title: "主线标题"\n'
+        f"    stage: hook\n"
+        f"    main_cast: []\n"
+        f"    branching_points: []\n"
+        f"hooks:\n"
+        f'  - description: "初始伏笔描述"\n'
+        f"    urgency: medium"
+    )
+    model = get_model()
+    sys_msg = "你是世界创作助手，输出严格的 YAML 格式。"
+    result = await model._agenerate([SystemMessage(content=sys_msg), HumanMessage(content=prompt)])
+    content = str(result.generations[0].message.content).strip()
+    if content.startswith("```"):
+        content = content.split("\n", 1)[1] if "\n" in content else content[3:]
+    if content.endswith("```"):
+        content = content[:-3].strip()
+    new_data = yaml.safe_load(content)
+    if new_data:
+        data.update(new_data)
+    sp_path.write_text(yaml.dump(data, allow_unicode=True), encoding="utf-8")
+    return state
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -141,6 +210,8 @@ def build_graph() -> StateGraph:
     graph = StateGraph(GenState)
 
     graph.add_node("skeleton", node_skeleton)
+    graph.add_node("meta", node_generate_meta)
+    graph.add_node("story_setup", node_generate_story_setup)
     graph.add_node("lore", node_generate_lore)
     graph.add_node("pcs", node_generate_pcs)
     graph.add_node("npcs", node_generate_npcs)
@@ -151,7 +222,9 @@ def build_graph() -> StateGraph:
     graph.add_node("retry", node_retry)
 
     graph.set_entry_point("skeleton")
-    graph.add_edge("skeleton", "lore")
+    graph.add_edge("skeleton", "meta")
+    graph.add_edge("meta", "story_setup")
+    graph.add_edge("story_setup", "lore")
     graph.add_edge("lore", "pcs")
     graph.add_edge("pcs", "npcs")
     graph.add_edge("npcs", "items")

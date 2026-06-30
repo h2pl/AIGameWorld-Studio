@@ -62,7 +62,7 @@ def _fill_entity(data: dict, entity_type: str, prefix: str, idx: int, params: Ge
         return  # arcs/hooks 骨架保留模板结构
     else:
         data["id"] = f"{prefix}_{idx}"
-        data["name"] = f"{params.world_name} - {_label(entity_type)} {idx}"
+        data["name"] = f"{_label(entity_type)} {idx}"
         # 枚举字段 → 有效默认值 / Enum → valid default
         _fill_if_empty(data, "type", {"scene": "indoor"}.get(entity_type, ""))
         _fill_if_empty(data, "category", "history")

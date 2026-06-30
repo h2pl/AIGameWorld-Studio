@@ -72,7 +72,7 @@ def test_generate_pc_content(tmp_path: Path):
 
     pc = yaml.safe_load((out / "player_characters/player_character_1.yaml").read_text("utf-8"))
     assert pc["id"] == "player_character_1"
-    assert pc["name"] == "仙剑世界 - PC 1"
+    assert pc["name"] == "PC 1"
     assert pc["role"] == "warrior"
 
 
@@ -83,7 +83,7 @@ def test_generate_scene_content(tmp_path: Path):
 
     scene = yaml.safe_load((out / "scenes/scene_1.yaml").read_text("utf-8"))
     assert scene["id"] == "scene_1"
-    assert scene["name"] == "test - Scene 1"
+    assert scene["name"] == "Scene 1"
     assert scene["type"] == "indoor"
 
 
@@ -94,7 +94,7 @@ def test_generate_npc_content(tmp_path: Path):
 
     actor = yaml.safe_load((out / "actors/actor_1.yaml").read_text("utf-8"))
     assert actor["role"] == "npc"
-    assert actor["name"] == "test - NPC 1"
+    assert actor["name"] == "NPC 1"
 
 
 def test_generate_item_content(tmp_path: Path):

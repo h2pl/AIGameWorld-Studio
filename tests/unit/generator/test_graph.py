@@ -65,6 +65,7 @@ def test_node_validate_passed(tmp_path: Path):
 
 def test_node_validate_failed(tmp_path: Path):
     s = _state(GenerateParams(output_dir=tmp_path))
+    s["output_dir"] = tmp_path / "nonexistent"
     s = node_validate(s)
     assert "errors" in s
 
@@ -120,8 +121,10 @@ def test_build_graph_returns_valid_graph():
 def test_graph_nodes_count():
     graph = build_graph()
     nodes = graph.compile().get_graph().nodes
-    assert len(nodes) >= 9
+    assert len(nodes) >= 11  # 11 业务节点 + 系统节点
     assert "skeleton" in nodes
+    assert "meta" in nodes
+    assert "story_setup" in nodes
     assert "validate" in nodes
     assert "retry" in nodes
 

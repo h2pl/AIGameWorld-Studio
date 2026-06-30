@@ -5,12 +5,12 @@
 世界主题：{{ theme }}
 {% endif %}
 
-要求：
+关键约束：
+- scene_id 只能使用 scene_1（只有 1 个场景）
 - object_type 从以下选：chest, door, trap, mechanism, decoration
 - 至少一个宝箱(chest)包含物品掉落
-- 每个对象的 scene_id 对应已有场景
 
-输出格式（严格的 YAML 序列）：
+输出格式（严格 YAML）：
 # scene_object_1
 id: scene_object_1
 name: 远古石门
@@ -20,4 +20,4 @@ interact_data:
   locked: true
   dc: 15
 
-{# 输出 {{ count }} 个 #}
+{# 输出恰好 {{ count }} 个 #}

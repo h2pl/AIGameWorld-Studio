@@ -1,0 +1,29 @@
+{# 世界观设定生成 / Lore Generation #}
+为「{{ world_name }}」世界生成 {{ count }} 条世界观设定（lore）。
+
+{% if theme %}
+世界主题：{{ theme }}
+{% endif %}
+
+每条设定必须：
+- category 从以下选：geography, history, race, faction, culture, magic, religion
+- content 至少 4 句话，有具体的人名、地名、事件、因果关系
+- references 列出相关联的场景/人物/物品 id
+
+输出格式（严格的 YAML 序列，每条以 "# lore_N" 注释分隔）：
+# lore_1
+id: lore_1
+category: history
+content: >
+  上古时期，天柱断裂，女娲炼五色石补天。补天石碎片散落人间，每片都蕴含着女娲的神力。
+  蜀山派初代掌门太清真人在昆仑山发现了第一片补天石，以此为基础创立了蜀山剑诀。
+  传说若能集齐九片补天石，可以逆转时空、改写天命。
+references: [shushan, celestial_sword]
+
+# lore_2
+id: lore_2
+category: faction
+content: ...
+references: []
+
+{# 输出 {{ count }} 条，以此类推 #}

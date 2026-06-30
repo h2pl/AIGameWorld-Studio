@@ -1,0 +1,39 @@
+{# 物品生成 / Item Generation #}
+为「{{ world_name }}」世界生成 {{ count }} 件物品。
+
+{% if theme %}
+世界主题：{{ theme }}
+{% endif %}
+
+要求：
+- 覆盖不同类别：武器 1-2 件，护甲 1 件，药水 1 件，钥匙/任务物品 1 件
+- item_type 从以下选：weapon, armor, potion, scroll, key, consumable, misc
+- rarity 合理分布：common 为主，1-2 件 uncommon，传奇物品单独说明
+- 每件物品的 description 要有叙事味道，不只是数值
+
+输出格式（严格的 YAML 序列）：
+# item_1
+id: item_1
+name: 寒铁长剑
+item_type: weapon
+rarity: uncommon
+weight: 3.5
+value: 120
+description: 以北冥寒铁锻造，剑身自带寒气。刃口有一道天然冰裂纹，传说是铸剑师用千年寒泉淬火时留下的印记。
+data:
+  damage_dice: 1d8
+  damage_type: slashing
+
+# item_2
+id: item_2
+name: 回春丹
+item_type: potion
+rarity: common
+weight: 0.1
+value: 30
+description: 蜀山丹房以百年灵芝配三七草炼制，药香清冽。服下后丹田有暖流涌动，伤口以肉眼可见的速度愈合。
+data:
+  effect: heal
+  amount: 3d6
+
+{# 输出 {{ count }} 件物品 #}

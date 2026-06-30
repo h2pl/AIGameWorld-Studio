@@ -13,10 +13,10 @@ _EXAMPLES = """
   aw-studio generate                              # 全部默认
   aw-studio generate --name my_world              # 指定 world-pack 名称
   aw-studio generate --pc 4 --actor 6 --scene 3   # 指定数量
-  aw-studio validate worlds/custom/my_world       # 校验 world-pack
+  aw-studio validate world-packs/custom/my_world  # 校验 world-pack
 
   导入到 AIGameWorld 引擎:
-  aw import worlds/custom/my_world                # world-pack → Domain → SQLite + ChromaDB
+  aw import world-packs/custom/my_world           # world-pack → Domain → SQLite + ChromaDB
 """
 
 
@@ -59,14 +59,14 @@ def _main() -> int:
     )
     gen.add_argument("--lore", type=int, default=_DEFAULTS["lore"], help=f"设定条数 (default: {_DEFAULTS['lore']})")
     gen.add_argument(
-        "-o", "--output", type=Path, default=Path("worlds/custom"), help="world-pack 输出目录 (default: worlds/custom/)"
+        "-o", "--output", type=Path, default=Path("world-packs/custom"), help="输出目录 (default: world-packs/custom/)"
     )
 
     # --- validate world-pack ---
     val = sub.add_parser(
         "validate",
         help="校验 world-pack / Validate world pack",
-        epilog="示例: aw-studio validate worlds/custom/my_world",
+        epilog="示例: aw-studio validate world-packs/custom/my_world",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     val.add_argument("path", type=Path, help="world-pack 目录 / World pack directory")

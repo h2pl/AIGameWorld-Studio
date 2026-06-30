@@ -28,7 +28,7 @@ class GenerateParams:
     num_items: int = 5
     num_scene_objects: int = 2
     num_lore: int = 1
-    output_dir: Path = Path("worlds") / "custom"
+    output_dir: Path = Path("world-packs") / "custom"
 
 
 # ---- 模板名 → (文件名, 输出子目录) / Template name → (file, output subdir) ----

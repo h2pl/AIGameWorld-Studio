@@ -13,9 +13,10 @@ _EXAMPLES = """
   aw-studio generate                              # 全部默认
   aw-studio generate --name my_world              # 指定世界名
   aw-studio generate --pc 4 --actor 6 --scene 3   # 指定数量
-  aw-studio generate --pc 4 --actor 6 --scene 3   # 指定数量
   aw-studio validate worlds/custom/my_world       # 校验
-  aw-studio load worlds/custom/my_world --db worlds.db     # 加载
+
+  导入到 AIGameWorld 引擎:
+  aw import worlds/custom/my_world                # YAML → Domain → SQLite + ChromaDB
 """
 
 
@@ -70,19 +71,8 @@ def _main() -> int:
     )
     val.add_argument("path", type=Path, help="模板目录 / Template directory")
 
-    # --- load ---
-    ld = sub.add_parser(
-        "load",
-        help="加载到数据库 / Load to database",
-        epilog="示例: aw-studio load worlds/custom/my_world --db worlds.db",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-    )
-    ld.add_argument("path", type=Path, help="模板目录 / Template directory")
-    ld.add_argument("--db", type=Path, help="SQLite 路径 (default: <pack>.db)")
-    ld.add_argument("--chroma", type=Path, help="ChromaDB 路径 (optional)")
-
     args = parser.parse_args()
-    return {"generate": _generate, "validate": _validate, "load": _load}[args.command](args)
+    return {"generate": _generate, "validate": _validate}[args.command](args)
 
 
 # ---- handlers ----
@@ -123,50 +113,6 @@ def _validate(args) -> int:
     if result.is_valid:
         print("[OK] Validation passed")
     return 0 if result.is_valid else 1
-
-
-def _load(args) -> int:
-    """Load validated template data into SQLite and optionally ChromaDB."""
-    if not args.path.exists():
-        print(f"Error: not found: {args.path}", file=sys.stderr)
-        return 1
-    # Import for reading YAML and writing to DB
-    from src.loader.db_writer import write_template
-    from src.loader.yaml_reader import load_all
-    from src.validator.validate import validate_template
-
-    vr = validate_template(args.path)
-    if not vr.is_valid:
-        print(f"Validation failed ({vr.failed} errors):", file=sys.stderr)
-        for e in vr.errors:
-            print(f"  {e}", file=sys.stderr)
-        return 1
-
-    data = load_all(args.path)
-    pack_name = args.path.name
-    db_path = args.db or (args.path.parent / f"{pack_name}.db")
-    try:
-        written = write_template(str(db_path), data, pack_name=pack_name)
-        print(f"[OK] SQLite: {written} records → {db_path}")
-    except Exception as e:
-        print(f"Error: {e}", file=sys.stderr)
-        return 2
-
-    if args.chroma:
-        try:
-            import chromadb
-
-            from src.loader.chroma_writer import write_lore, write_scenes
-
-            client = chromadb.PersistentClient(path=str(args.chroma))
-            write_lore(client, data.get("lore", []), pack_name)
-            write_scenes(client, data.get("scenes", []), pack_name)
-            print(f"[OK] ChromaDB → {args.chroma}")
-        except ImportError:
-            print("Warning: chromadb not installed, skipped", file=sys.stderr)
-        except Exception as e:
-            print(f"Warning: ChromaDB failed ({e}), SQLite OK", file=sys.stderr)
-    return 0
 
 
 if __name__ == "__main__":

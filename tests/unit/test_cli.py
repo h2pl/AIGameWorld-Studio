@@ -62,40 +62,6 @@ def test_validate_missing_exits_one():
     assert r.returncode == 1
 
 
-# === load ===
-
-
-def test_load_ok_exits_zero(tmp_path: Path):
-    from src.generator.generate import GenerateParams, generate
-
-    world = generate(GenerateParams(world_name="test", output_dir=tmp_path))
-    db = tmp_path / "test.db"
-    r = _run("load", str(world), "--db", str(db))
-    assert r.returncode == 0, r.stderr
-    assert "records" in r.stdout
-
-
-def test_load_auto_validates(tmp_path: Path):
-    import yaml
-
-    from src.generator.generate import GenerateParams, generate
-
-    world = generate(GenerateParams(world_name="test", output_dir=tmp_path))
-    # break meta
-    meta = world / "meta.yaml"
-    data = yaml.safe_load(meta.read_text(encoding="utf-8")) or {}
-    del data["name"]
-    meta.write_text(yaml.dump(data, allow_unicode=True), encoding="utf-8")
-    r = _run("load", str(world), "--db", str(tmp_path / "t.db"))
-    assert r.returncode == 1
-    assert "Validation failed" in r.stderr
-
-
-def test_load_missing_exits_one():
-    r = _run("load", "no_such")
-    assert r.returncode == 1
-
-
 # === edge cases ===
 
 

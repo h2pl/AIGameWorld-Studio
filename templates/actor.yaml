@@ -16,12 +16,12 @@ attributes: # 六维属性 / Six attributes
   cha: 10
 combat: # 战斗数值 / Combat stats
   hp: 10
+  max_hp: 10
   ac: 10
   initiative: 0 # 先攻加值 / Initiative bonus
   speed: 30 # 速度 / Speed
   attack_bonus: 0
   damage_dice: "1d4" # 伤害骰 / Damage dice
-  damage_bonus: 0 # 伤害加值 / Damage bonus
 functions: [] # 功能标签 [dialogue, merchant, quest_giver, combat]
 function_data: # 按功能扩展数据 / Extended data per function
   dialogue:

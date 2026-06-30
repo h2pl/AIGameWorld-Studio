@@ -22,7 +22,6 @@ combat: # 战斗数值 / Combat stats
   speed: 30 # 速度 / Speed
   attack_bonus: 0
   damage_dice: "1d6" # 伤害骰 / Damage dice
-  damage_bonus: 0 # 伤害加值 / Damage bonus
 character_arc: # 角色弧 / Character arc
   goal: "" # → domain.long_term_goal
   flaw: ""

@@ -188,8 +188,9 @@ def _interactive_prompt(parser, args):
 
 async def _generate(args) -> int:
     """LLM 管线生成 world-pack / LLM pipeline generate world-pack."""
-    from src.generator.graph import GenerateParams, generate_world_pack
-    from src.generator.skeleton import generate_skeleton
+    from src.graph.graph import generate_world_pack
+    from src.pipeline.world_pack.params import GenerateParams
+    from src.pipeline.world_pack.skeleton import generate_skeleton
 
     params = GenerateParams(
         world_name=args.name,

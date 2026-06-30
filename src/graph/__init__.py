@@ -1,4 +1,4 @@
-# 生成器入口 / Generator Entry — 调用主图
+# Graph 编排 / Graph Pipeline
 
 from src.graph.graph import generate_world_pack
 

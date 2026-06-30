@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from src.generator.params import GenerateParams, _slugify
+from src.pipeline.world_pack.params import GenerateParams, _slugify
 
 
 def test_default_values():

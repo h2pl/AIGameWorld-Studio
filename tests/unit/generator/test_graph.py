@@ -2,16 +2,24 @@
 
 from pathlib import Path
 
-from src.generator.graph import GenState, build_graph, node_retry, node_skeleton, node_validate, should_retry
-from src.generator.params import GenerateParams
+from src.graph.graph import build_graph
+from src.graph.subgraphs.world_pack import (
+    WorldPackState,
+    _node_retry,
+    _node_skeleton,
+    _node_validate,
+    _should_retry,
+    build_world_pack_subgraph,
+)
+from src.pipeline.world_pack.params import GenerateParams
 
 
-def _state(params: GenerateParams | None = None) -> GenState:
+def _state(params: GenerateParams | None = None) -> WorldPackState:
     if params is None:
         params = GenerateParams()
-    return GenState(
+    return WorldPackState(
         params=params,
-        output_dir=Path(),
+        output_dir="",
         world_name=params.world_name,
         theme=params.theme or params.world_name,
         retry_count=0,
@@ -36,9 +44,10 @@ def test_node_skeleton_creates_output(tmp_path: Path):
         num_scene_objects=1,
     )
     s = _state(params)
-    s = node_skeleton(s)
-    assert s["output_dir"].exists()
-    assert (s["output_dir"] / "meta.yaml").exists()
+    s = _node_skeleton(s)
+    out = Path(s["output_dir"])
+    assert out.exists()
+    assert (out / "meta.yaml").exists()
     assert s["world_name"] == "test"
     assert s["retry_count"] == 0
     assert s["done"] is False
@@ -47,7 +56,7 @@ def test_node_skeleton_creates_output(tmp_path: Path):
 def test_node_skeleton_uses_theme(tmp_path: Path):
     params = GenerateParams(world_name="test", theme="仙侠", output_dir=tmp_path)
     s = _state(params)
-    s = node_skeleton(s)
+    s = _node_skeleton(s)
     assert s["theme"] == "仙侠"
 
 
@@ -57,16 +66,16 @@ def test_node_skeleton_uses_theme(tmp_path: Path):
 def test_node_validate_passed(tmp_path: Path):
     params = GenerateParams(output_dir=tmp_path)
     s = _state(params)
-    s = node_skeleton(s)
-    s = node_validate(s)
+    s = _node_skeleton(s)
+    s = _node_validate(s)
     assert s["done"] is True
     assert s["errors"] == []
 
 
 def test_node_validate_failed(tmp_path: Path):
     s = _state(GenerateParams(output_dir=tmp_path))
-    s["output_dir"] = tmp_path / "nonexistent"
-    s = node_validate(s)
+    s["output_dir"] = str(tmp_path / "nonexistent")
+    s = _node_validate(s)
     assert "errors" in s
 
 
@@ -76,9 +85,9 @@ def test_node_validate_failed(tmp_path: Path):
 def test_node_retry_increments():
     s = _state()
     assert s["retry_count"] == 0
-    s = node_retry(s)
+    s = _node_retry(s)
     assert s["retry_count"] == 1
-    s = node_retry(s)
+    s = _node_retry(s)
     assert s["retry_count"] == 2
 
 
@@ -88,28 +97,28 @@ def test_node_retry_increments():
 def test_should_retry_done():
     s = _state()
     s["done"] = True
-    assert should_retry(s) == "done"
+    assert _should_retry(s) == "done"
 
 
 def test_should_retry_under_limit():
     s = _state()
     s["retry_count"] = 1
-    assert should_retry(s) == "retry"
+    assert _should_retry(s) == "retry"
 
 
 def test_should_retry_at_limit():
     s = _state()
     s["retry_count"] = 3
-    assert should_retry(s) == "done"
+    assert _should_retry(s) == "done"
 
 
 def test_should_retry_over_limit():
     s = _state()
     s["retry_count"] = 5
-    assert should_retry(s) == "done"
+    assert _should_retry(s) == "done"
 
 
-# === build_graph ===
+# === build_graph (main orchestrator) ===
 
 
 def test_build_graph_returns_valid_graph():
@@ -118,29 +127,18 @@ def test_build_graph_returns_valid_graph():
     assert compiled is not None
 
 
-def test_graph_nodes_count():
+def test_main_graph_has_subgraphs():
     graph = build_graph()
     nodes = graph.compile().get_graph().nodes
-    assert len(nodes) >= 11  # 11 业务节点 + 系统节点
+    assert len(nodes) >= 3  # world_pack + assets + __start__ + __end__
+    assert "world_pack" in nodes
+    assert "assets" in nodes
+
+
+def test_world_pack_subgraph_nodes():
+    graph = build_world_pack_subgraph()
+    nodes = graph.compile().get_graph().nodes
+    assert len(nodes) >= 11
     assert "skeleton" in nodes
-    assert "meta" in nodes
-    assert "story_setup" in nodes
     assert "validate" in nodes
     assert "retry" in nodes
-
-
-def test_graph_skeleton_to_validate_full(tmp_path: Path):
-    params = GenerateParams(
-        world_name="test",
-        output_dir=tmp_path,
-        num_pcs=1,
-        num_actors=1,
-        num_scenes=1,
-        num_items=1,
-        num_lore=1,
-        num_scene_objects=1,
-    )
-    s = _state(params)
-    s = node_skeleton(s)
-    s = node_validate(s)
-    assert s["done"] is True, s.get("errors", [])

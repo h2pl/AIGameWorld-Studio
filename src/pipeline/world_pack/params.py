@@ -29,7 +29,8 @@ class GenerateParams:
     num_lore: int = 1
     # 输出根目录 / Output root directory
     output_dir: Path = field(default_factory=lambda: Path("world-packs") / "custom")
-    max_retries: int = 3  # LLM 最大重试次数 / Max LLM retries
+    max_retries: int = 3
+    assets_method: str = "recolor"  # 素材方式: recolor | ai | skip  # LLM 最大重试次数 / Max LLM retries
 
     def __post_init__(self):
         # pack_id 为空时自动生成 / Auto-generate pack_id if empty

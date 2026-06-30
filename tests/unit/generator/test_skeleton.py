@@ -4,8 +4,8 @@ from pathlib import Path
 
 import yaml
 
-from src.generator.params import GenerateParams
-from src.generator.skeleton import generate_skeleton
+from src.pipeline.world_pack.params import GenerateParams
+from src.pipeline.world_pack.skeleton import generate_skeleton
 from src.validator.validate import validate_template
 
 

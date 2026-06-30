@@ -5,7 +5,7 @@ from pathlib import Path
 
 from ruamel.yaml import YAML
 
-from src.generator.params import GenerateParams
+from src.pipeline.world_pack.params import GenerateParams
 
 # YAML 读写（保留注释）/ YAML read/write with comment preservation
 _yaml = YAML()
@@ -13,7 +13,7 @@ _yaml.preserve_quotes = True
 _yaml.indent(mapping=2, sequence=4, offset=2)
 
 # 模板目录 / Templates directory
-_TEMPLATES = Path(__file__).resolve().parent.parent.parent / "templates"
+_TEMPLATES = Path(__file__).resolve().parent.parent.parent.parent / "templates"
 
 # 实体规格 / Entity spec: (entity_type, template_file, output_subdir, file_prefix)
 _ENTITY_SPEC: list[tuple[str, str, str | None, str]] = [

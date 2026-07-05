@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.10" tiledversion="1.11.0" orientation="orthogonal" renderorder="right-down" compressionlevel="0" width="19" height="16" tilewidth="16" tileheight="16" infinite="0" nextlayerid="7" nextobjectid="8">
+ <tileset firstgid="1" name="core_indoor_walls" tilewidth="16" tileheight="16" tilecount="3864" columns="46">
+  <image source="../gfx/tilesets/core_indoor_walls.png" width="736" height="1344"/>
+ </tileset>
+ <tileset firstgid="3865" name="core_indoor_floors" tilewidth="16" tileheight="16" tilecount="3864" columns="46">
+  <image source="../gfx/tilesets/core_indoor_floors.png" width="736" height="1344"/>
+ </tileset>
+ <tileset firstgid="7729" name="core_set pieces" tilewidth="16" tileheight="16" tilecount="1550" columns="31">
+  <image source="../gfx/tilesets/core_set pieces.png" width="496" height="800"/>
+ </tileset>
+ <tileset firstgid="9279" source="../gfx/tilesets/core_outdoor.tsx"/>
+ <layer id="1" name="Layer 1" width="19" height="16">
+  <data encoding="base64" compression="zlib">
+   eAG7LczAcJsELMjKwIANCwHFHYGYGLNOQtUx4AAOJJhFyL5Rs4iLE1g4jpTwygemMRCA+ZtcGmTOaWh6JtcMmD5qmQMzbzDSedBwh4Q+ZeQpoFkAUQDvuQ==
+  </data>
+ </layer>
+ <layer id="2" name="Layer 2" width="19" height="16">
+  <data encoding="base64" compression="zlib">
+   eAGlkk1OAkEQhUuDewEDa/cKAnsicAt/EtwLR+Im7oEDwIateAZ14/tgKpYdWiZayeP1VLq/qdfD+ZlZNaOLA337pfrav8hoEPqzy/w+zlOwunWzlnQlXUudwmF5vYiV1mvV7E3aShQsGPVwjv6DepG1OcAa1MxG0lCiYDETfiP32ZgP1rsYH9Kns3Bf7wjfPzCYAed8rDhX7Pv6JGHCuCtYPtOjnrmzYyxnusPiHB6rnbDifZ4m8/g5GNwTTla+Kc/30rN6k0JT+bGCQSacWWLN1fP/3jLDivPCYBace4PHveFo3bBxr7nXkzy+i/Vt8Q4cxqrxM4/nKuOe3VmVplnM47nKuGd31lis/xas+K3KZMrtIetfs6X5yfoFXl5fDg==
+  </data>
+ </layer>
+ <layer id="3" name="Layer 3" width="19" height="16">
+  <data encoding="base64" compression="zlib">
+   eAFjYBhYkKiNsH+CAoJNDqsNySxs+oVZsYnSVuyJAgPDUyAGARgN4ZFOMisyMLAAMYwm3QRUHSC3UQKQw5McNxXQOT6Q3UuJv0F6HensdkrdO1z1AwCu1gfe
+  </data>
+ </layer>
+ <layer id="4" name="Above Player" width="19" height="16">
+  <data encoding="base64" compression="zlib">
+   eAFjYBgF6CHwUIGBAYSpCZ4AzXsExIMJPAa65ykQj4LREBiqIQAAuoUGEQ==
+  </data>
+ </layer>
+ <objectgroup color="#ff0000" id="4" name="Collisions">
+  <object id="1" type="collision" x="16" y="32">
+   <polygon points="0,0 96,0 96,128 160,128 160,80 144,80 144,96 112,96 112,48 160,48 160,0 192,0 192,16 208,16 208,0 240,0 240,-16 256,-16 256,0 272,0 272,192 0,192 0,0 -16,0 -16,224 288,224 288,-32 0,-32 -16,-32 -16,0"/>
+  </object>
+  <object id="2" type="collision" x="32" y="48">
+   <polygon points="0,0 0,160 240,160 240,96 224,96 224,128 16,128 16,0"/>
+  </object>
+  <object id="4" type="collision" x="256" y="96">
+   <polygon points="0,0 -16,0 -16,-16 0,-16"/>
+  </object>
+  <object id="5" type="collision" x="224" y="112">
+   <polygon points="0,0 0,16 -16,16 -16,0 16,0 16,16 0,16"/>
+  </object>
+  <object id="6" type="collision" x="192" y="80">
+   <polygon points="0,0 0,16 32,16 48,16 48,0 0,0"/>
+  </object>
+ </objectgroup>
+ <objectgroup id="5" name="Events">
+ </objectgroup>
+</map>

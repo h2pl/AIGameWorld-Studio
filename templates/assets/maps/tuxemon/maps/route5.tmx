@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.10" tiledversion="git" orientation="orthogonal" renderorder="right-down" compressionlevel="0" width="40" height="20" tilewidth="16" tileheight="16" infinite="0" nextlayerid="8" nextobjectid="22">
+ <properties>
+  <property name="edges" value="clamped"/>
+  <property name="scenario" value="xero"/>
+  <property name="slug" value="route5"/>
+  <property name="map_type" value="route"/>
+ </properties>
+ <tileset firstgid="1" name="Tileset" tilewidth="16" tileheight="16" tilecount="1120" columns="28">
+  <image source="../gfx/tilesets/Tileset.png" width="448" height="640"/>
+ </tileset>
+ <tileset firstgid="1121" source="../gfx/tilesets/core_city_and_country.tsx"/>
+ <tileset firstgid="2561" source="../gfx/tilesets/core_outdoor.tsx"/>
+ <layer id="1" name="Tile Layer 1" width="40" height="20">
+  <data encoding="base64" compression="zlib">
+   eAHt0iERAAAMA7Hiqa1/VBdDAW/gL72k8oABBhhggAEGGGCAAQYeDAxDjn1Q
+  </data>
+ </layer>
+ <layer id="2" name="Long Grass" width="40" height="20">
+  <data encoding="base64" compression="zlib">
+   eAHtkl0KA0EIg+cEvf/p2quUPHwQxFGHbbsvFRb/YozDrvW3T77A67HWnV93i7RNTLhnuEVz8baOCzxcE3y2Bx75XT+rZzW4sp5qlVX7K97dnHYxF33Wq7SBx/PmGW/H4/04T84ecvnOwPjMlTjTAF/Uwu5Y9xwMHJXfva/PdPrAgnMtWSy8jLmrPuPiLu8pntgv9HGz9BDjO43o63AZN+/CrgmXY0/xUYPnHscdnle4rKdaZRW35uh7TC3zFS7rqVaZ7xBul8ee4zyucFlPtROLu05mJ1j4+Xe7GfB3+ak+7vm2zrin0/fvn73AG96fbMk=
+  </data>
+ </layer>
+ <layer id="3" name="Path" width="40" height="20">
+  <data encoding="base64" compression="zlib">
+   eAHtVdFNQzEQyxeMUDoN6gwVM5TOULpCGQKxAmzQblNW6FnIkmXdJVHLH33S410uiX3nOKW1+/OXCiweW3uaeJexRh/u0zxzPTxdr3i9+PzQ2ilefH/iPdoYcyur7znGnmeuh+U4vbowR8xD8L0m73vkUK/jYp/nmcuwgOP9jGpjfc6j+8AJTb/iq+f2neSZ815meJRTY/JnmIqbnRn6cj9UvZJH+5zxIvbBd1V9m5jPzj3L9c4QPKhd+6w4Xb9rfKEYjFlDxos58MCb6OMtYtUS3nmJnD89TF87GgML513Vx7Mnp2qJuX1RX+Z/vQuMR34hr+uC/Xp3Ks98FvW5L6pxpotqivqgievCMfXTPaOYvcATuCf87aLX6ZcZbOpHDL1DxBv1WNXL3rmfXBgjrnyleL11iqd7PF6HRvSTfuEP1Yhc8BLndH0Wc93If16Tjncdf6hG7JfewVzly+r/drae56M1afwRPOoLj7ehFx760udvHRP/l+X+978pcAFh+7bh
+  </data>
+ </layer>
+ <layer id="4" name="Gravestones" width="40" height="20">
+  <data encoding="base64" compression="zlib">
+   eAHNlj0OwjAMRiMQYmRk4AIwMzByAspl4PT8+lP7JMtqFQoViaU0TeI6L1/ctM0qpZOVpqI6mcG0Na6dFdltltK9cHnZ/DCphlN867mu461ZpHS2IvP3bU/+6hk2xkBbtbSDV3zHZT5e9LgY27Xj8/fR75O2+GQw+bz7Vr824jRX+NAQTkWvhQ8m1XD+i4+5h9TO5d/Qc1P1ez36YrK/rKO2/Nvb+/GwM4Z1wKm11JB/UVM4a+HTN0L6oVs8/yJ/rk2c6DfUH/1im/xDt1/zjzhxnqH+6Ke2X4v4aKvmXn6l8s+vJZ4vjD1tzw/dt0WspYz99brlWMb45mLlxuFDN+aWfvq36TN8+8am7ov55+culX9+jTH//Pmis7v0/ynvAPvqzxf6StfSk319A7zfhBU=
+  </data>
+ </layer>
+ <layer id="5" name="Tile Layer 8" width="40" height="20">
+  <data encoding="base64" compression="zlib">
+   eAHt0DERADAIBMF3gI3g3yA4SEG7N3MGNtFP4FXSuwgQIECAAAECBAgQuAkM+KIAcA==
+  </data>
+ </layer>
+ <objectgroup color="#ff0000" id="6" name="Collisions">
+  <object id="3" type="collision" x="0" y="0" width="48" height="240"/>
+  <object id="4" type="collision" x="48" y="16" width="528" height="16"/>
+  <object id="5" type="collision" x="576" y="32" width="64" height="112"/>
+  <object id="6" type="collision" x="576" y="160" width="64" height="128"/>
+  <object id="7" type="collision" x="48" y="288" width="528" height="16"/>
+  <object id="8" type="collision" x="0" y="256" width="48" height="32"/>
+  <object id="10" type="collision" x="320" y="32" width="32" height="32"/>
+  <object id="11" type="collision" x="272" y="32" width="32" height="32"/>
+  <object id="12" type="collision" x="448" y="96" width="32" height="32"/>
+  <object id="13" type="collision" x="352" y="176" width="32" height="32"/>
+  <object id="14" type="collision" x="256" y="176" width="32" height="32"/>
+  <object id="15" type="collision" x="528" y="32" width="32" height="16"/>
+  <object id="16" type="collision" x="528" y="192" width="32" height="32"/>
+  <object id="17" type="collision" x="144" y="240" width="32" height="32"/>
+ </objectgroup>
+ <objectgroup color="#ffff00" id="7" name="Events">
+  <object id="1" name="Teleport to Flower City" type="event" x="0" y="240" width="16" height="16">
+   <properties>
+    <property name="act10" value="transition_teleport player,flower_city.tmx,39,15,0.3"/>
+    <property name="act20" value="char_face player,left"/>
+    <property name="cond10" value="is char_at player"/>
+    <property name="cond20" value="is char_facing player,left"/>
+   </properties>
+  </object>
+  <object id="2" name="Teleport to Timber Town" type="event" x="624" y="144" width="16" height="16">
+   <properties>
+    <property name="act10" value="transition_teleport player,timber_town.tmx,0,29,0.3"/>
+    <property name="act20" value="char_face player,right"/>
+    <property name="cond10" value="is char_at player"/>
+    <property name="cond20" value="is char_facing player,right"/>
+   </properties>
+  </object>
+  <object id="18" name="Play Music" type="event" x="0" y="0" width="16" height="16">
+   <properties>
+    <property name="act10" value="play_music music_the_wild_places"/>
+    <property name="cond10" value="not music_playing music_the_wild_places"/>
+   </properties>
+  </object>
+  <object id="20" name="Environment Day" type="event" x="16" y="0" width="16" height="16">
+   <properties>
+    <property name="act1" value="set_environment grass"/>
+    <property name="cond1" value="not time_is stage_of_day,equals,night"/>
+    <property name="cond2" value="not environment_is grass"/>
+   </properties>
+  </object>
+  <object id="21" name="Environment Night" type="event" x="32" y="0" width="16" height="16">
+   <properties>
+    <property name="act1" value="set_environment night_grass"/>
+    <property name="cond1" value="is time_is stage_of_day,equals,night"/>
+    <property name="cond2" value="not environment_is night_grass"/>
+   </properties>
+  </object>
+ </objectgroup>
+</map>

@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.10" tiledversion="git" orientation="orthogonal" renderorder="right-down" compressionlevel="0" width="40" height="40" tilewidth="16" tileheight="16" infinite="0" nextlayerid="8" nextobjectid="185">
+ <properties>
+  <property name="edges" value="clamped"/>
+  <property name="scenario" value="xero"/>
+  <property name="slug" value="route3"/>
+  <property name="map_type" value="route"/>
+ </properties>
+ <tileset firstgid="1" source="../gfx/tilesets/core_city_and_country.tsx"/>
+ <tileset firstgid="1441" name="Superpowers_Tilesheet" tilewidth="16" tileheight="16" tilecount="1600" columns="40">
+  <image source="../gfx/tilesets/Superpowers_Tilesheet.png" width="640" height="640"/>
+ </tileset>
+ <tileset firstgid="3041" source="../gfx/tilesets/core_buildings.tsx"/>
+ <tileset firstgid="5391" source="../gfx/tilesets/core_outdoor.tsx"/>
+ <tileset firstgid="8166" source="../gfx/tilesets/core_outdoor_nature.tsx"/>
+ <layer id="1" name="Layer 1" width="40" height="40">
+  <data encoding="base64" compression="zlib">
+   eAHtV8EJwzAM9BKlj87YFTJEt8iWxY+DQ5USy3ZUB/QIsnWS7riIQLZHKVs+6cFNdmB/luJ9sN/ow/2KCI7R2KNtlNPT79HnmXt1rab7ak7vfKnR2x9Rzxoj+Ho4oLGnN6IH+mqM4PNyrKyPta3oH+vz+h5Rz/pW9K96sLJGqW01D1Pf2Dc1/Uv/Ir7DFkfuX+6ftRsR+Tvt37/8YI+khiNM1o7emcs6Sw6uk9jMO/McnTVO1GvYrBw4zqLGhx4Ni8iBv0aND7iGReTAn/r093P2Dtg/zUPg1hzgLdGaYeVbZn5ev/9wLX1c854wg+fJ8xc1LGGM
+  </data>
+ </layer>
+ <layer id="2" name="Layer 2" width="40" height="40">
+  <data encoding="base64" compression="zlib">
+   eAHtWEtuE0EUbBLWZJGAUMgCc4eQZBkpErkDESfIjk92SJCThJ8gd0kQvwP4CsABqIpdUH6anumZscdCSkvlN/1571VX97TbTimlh5sp7QCyaLoqqi/a1uVj32NwOwJkNV71RdqDW8qW0iM8HwKe71/vcp6egs8z4DnwAjgBWLRmk9rwn2ejSc434PMWeAe8Bz4ALNJwUiv/XL+d0us77bABH/djXeUL+HwFvgHfgR8AS1f9noBb23IEH/dj/W9ZS+kGsAKsAjcBlqifz4/6bGOOgut16rEnoRo/a/llvF0/cuuSNxN6pnkH89lD/F1gbzq3V7A+Z3/W2rt+rv1M8DlUqN1LcCNK8sys/TR/iV9XqtKKupTk8fHKWeKnsV0t87bZQ65j5Deenk1duXDP7U6hPdc2lvPj3lU8t31ia891je38FCvaqGupBlxL7rcYz+s53tKH77xKPPv0vsf9ciyHAqt9rlhum7hrHkrTVSf5t7V13DUPnYOM7Wdn21x9x3+8l9In4Bzw4vuP7UNy1N2FeS/A6xL4bPz0ncN+L0OvM3P/BK9fwG/jF7UTx2XwU2631/xcjfbP1/q118w9lqlfyXdQFT/eWf7n93frrq/AYp+r9GPGKv0O5kxl9KA5YBW/UeH6ju83x+87oorfIn/Dka/fqXXHc+t34chvCG5+36zS1/dW5Od9Vb592nJ3kRjTOej+rTHep7Z52ahFLm7k4H6xLxejrn0f5w8Ri+eJfV6PHNwv9rlf32euFf/H0b1d1u/vzCEOursOxS83P8/v/DTe+8VdfX2tNKiLw/z6nUYbOZTwazqzcudXHS/1RX7x97CfR7FPeX2M4uZsLoZiRcvYrl8ubt/2ccH3aZ8cfwBxX7Tr
+  </data>
+ </layer>
+ <layer id="3" name="Layer 3" width="40" height="40">
+  <data encoding="base64" compression="zlib">
+   eAHNmLluFEEQhjsiIQAiDMareQoccokUk0OEifwiiAS/AikIeAMeAYMQPAUgbnEl1K/Zb7dc2zXH7srakmp76uiuf//pY2ZKWZQ7F0u5a7qpctmw7W4gPnD18ffxQsvsp2l7UjyDC5zL1PWYuaZdZjz6aAxwgXOvIboZLbgiGmFfBwdx3MxeV62jnVJeBX1t9jplCNbbzWJFYXtj+i3oT7NrGIfeA+bYYsV+j+dL2H6YRnlivqfB34ftz2Q+CnMMnDX+zjbzfH/13erCVw2bcpWTxfxYh5Py+MD0pqn3cw1O7K72VlPKva1S9k3vm65D/k45+z1tI174U60ahxHDgymuhwPx+fHjWJn9r3Kf++YGY3Xh8/OStcH9ASd1sBk3a33eKvzFdRznHjjBh019/Ni05GX4oz/jr7ZeY9+aTX3wYdOCs9a35ls3vloN7wNndm+37Ux7a2tBesmux+J7eboU2zuOyYdTx8xOo4s/Ybthirw3jBk+7Xc6MzjnWB/qa/vbTCLWWWB6obj+EwJ/2L595/aQHcN5rYM/9cv2bdvTZuKx4vSYfRzu1PKsSR+14NM5Iu4k8Ld/frk9GqyeI4+JuGrBndqagE+xiE++MRg/b5fyxfSraRRhyuYkHMY+svvwKUcYdd6N1aHnIxyqlsSv4xq+Z4blimFaRs41815d/wvscKe2JjV8ylsFY61O9HG2w92Q+Xfd1q72P0QYnw/UsXwL35mmrQSH1PWt509+1gg5ce/GH1vWfPRnNvwpDod+3tEv4hOHEs6TuHe30cXfMVzrnrwwlcDdkPnX9sh/I7d55vAI3GXz76rxNXFzrmtkcQuvfp529fH8ZN9RyMnGEcZfxnemNfxDuNR88vxk36HI8fj0rOnPdx+L13GOKh7XeuwjW/ikffzU4jyLDMGYzYE+DoVNZ37kR34vMU4MjDwv0dYwMwf8vc7w1figJpxi97X+eYn33ey7gMYSTkTPYlFUP+NDuRm+yGkc19vwWuPR5429FoYat2OwUVMY4/uZYtn3Bvr1tV3c9vU9qfijppRDUy/LcEj/Vfr6MRjnqLG9zTQK8ejP7Nr7QJbr/b4OzyiKe/9e0/ao1fB5bVb7m/l9jr8ekl/7nqgx/DxmnP/o/jCW
+  </data>
+ </layer>
+ <layer id="4" name="Above Player" width="40" height="40">
+  <data encoding="base64" compression="zlib">
+   eAHt0MEJgDAMheE3gQMoOIJHnaAO417qLupQ5iKUIu2lpRT+QJASCS+fRKUEXCet1hQCCCCAAAIIIIBAXMCN8Xnt6eblS2VNzUvdsg/SYX1ah+Vn8m8J/yv5vizXbf385KuVqeS97EYAAQRaFph7abH+vi3fQnYEEEAgh8CUYwk7mhJ4ASI8CjE=
+  </data>
+ </layer>
+ <objectgroup color="#ff0000" id="6" name="Collisions">
+  <object id="17" type="collision" x="0" y="0">
+   <polygon points="0,0 528,0 528,32 0,32"/>
+  </object>
+  <object id="58" type="collision" x="464" y="464" width="64" height="16"/>
+  <object id="61" type="collision" x="80" y="512" width="96" height="32"/>
+  <object id="65" type="collision" x="512" y="32" width="48" height="48"/>
+  <object id="66" type="collision" x="512" y="80" width="32" height="16"/>
+  <object id="67" type="collision" x="560" y="32" width="32" height="32"/>
+  <object id="68" type="collision" x="576" y="64" width="16" height="16"/>
+  <object id="72" type="collision" x="528" y="544" width="32" height="32"/>
+  <object id="81" type="collision" x="368" y="288" width="16" height="16"/>
+  <object id="82" type="collision" x="256" y="208" width="32" height="80"/>
+  <object id="83" type="collision" x="272" y="272" width="64" height="32"/>
+  <object id="84" type="collision" x="272" y="192" width="64" height="32"/>
+  <object id="85" type="collision" x="240" y="96" width="96" height="32"/>
+  <object id="86" type="collision" x="320" y="112" width="32" height="48"/>
+  <object id="87" type="collision" x="176" y="128" width="64" height="32"/>
+  <object id="88" type="collision" x="224" y="112" width="32" height="32"/>
+  <object id="94" type="collision" x="80" y="32" width="32" height="48"/>
+  <object id="95" type="collision" x="48" y="64" width="32" height="32"/>
+  <object id="98" type="collision" x="384" y="304" width="48" height="16"/>
+  <object id="99" type="collision" x="496" y="320" width="32" height="16"/>
+  <object id="100" type="collision" x="512" y="272" width="48" height="16"/>
+  <object id="101" type="collision" x="352" y="256" width="16" height="16"/>
+  <object id="102" type="collision" x="544" y="304" width="16" height="16"/>
+  <object id="103" type="collision" x="560" y="272" width="16" height="16"/>
+  <object id="129" type="collision" x="176" y="544" width="32" height="32"/>
+  <object id="135" type="collision" x="64" y="480" width="16" height="48"/>
+  <object id="136" type="collision" x="80" y="496" width="16" height="16"/>
+  <object id="137" type="collision" x="160" y="528" width="32" height="32"/>
+  <object id="140" type="collision" x="480" y="480" width="32" height="32"/>
+  <object id="141" type="collision" x="416" y="512" width="32" height="32"/>
+  <object id="143" type="collision" x="208" y="400" width="64" height="16"/>
+  <object id="152" type="collision" x="560" y="0" width="48" height="32"/>
+  <object id="164" type="collision" x="144" y="256" width="16" height="48"/>
+  <object id="180" type="collision" x="432" y="256" width="16" height="16"/>
+  <object id="181" type="collision" x="448" y="304" width="16" height="16"/>
+  <object id="182" type="collision" x="480" y="144" width="48" height="16"/>
+  <object id="183" type="collision" x="544" y="160" width="48" height="16"/>
+  <object id="184" type="collision" x="48" y="480" width="16" height="32"/>
+ </objectgroup>
+ <objectgroup color="#ffff00" id="7" name="Events">
+  <object id="111" name="Play Music" type="event" x="0" y="0" width="16" height="16">
+   <properties>
+    <property name="act10" value="play_music music_the_wild_places"/>
+    <property name="cond10" value="not music_playing music_the_wild_places"/>
+   </properties>
+  </object>
+  <object id="153" name="Teleport to Leather Town" type="event" x="480" y="624" width="16" height="16">
+   <properties>
+    <property name="act10" value="transition_teleport player,leather_town.tmx,30,0,0.3"/>
+    <property name="act20" value="char_face player,bottom"/>
+    <property name="cond10" value="is char_at player"/>
+    <property name="cond20" value="is char_facing player,bottom"/>
+   </properties>
+  </object>
+  <object id="154" name="Teleport to Leather Town" type="event" x="496" y="624" width="16" height="16">
+   <properties>
+    <property name="act10" value="transition_teleport player,leather_town.tmx,31,0,0.3"/>
+    <property name="act20" value="char_face player,bottom"/>
+    <property name="cond10" value="is char_at player"/>
+    <property name="cond20" value="is char_facing player,bottom"/>
+   </properties>
+  </object>
+  <object id="155" name="Teleport to Leather Town" type="event" x="512" y="624" width="16" height="16">
+   <properties>
+    <property name="act10" value="transition_teleport player,leather_town.tmx,32,0,0.3"/>
+    <property name="act20" value="char_face player,bottom"/>
+    <property name="cond10" value="is char_at player"/>
+    <property name="cond20" value="is char_facing player,bottom"/>
+   </properties>
+  </object>
+  <object id="156" name="Teleport to Leather Town" type="event" x="528" y="624" width="16" height="16">
+   <properties>
+    <property name="act10" value="transition_teleport player,leather_town.tmx,33,0,0.3"/>
+    <property name="act20" value="char_face player,bottom"/>
+    <property name="cond10" value="is char_at player"/>
+    <property name="cond20" value="is char_facing player,bottom"/>
+   </properties>
+  </object>
+  <object id="157" name="Teleport to Leather Town" type="event" x="544" y="624" width="16" height="16">
+   <properties>
+    <property name="act10" value="transition_teleport player,leather_town.tmx,34,0,0.3"/>
+    <property name="act20" value="char_face player,bottom"/>
+    <property name="cond10" value="is char_at player"/>
+    <property name="cond20" value="is char_facing player,bottom"/>
+   </properties>
+  </object>
+  <object id="161" name="Teleport to Wayfarer Inn" type="event" x="560" y="64" width="16" height="16">
+   <properties>
+    <property name="act10" value="transition_teleport player,wayfarer_inn1.tmx,11,10,0.3"/>
+    <property name="act20" value="char_face player,up"/>
+    <property name="cond10" value="is char_at player"/>
+    <property name="cond20" value="is char_facing player,up"/>
+   </properties>
+  </object>
+  <object id="166" name="Teleport to Wayfarer Inn" type="event" x="544" y="464" width="16" height="16">
+   <properties>
+    <property name="act10" value="transition_teleport player,wayfarer_inn1.tmx,11,10,0.3"/>
+    <property name="act20" value="char_face player,up"/>
+    <property name="cond10" value="is char_at player"/>
+    <property name="cond20" value="is char_facing player,up"/>
+   </properties>
+  </object>
+  <object id="167" name="Teleport to Wayfarer Inn" type="event" x="544" y="16" width="16" height="16">
+   <properties>
+    <property name="act10" value="transition_teleport player,wayfarer_inn1.tmx,12,2,0.3"/>
+    <property name="act20" value="char_face player,down"/>
+    <property name="cond10" value="is char_at player"/>
+    <property name="cond20" value="is char_facing player,down"/>
+   </properties>
+  </object>
+  <object id="168" name="Teleport to Wayfarer Inn" type="event" x="528" y="16" width="16" height="16">
+   <properties>
+    <property name="act10" value="transition_teleport player,wayfarer_inn1.tmx,11,2,0.3"/>
+    <property name="act20" value="char_face player,down"/>
+    <property name="cond10" value="is char_at player"/>
+    <property name="cond20" value="is char_facing player,down"/>
+   </properties>
+  </object>
+  <object id="169" name="Teleport to Route 4" type="event" x="528" y="0" width="16" height="16">
+   <properties>
+    <property name="act10" value="transition_teleport player,route4.tmx,13,39,0.3"/>
+    <property name="act20" value="char_face player,up"/>
+    <property name="cond10" value="is char_at player"/>
+    <property name="cond20" value="is char_facing player,up"/>
+   </properties>
+  </object>
+  <object id="170" name="Teleport to Route 4" type="event" x="544" y="0" width="16" height="16">
+   <properties>
+    <property name="act10" value="transition_teleport player,route4.tmx,14,39,0.3"/>
+    <property name="act20" value="char_face player,up"/>
+    <property name="cond10" value="is char_at player"/>
+    <property name="cond20" value="is char_facing player,up"/>
+   </properties>
+  </object>
+  <object id="178" name="Environment Day" type="event" x="16" y="0" width="16" height="16">
+   <properties>
+    <property name="act1" value="set_environment grass"/>
+    <property name="cond1" value="not time_is stage_of_day,equals,night"/>
+    <property name="cond2" value="not environment_is grass"/>
+   </properties>
+  </object>
+  <object id="179" name="Environment Night" type="event" x="32" y="0" width="16" height="16">
+   <properties>
+    <property name="act1" value="set_environment night_grass"/>
+    <property name="cond1" value="is time_is stage_of_day,equals,night"/>
+    <property name="cond2" value="not environment_is night_grass"/>
+   </properties>
+  </object>
+ </objectgroup>
+</map>

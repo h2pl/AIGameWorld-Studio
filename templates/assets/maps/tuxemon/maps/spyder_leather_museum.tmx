@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.10" tiledversion="1.11.0" orientation="orthogonal" renderorder="right-down" width="30" height="11" tilewidth="16" tileheight="16" infinite="0" nextlayerid="8" nextobjectid="62">
+ <properties>
+  <property name="edges" value="clamped"/>
+  <property name="inside" type="bool" value="true"/>
+  <property name="map_type" value="notype"/>
+  <property name="scenario" value="spyder"/>
+  <property name="slug" value="leather_museum"/>
+ </properties>
+ <tileset firstgid="1" source="../gfx/tilesets/Superpowers_Tilesheet.tsx"/>
+ <tileset firstgid="1601" source="../gfx/tilesets/core_set pieces.tsx"/>
+ <tileset firstgid="3151" source="../gfx/tilesets/core_outdoor.tsx"/>
+ <tileset firstgid="5926" source="../gfx/tilesets/core_indoor_floors.tsx"/>
+ <tileset firstgid="9790" source="../gfx/tilesets/core_indoor_walls.tsx"/>
+ <layer id="1" name="Layer 1" width="30" height="11">
+  <data encoding="base64" compression="zlib">
+   eJzr0GJg6MCCiQHY9BGLt+HAxABceinBtLb3CQ78T5MwxqWXGLxdmoGhUxqT1tEijLdLo2Js5uCicclFaRHGndKomBS7ccltBeJ2AjQt/EvIznbpUf8OBf8CACnK58w=
+  </data>
+ </layer>
+ <layer id="2" name="Layer 2" width="30" height="11">
+  <data encoding="base64" compression="zlib">
+   eJxjYBgFo2AUjALSwB5pBoa9ULxPmn72vgLa9RqK39DRXgDs5Ad5
+  </data>
+ </layer>
+ <layer id="3" name="Layer 3" width="30" height="11">
+  <data encoding="base64" compression="zlib">
+   eJxjYBgFpID77OSzKQH/2Mln4wLUchupgBi3DWXwgIuBgYkbwhZkYmAIZoGw1YG0H5RdBaT5mVD1HRVmYDgGxMeB+AQQnwTiU0B8Wpg4e/9zkefeV0DzXwPxGyB+C8TvgPg9EH+gsb38IgwMAkAsCMRCQCwMxCJALCpCW3vJAQAa4h8S
+  </data>
+ </layer>
+ <layer id="5" name="Layer 4" width="30" height="11">
+  <data encoding="base64" compression="zlib">
+   eJxjYBgFo2AUDAfgwTXQLhi+AAB0lgBT
+  </data>
+ </layer>
+ <layer id="7" name="Above Player" width="30" height="11">
+  <data encoding="base64" compression="zlib">
+   eJztzccNACAMwMDskHGpo9DnxEuA8oile1vE82wWVCQiIaOg6vtv49ExMLGwcT68PZtdnp8IXg==
+  </data>
+ </layer>
+ <objectgroup color="#ff0000" id="4" name="Collisions">
+  <object id="47" type="collision" x="96" y="112" width="32" height="16"/>
+  <object id="48" type="collision" x="144" y="112" width="32" height="16"/>
+  <object id="49" type="collision" x="192" y="112" width="32" height="16"/>
+  <object id="50" type="collision" x="288" y="112" width="80" height="32"/>
+  <object id="51" type="collision" x="0" y="48" width="480" height="16"/>
+  <object id="52" type="collision" x="96" y="64" width="144" height="32"/>
+  <object id="53" type="collision" x="48" y="112" width="16" height="64"/>
+  <object id="54" type="collision" x="64" y="112" width="16" height="16"/>
+ </objectgroup>
+</map>

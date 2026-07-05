@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.8" tiledversion="1.8.0" orientation="orthogonal" renderorder="right-down" compressionlevel="0" width="14" height="9" tilewidth="16" tileheight="16" infinite="0" nextlayerid="10" nextobjectid="54">
+ <properties>
+  <property name="edges" value="clamped"/>
+  <property name="inside" type="bool" value="true"/>
+  <property name="scenario" value="spyder"/>
+  <property name="slug" value="flower_petshop"/>
+  <property name="map_type" value="notype"/>
+ </properties>
+ <tileset firstgid="1" name="Interiors_16x16" tilewidth="16" tileheight="16" tilecount="2592" columns="16">
+  <image source="../gfx/tilesets/Interiors_16x16.png" width="256" height="2592"/>
+ </tileset>
+ <tileset firstgid="2593" name="Tilesets_16x16" tilewidth="16" tileheight="16" tilecount="1760" columns="40">
+  <image source="../gfx/tilesets/Tilesets_16x16.png" width="640" height="704"/>
+ </tileset>
+ <layer id="1" name="Tile Layer 1" width="14" height="9">
+  <data encoding="base64" compression="zlib">
+   eAFr52VgyCIBZwPVdgHxeiCeRAKeDFS7CYivA/EuIN5NAr4FVPsfiB8B8WMSMEhfFx95+l6SaR/IfeS405ebdH17gHbtJMM+kD4A60VoKw==
+  </data>
+ </layer>
+ <layer id="6" name="Tile Layer 2" width="14" height="9">
+  <data encoding="base64" compression="zlib">
+   eAFjYMAEm9gxxbCJLGZkYFgCxKeB+AwQH0LTBxOHqYOZsRmodgsQ3wbiO0AsDZSQgWJZIA0Th6mD6UOntYECOlCsiy6Jhw/SBwOk6LMGarKBYluYAUTQ3kA1PlDsS4R6XEpamBkYWoGYVDAFqGcqmj4AuXoTYQ==
+  </data>
+ </layer>
+ <layer id="7" name="Tile Layer 3" width="14" height="9">
+  <data encoding="base64" compression="zlib">
+   eAFjYBgFIzEEAAH4AAE=
+  </data>
+ </layer>
+ <layer id="8" name="Tile Layer 4" width="14" height="9">
+  <data encoding="base64" compression="zlib">
+   eAFjYKAe4AYaxQPFvNQzdtQkGoQAAFEMADE=
+  </data>
+ </layer>
+ <layer id="9" name="Tile Layer 5" width="14" height="9">
+  <data encoding="base64" compression="zlib">
+   eAFjYBgFIzEEAAH4AAE=
+  </data>
+ </layer>
+ <objectgroup color="#ff0000" id="3" name="Collisions">
+  <object id="14" type="collision" x="0" y="32" width="224" height="16"/>
+  <object id="15" type="collision" x="0" y="48" width="16" height="48"/>
+  <object id="16" type="collision" x="208" y="32" width="16" height="112"/>
+  <object id="24" type="collision" x="80" y="80" width="64" height="16"/>
+  <object id="25" type="collision" x="80" y="48" width="16" height="32"/>
+  <object id="26" type="collision" x="128" y="48" width="16" height="32"/>
+  <object id="45" type="collision" x="0" y="112" width="16" height="32"/>
+ </objectgroup>
+</map>

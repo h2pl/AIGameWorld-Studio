@@ -1,0 +1,664 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" compressionlevel="0" width="40" height="40" tilewidth="16" tileheight="16" infinite="0" nextlayerid="8" nextobjectid="511">
+ <properties>
+  <property name="east" value="route4"/>
+  <property name="edges" value="clamped"/>
+  <property name="map_type" value="town"/>
+  <property name="north" value="routea"/>
+  <property name="scenario" value="spyder"/>
+  <property name="slug" value="flower_city"/>
+  <property name="west" value="route5"/>
+ </properties>
+ <tileset firstgid="1" source="../gfx/tilesets/core_city_and_country.tsx"/>
+ <tileset firstgid="1441" source="../gfx/tilesets/core_outdoor_nature.tsx"/>
+ <tileset firstgid="9633" source="../gfx/tilesets/core_set pieces.tsx"/>
+ <tileset firstgid="11183" source="../gfx/tilesets/core_buildings.tsx"/>
+ <tileset firstgid="13533" source="../gfx/tilesets/core_outdoor.tsx"/>
+ <tileset firstgid="16308" source="../gfx/tilesets/core_outdoor_water.tsx"/>
+ <layer id="1" name="Layer 1" width="40" height="40">
+  <data encoding="base64" compression="zlib">
+   eAHtlstRxTAMRVMGvzYYYMHQwNsAHQA1AL0AxUAJFAEdwBZpJmfGI+RYfvl5kYVGiSPrXuvn7E67brdJdy0xuOnltsF4PAqnp16eG+T3Ipw+GuVHbr97fl+iyfWQXqoO0tyS44heqg7g9y5xe62QN7FdYrbAb6l41J6pBX70gFfTLfCDg/am5ci3NfMLB+1LOz+YK2vyS+dvbnasyU97hhjm5shS8yLXv/BbO07wo2e5o1qoM7il+bT1Vhs/zmn7PsXa51l7wruvauustbqwsdj4jfvPmCN+U9b0HPym9DmlL2o76jMS56gvsFWX/EZ9RuwiNik3fS7tKX3HX8QuYoM/NLM3N2vxaf+luOvQkTsPX7X3DlzJNZiqwbV3W+59CHssP/Z72Ll/KXvv5fKgMcD/0BmIlafJtcXU9yFcz5e3NpbfwVnXHQbkSGw8/NLaED+L62FcCu7nRV4UX79fzcDP4h6f/4/ViaxZO+/d2xs5P/Xj1YqHM+dabYz34fIjebwX+S3k3fNdy09xkCgeGKW6nIJf2lt3CVc4e/pB7HRfxN6embOluGs+2xhv/Opm8Nj4/QGc1ZEo
+  </data>
+ </layer>
+ <layer id="2" name="Layer 2" width="40" height="40">
+  <data encoding="base64" compression="zlib">
+   eAHNkjtOA0EQRBsJJ0AAMYhPgsTnApCQAeInX4efcAwcAy4AdwBkcxRICICQtuBJq5FbPbZ7ZxmpVHb1bFepdkX+15ncFmkpYC9dt+XdiJ2vabZ1BRy7PW4b/cFxm8ff1NN3Rn9w7ta3DZF3Bx86b+rMb4osOFjRefS5nhW5MXCrOieqP74ri/GDu5qhZ+C1ki+qP74ri8kF5+Y70Hd3OABHqh0rThRthXes3lKdPbn5TtX7bADOVbtQXCquFN6xekt19uTm4/64TE/pHnSYeel89IQ/jA6Ts3Q+fMkFo8PkLJ0PX3LB6DA5S+fDl1wwOkzOqTmRaQMzqkcffNO96HA6L/Wffiw/b249F6V7/TBvKqfny5ycUb3k7vF8vXmuz6j36Md63ptbz0XpXj/Mm8rp+TInZ1QvuXs8X+bkzN0bdc/zZU7OKN/cPZ4vc3I+bIk8Juh79bU6Dr7WbubktO7VpXu+zMlZVw5rr+WLDpPT2lOXbvmiw+QcNce3SOdL8akYZofliw6Tc5jd1bvLE9JZUiwqqrr32/JFh7093nxfc+0pdofMZ+2lN9i615ROb3BTOSxfeoPvVq2bzej0Bt8XzkcvuVwq3/PO7/ugl1wuke/pL9uLcm5v3CuRr/ol5/bGvR+FO8sK
+  </data>
+ </layer>
+ <layer id="3" name="Layer 3" width="40" height="40">
+  <data encoding="base64" compression="zlib">
+   eAHtlstOFEEUhgscUAnKuPERSCSOjBcSLoprohAfwZCgI4+AGkeNG9YorFBhAQzu2LlVMCEKcvUWUV4B0ETj7euYkykqXenqnp7JMOEkX+rSVef8dfqku5T6b4l2pWpATB9LX1pZU2h7I6WyGbgO16APTJ8S8wTamsAce+vlmdfGaSPoGYZH8BCGwPQvsWXeHMt8MdpX6JmDWXgJL6CrMXqkwWT0vX47v6PnG+zANmxBJqS+XEfe83zM+vKe7T2pN/uK/JO6Y/l+qXqlrLcoZwqTvyj+C90j+esNWZeFxo17f7Hy3NOsst1wGS6Bqds1ruTZ3F/o+DaabsFNGPDR5xrX9Rxh9T5D0zTkYMpHn6s/13O4+pN1cekz8/f5pFIb8AW+wiZEsU/k7CN8gPcx5q8+pdQROAoNkIQoVqz8daDnPFyATrgIuo3zLx2Dp/AEHsMo6Gu8flD+5L1JfUkrfmQsrcwHtctoWYK3sAgL8AbMfaa+K227V+hxX8d4v6s6hRb4i6Y/8Bt++eirS6vsYTgEB2G3usodudaXZOCBdk+TuTBthvc+E0C/Vhuu9eWiYSut1DbswHHLOVZbgz2ta2tc6muFb+IqrME6vIOoput7ruVJ96fr0+dt/Wq+OQcgATVQC1FN12fzEUZfmvvaafScgbNwDlrAz/T36/fcm3PRZ9tbinlP31VLbZYiflCMH+j76cMdNmbhLtyD+xC3ubxfW8wJHkzCFORgGirVbN+2SjvvRIz3hErLzf559jNQbhmostxXykVnY5nrK5c87UUd/wDfo9Eo
+  </data>
+ </layer>
+ <layer id="4" name="Above Player" width="40" height="40">
+  <data encoding="base64" compression="zlib">
+   eAHtlklOAzEQRWsBYsgZICuEgCCGrOAiENhmnzDcgwVXYFoxJLAOCHIB4BwJR+CxKCnqOOlOp9yyhEt6KtltVf3+tiyLTBadDZHXFN74PrsvMgODWTvpvI4tc4/e/RR++L6OtjUYzKpD53VsmbPqy9qzXnGvzOvxEvWWUyiP6OlScjlirU+PXTriXLEO5D1/RamM568op2MfHw7cc68+wCM8QQti2DnQ2BRpwgmcwhmcQ97Q+1Cz1kmOdT7m8BzobfO2BIuwPl8WmnzVeMezD+g6vPN5/q+4E6/hBm7hDiYNH++E9orIM7xAiPGJri/4zqhv3P6m/d8cC+ZhARahBCHFFmL+ju0O7EIVQooDxBxCDY7gGKwjy/629kTaDqy1hFSvuRqSmmEtF4HrG1YcZ6ID0YH/6IC+A62zlZf6DrTOFvqsPUvWm1ajtWfJetPo+wVvJnQD
+  </data>
+ </layer>
+ <objectgroup color="#ff0000" id="6" name="Collisions">
+  <object id="308" type="collision" x="448" y="608" width="16" height="32"/>
+  <object id="332" type="collision" x="368" y="336" width="32" height="48"/>
+  <object id="333" type="collision" x="400" y="336" width="48" height="32"/>
+  <object id="334" type="collision" x="416" y="368" width="32" height="16"/>
+  <object id="343" type="collision" x="128" y="416" width="32" height="32"/>
+  <object id="350" type="collision" x="160" y="144" width="32" height="128"/>
+  <object id="351" type="collision" x="32" y="256" width="64" height="16"/>
+  <object id="352" type="collision" x="128" y="256" width="32" height="16"/>
+  <object id="366" type="collision" x="320" y="0" width="32" height="160"/>
+  <object id="367" type="collision" x="192" y="0" width="128" height="128"/>
+  <object id="368" type="collision" x="192" y="128" width="112" height="32"/>
+  <object id="369" type="collision" x="352" y="0" width="80" height="32"/>
+  <object id="370" type="collision" x="464" y="0" width="32" height="32"/>
+  <object id="372" type="collision" x="496" y="0" width="80" height="64"/>
+  <object id="375" type="collision" x="608" y="32" width="32" height="32"/>
+  <object id="378" type="collision" x="32" y="0" width="32" height="32"/>
+  <object id="379" type="collision" x="64" y="16" width="32" height="32"/>
+  <object id="380" type="collision" x="96" y="0" width="32" height="32"/>
+  <object id="382" type="collision" x="144" y="0" width="48" height="32"/>
+  <object id="386" type="collision" x="480" y="96" width="32" height="416"/>
+  <object id="387" type="collision" x="512" y="96" width="128" height="16"/>
+  <object id="388" type="collision" x="576" y="160" width="64" height="96"/>
+  <object id="390" type="collision" x="560" y="272" width="32" height="16"/>
+  <object id="391" type="collision" x="512" y="272" width="32" height="16"/>
+  <object id="392" type="collision" x="544" y="256" width="16" height="16"/>
+  <object id="393" type="collision" x="608" y="256" width="32" height="192"/>
+  <object id="394" type="collision" x="576" y="448" width="32" height="160"/>
+  <object id="398" type="collision" x="448" y="576" width="128" height="32"/>
+  <object id="399" type="collision" x="368" y="448" width="16" height="16"/>
+  <object id="400" type="collision" x="0" y="16" width="32" height="128"/>
+  <object id="401" type="collision" x="0" y="160" width="32" height="352"/>
+  <object id="409" type="collision" x="576" y="48" width="16" height="16"/>
+  <object id="416" type="collision" x="224" y="304" width="16" height="48"/>
+  <object id="417" type="collision" x="240" y="304" width="80" height="32"/>
+  <object id="418" type="collision" x="256" y="336" width="64" height="16"/>
+  <object id="419" type="collision" x="352" y="240" width="16" height="48"/>
+  <object id="420" type="collision" x="368" y="240" width="80" height="32"/>
+  <object id="421" type="collision" x="384" y="272" width="64" height="16"/>
+  <object id="450" type="collision" x="224" y="208" width="32" height="48"/>
+  <object id="451" type="collision" x="256" y="208" width="16" height="32"/>
+  <object id="452" type="collision" x="272" y="208" width="32" height="48"/>
+  <object id="465" type="collision" x="32" y="128" width="16" height="16"/>
+  <object id="469" type="collision" x="352" y="368" width="16" height="16"/>
+  <object id="480" type="collision" x="384" y="608" width="16" height="32"/>
+  <object id="493" type="collision" x="0" y="576" width="400" height="32"/>
+  <object id="494" type="collision" x="176" y="384" width="32" height="64"/>
+  <object id="497" type="collision" x="128" y="384" width="48" height="16"/>
+  <object id="500" type="collision" x="144" y="400" width="16" height="16"/>
+ </objectgroup>
+ <objectgroup color="#ffff00" id="7" name="Events">
+  <object id="293" name="Teleport to Route 4" type="event" x="624" y="64" width="16" height="16">
+   <properties>
+    <property name="act1" value="transition_teleport player,spyder_route4.tmx,0,4,0.3"/>
+    <property name="act2" value="char_face player,right"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_facing player,right"/>
+   </properties>
+  </object>
+  <object id="294" name="Teleport to Route 4" type="event" x="624" y="80" width="16" height="16">
+   <properties>
+    <property name="act1" value="transition_teleport player,spyder_route4.tmx,0,5,0.3"/>
+    <property name="act2" value="char_face player,right"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_facing player,right"/>
+   </properties>
+  </object>
+  <object id="295" name="Teleport to Side Route A" type="event" x="448" y="0" width="16" height="16">
+   <properties>
+    <property name="act1" value="transition_teleport player,spyder_routea.tmx,8,39,0.3"/>
+    <property name="act2" value="char_face player,up"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_facing player,up"/>
+   </properties>
+  </object>
+  <object id="296" name="Teleport to Side Route A" type="event" x="432" y="0" width="16" height="16">
+   <properties>
+    <property name="act1" value="transition_teleport player,spyder_routea.tmx,7,39,0.3"/>
+    <property name="act2" value="char_face player,up"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_facing player,up"/>
+   </properties>
+  </object>
+  <object id="298" name="Teleport to Route 5" type="event" x="0" y="144" width="16" height="16">
+   <properties>
+    <property name="act1" value="transition_teleport player,spyder_route5.tmx,39,9,0.3"/>
+    <property name="act2" value="char_face player,left"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_facing player,left"/>
+   </properties>
+  </object>
+  <object id="300" name="Teleport to Dojo" type="event" x="544" y="272" width="16" height="16">
+   <properties>
+    <property name="act1" value="transition_teleport player,spyder_dojo1.tmx,11,11,0.3"/>
+    <property name="act2" value="char_face player,up"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_facing player,up"/>
+   </properties>
+  </object>
+  <object id="385" name="Teleport to Nimrod" type="event" x="304" y="144" width="16" height="16">
+   <properties>
+    <property name="act1" value="transition_teleport player,spyder_nimrod_bottom.tmx,8,19,0.3"/>
+    <property name="act2" value="char_face player,up"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_facing player,up"/>
+   </properties>
+  </object>
+  <object id="403" name="Create Mieke" type="event" x="320" y="496" width="16" height="16">
+   <properties>
+    <property name="act1" value="create_npc spyder_flower_mieke,20,31"/>
+    <property name="act2" value="char_face spyder_flower_mieke,left"/>
+    <property name="cond1" value="not char_exists spyder_flower_mieke"/>
+   </properties>
+  </object>
+  <object id="404" name="Talk Mieke - No Budaye" type="event" x="320" y="480" width="16" height="16">
+   <properties>
+    <property name="act1" value="translated_dialog spyder_flower_mieke1"/>
+    <property name="act2" value="translated_dialog spyder_flower_mieke_nobudaye"/>
+    <property name="behav1" value="talk spyder_flower_mieke"/>
+    <property name="cond1" value="not has_monster player,budaye"/>
+    <property name="cond2" value="not variable_set mieke_hastraded:yes"/>
+   </properties>
+  </object>
+  <object id="405" name="Talk Mieke - Has Budaye" type="event" x="320" y="464" width="16" height="16">
+   <properties>
+    <property name="act1" value="translated_dialog spyder_flower_mieke1"/>
+    <property name="act2" value="translated_dialog_choice yes:no,mieke_willtrade"/>
+    <property name="behav1" value="talk spyder_flower_mieke"/>
+    <property name="cond1" value="is has_monster player,budaye"/>
+    <property name="cond2" value="not variable_set mieke_hastraded:yes"/>
+   </properties>
+  </object>
+  <object id="406" name="Talk Mieke - Will Trade Budaye" type="event" x="320" y="448" width="16" height="16">
+   <properties>
+    <property name="act1" value="translated_dialog spyder_flower_mieke_willtrade"/>
+    <property name="act2" value="get_player_monster budaye,slug,budaye"/>
+    <property name="act3" value="trading budaye,conileaf"/>
+    <property name="act4" value="set_variable mieke_hastraded:yes"/>
+    <property name="cond1" value="is has_monster player,budaye"/>
+    <property name="cond2" value="is variable_set mieke_willtrade:yes"/>
+    <property name="cond3" value="not variable_set mieke_hastraded:yes"/>
+   </properties>
+  </object>
+  <object id="407" name="Create Teach" type="event" x="400" y="496" width="16" height="16">
+   <properties>
+    <property name="act1" value="create_npc spyder_flower_teach,25,31"/>
+    <property name="act2" value="char_face spyder_flower_teach,right"/>
+    <property name="cond1" value="not char_exists spyder_flower_teach"/>
+   </properties>
+  </object>
+  <object id="408" name="Talk Teach" type="event" x="400" y="480" width="16" height="16">
+   <properties>
+    <property name="act1" value="translated_dialog spyder_flower_teach1"/>
+    <property name="behav1" value="talk spyder_flower_teach"/>
+   </properties>
+  </object>
+  <object id="410" name="Sign: Flower City" type="event" x="576" y="48" width="16" height="16">
+   <properties>
+    <property name="act1" value="translated_dialog welcome_location_city"/>
+    <property name="cond1" value="is char_facing_tile player"/>
+    <property name="cond2" value="is button_pressed INTERACT"/>
+   </properties>
+  </object>
+  <object id="412" name="Sign: Route 5" type="event" x="32" y="128" width="16" height="16">
+   <properties>
+    <property name="act1" value="translated_dialog here_to_west"/>
+    <property name="cond1" value="is char_facing_tile player"/>
+    <property name="cond2" value="is button_pressed INTERACT"/>
+   </properties>
+  </object>
+  <object id="413" name="Teleport to Pet Shop" type="event" x="160" y="432" width="16" height="16">
+   <properties>
+    <property name="act1" value="transition_teleport player,spyder_flower_petshop.tmx,9,8,0.3"/>
+    <property name="act2" value="char_face player,up"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_facing player,up"/>
+   </properties>
+  </object>
+  <object id="414" name="Sign: Dojo" type="event" x="560" y="272" width="32" height="16">
+   <properties>
+    <property name="act1" value="translated_dialog spyder_flower_dojo_sign"/>
+    <property name="cond1" value="is char_facing_tile player"/>
+    <property name="cond2" value="is button_pressed INTERACT"/>
+   </properties>
+  </object>
+  <object id="423" name="Teleport to Flower House 2" type="event" x="368" y="272" width="16" height="16">
+   <properties>
+    <property name="act1" value="transition_teleport player,spyder_flower_house2.tmx,2,7,0.3"/>
+    <property name="act2" value="char_face player,up"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_facing player,up"/>
+   </properties>
+  </object>
+  <object id="424" name="Teleport to Flower House 1" type="event" x="240" y="336" width="16" height="16">
+   <properties>
+    <property name="act1" value="transition_teleport player,spyder_flower_house1.tmx,6,7,0.3"/>
+    <property name="act2" value="char_face player,up"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_facing player,up"/>
+   </properties>
+  </object>
+  <object id="425" name="Create Florist" type="event" x="240" y="480" width="16" height="16">
+   <properties>
+    <property name="act1" value="create_npc spyder_flower_lissa,15,30"/>
+    <property name="act2" value="char_face spyder_flower_lissa,up"/>
+    <property name="cond1" value="not char_exists spyder_flower_lissa"/>
+    <property name="cond2" value="not variable_set captainreturns:yes"/>
+   </properties>
+  </object>
+  <object id="426" name="Talk Florist" type="event" x="256" y="464" width="16" height="16">
+   <properties>
+    <property name="act1" value="translated_dialog spyder_flower_florist"/>
+    <property name="behav1" value="talk spyder_flower_lissa"/>
+   </properties>
+  </object>
+  <object id="427" name="Create Fez" type="event" x="352" y="448" width="16" height="16">
+   <properties>
+    <property name="act1" value="create_npc spyder_flower_fez,22,28"/>
+    <property name="act2" value="char_face spyder_flower_fez,down"/>
+    <property name="cond1" value="not char_exists spyder_flower_fez"/>
+   </properties>
+  </object>
+  <object id="428" name="Talk Fez - No Ignibus" type="event" x="352" y="432" width="16" height="16">
+   <properties>
+    <property name="act1" value="translated_dialog spyder_flower_fez1"/>
+    <property name="act2" value="translated_dialog spyder_flower_fez_noignibus"/>
+    <property name="behav1" value="talk spyder_flower_fez"/>
+    <property name="cond1" value="not has_monster player,ignibus"/>
+    <property name="cond2" value="not variable_set fez_hastraded:yes"/>
+   </properties>
+  </object>
+  <object id="429" name="Talk Fez - Has Ignibus" type="event" x="352" y="416" width="16" height="16">
+   <properties>
+    <property name="act1" value="translated_dialog spyder_flower_fez1"/>
+    <property name="act2" value="translated_dialog_choice yes:no,fez_willtrade"/>
+    <property name="behav1" value="talk spyder_flower_fez"/>
+    <property name="cond1" value="is has_monster player,ignibus"/>
+    <property name="cond2" value="not variable_set fez_hastraded:yes"/>
+   </properties>
+  </object>
+  <object id="430" name="Talk Fez - Will Trade Ignibus" type="event" x="352" y="400" width="16" height="16">
+   <properties>
+    <property name="act1" value="translated_dialog spyder_flower_fez_willtrade"/>
+    <property name="act2" value="get_player_monster ignibus,slug,ignibus"/>
+    <property name="act3" value="trading ignibus,foxfire"/>
+    <property name="act4" value="set_variable fez_hastraded:yes"/>
+    <property name="cond1" value="is has_monster player,ignibus"/>
+    <property name="cond2" value="is variable_set fez_willtrade:yes"/>
+    <property name="cond3" value="not variable_set fez_hastraded:yes"/>
+   </properties>
+  </object>
+  <object id="431" name="Create Cady" type="event" x="448" y="544" width="16" height="16">
+   <properties>
+    <property name="act1" value="create_npc spyder_flower_cady,28,34"/>
+    <property name="act2" value="char_face spyder_flower_cady,left"/>
+    <property name="cond1" value="not char_exists spyder_flower_cady"/>
+   </properties>
+  </object>
+  <object id="432" name="Talk Cady - No Grintot" type="event" x="448" y="528" width="16" height="16">
+   <properties>
+    <property name="act1" value="translated_dialog spyder_flower_cady1"/>
+    <property name="act2" value="translated_dialog spyder_flower_cady_nogrintot"/>
+    <property name="behav1" value="talk spyder_flower_cady"/>
+    <property name="cond1" value="not has_monster player,grintot"/>
+    <property name="cond2" value="not variable_set cady_hastraded:yes"/>
+   </properties>
+  </object>
+  <object id="433" name="Talk Cady - Has Grintot" type="event" x="448" y="512" width="16" height="16">
+   <properties>
+    <property name="act1" value="translated_dialog spyder_flower_cady1"/>
+    <property name="act2" value="translated_dialog_choice yes:no,cady_willtrade"/>
+    <property name="behav1" value="talk spyder_flower_cady"/>
+    <property name="cond1" value="is has_monster player,grintot"/>
+    <property name="cond2" value="not variable_set cady_hastraded:yes"/>
+   </properties>
+  </object>
+  <object id="434" name="Talk Cady - Will Trade Grintot" type="event" x="448" y="496" width="16" height="16">
+   <properties>
+    <property name="act1" value="translated_dialog spyder_flower_cady_willtrade"/>
+    <property name="act2" value="get_player_monster grintot,slug,grintot"/>
+    <property name="act3" value="trading grintot,hampotamos"/>
+    <property name="act4" value="set_variable cady_hastraded:yes"/>
+    <property name="cond1" value="is has_monster player,grintot"/>
+    <property name="cond2" value="is variable_set cady_willtrade:yes"/>
+    <property name="cond3" value="not variable_set cady_hastraded:yes"/>
+   </properties>
+  </object>
+  <object id="435" name="Create Sandy" type="event" x="432" y="384" width="16" height="16">
+   <properties>
+    <property name="act1" value="create_npc spyder_flower_sandy,27,24"/>
+    <property name="act2" value="char_face spyder_flower_sandy,up"/>
+    <property name="cond1" value="not char_exists spyder_flower_sandy"/>
+   </properties>
+  </object>
+  <object id="436" name="Talk Sandy - No Tweesher" type="event" x="432" y="368" width="16" height="16">
+   <properties>
+    <property name="act1" value="translated_dialog spyder_flower_sandy1"/>
+    <property name="act2" value="translated_dialog spyder_flower_sandy_notweesher"/>
+    <property name="behav1" value="talk spyder_flower_sandy"/>
+    <property name="cond1" value="not has_monster player,tweesher"/>
+    <property name="cond2" value="not variable_set sandy_hastraded:yes"/>
+   </properties>
+  </object>
+  <object id="437" name="Talk Sandy - Has Tweesher" type="event" x="432" y="352" width="16" height="16">
+   <properties>
+    <property name="act1" value="translated_dialog spyder_flower_sandy1"/>
+    <property name="act2" value="translated_dialog_choice yes:no,sandy_willtrade"/>
+    <property name="behav1" value="talk spyder_flower_sandy"/>
+    <property name="cond1" value="is has_monster player,tweesher"/>
+    <property name="cond2" value="not variable_set sandy_hastraded:yes"/>
+   </properties>
+  </object>
+  <object id="438" name="Talk Sandy - Will Trade Tweesher" type="event" x="432" y="336" width="16" height="16">
+   <properties>
+    <property name="act1" value="translated_dialog spyder_flower_sandy_willtrade"/>
+    <property name="act2" value="get_player_monster tweesher,slug,tweesher"/>
+    <property name="act3" value="trading tweesher,pharfan"/>
+    <property name="act4" value="set_variable sandy_hastraded:yes"/>
+    <property name="cond1" value="is has_monster player,tweesher"/>
+    <property name="cond2" value="is variable_set sandy_willtrade:yes"/>
+    <property name="cond3" value="not variable_set sandy_hastraded:yes"/>
+   </properties>
+  </object>
+  <object id="439" name="Teleport to Nimrod" type="event" x="176" y="48" width="16" height="48">
+   <properties>
+    <property name="act1" value="transition_teleport player,spyder_nimrod_bottom.tmx,0,17,0.3"/>
+    <property name="act2" value="char_face player,right"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_facing player,right"/>
+   </properties>
+  </object>
+  <object id="444" name="Seen Flower" type="event" x="608" y="64" width="16" height="32">
+   <properties>
+    <property name="act1" value="add_tracker player,flower_city"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="not tracker player,flower_city"/>
+   </properties>
+  </object>
+  <object id="440" name="Create Captain" type="event" x="272" y="496" width="16" height="16">
+   <properties>
+    <property name="act1" value="create_npc spyder_captain,17,31"/>
+    <property name="act2" value="char_face spyder_captain,up"/>
+    <property name="cond1" value="not char_exists spyder_captain"/>
+    <property name="cond2" value="is variable_set captainreturns:yes"/>
+   </properties>
+  </object>
+  <object id="441" name="Talk Captain - Flower" type="event" x="192" y="464" width="16" height="16">
+   <properties>
+    <property name="act1" value="translated_dialog spyder_river_captain2"/>
+    <property name="act2" value="translated_dialog_choice paper_town:leather_town:flower_city,rivergoto"/>
+    <property name="behav1" value="talk spyder_captain"/>
+    <property name="cond1" value="not variable_set seentimber:yes"/>
+   </properties>
+  </object>
+  <object id="445" name="Talk Captain - Timber" type="event" x="208" y="464" width="16" height="16">
+   <properties>
+    <property name="act1" value="translated_dialog spyder_river_captain2"/>
+    <property name="act2" value="translated_dialog_choice paper_town:leather_town:flower_city:timber_town,rivergoto"/>
+    <property name="behav1" value="talk spyder_captain"/>
+    <property name="cond1" value="not variable_set seencandy:yes"/>
+    <property name="cond2" value="is variable_set seentimber:yes"/>
+   </properties>
+  </object>
+  <object id="448" name="Talk Captain - Candy" type="event" x="224" y="464" width="16" height="16">
+   <properties>
+    <property name="act1" value="translated_dialog spyder_river_captain2"/>
+    <property name="act2" value="translated_dialog_choice paper_town:leather_town:flower_city:timber_town:candy_port,rivergoto"/>
+    <property name="behav1" value="talk spyder_captain"/>
+    <property name="cond1" value="is variable_set seencandy:yes"/>
+   </properties>
+  </object>
+  <object id="449" name="Teleport to Centre" type="event" x="256" y="240" width="16" height="16">
+   <properties>
+    <property name="act1" value="transition_teleport player,spyder_flower_center.tmx,6,10,0.3"/>
+    <property name="act2" value="char_face player,up"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_facing player,up"/>
+   </properties>
+  </object>
+  <object id="453" name="Teleport to Scoop" type="event" x="400" y="368" width="16" height="16">
+   <properties>
+    <property name="act1" value="transition_teleport player,spyder_flower_scoop.tmx,5,10,0.3"/>
+    <property name="act2" value="char_face player,up"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_facing player,up"/>
+   </properties>
+  </object>
+  <object id="460" name="Destination - Flower" type="event" x="176" y="496" width="16" height="16">
+   <properties>
+    <property name="act1" value="set_variable rivergoto:nothing"/>
+    <property name="act4" value="char_face player,up"/>
+    <property name="act5" value="transition_teleport player,spyder_flower_city.tmx,17,30,0.3"/>
+    <property name="cond1" value="is variable_set rivergoto:flower_city"/>
+   </properties>
+  </object>
+  <object id="461" name="Destination - Leather" type="event" x="160" y="512" width="16" height="16">
+   <properties>
+    <property name="act1" value="set_variable rivergoto:nothing"/>
+    <property name="act2" value="transition_teleport player,spyder_leather_town.tmx,17,19,0.3"/>
+    <property name="act4" value="char_face player,right"/>
+    <property name="cond1" value="is variable_set rivergoto:leather_town"/>
+   </properties>
+  </object>
+  <object id="462" name="Destination - Paper" type="event" x="144" y="496" width="16" height="16">
+   <properties>
+    <property name="act1" value="set_variable rivergoto:nothing"/>
+    <property name="act2" value="transition_teleport player,spyder_paper_town.tmx,4,13,0.3"/>
+    <property name="act4" value="char_face player,up"/>
+    <property name="cond1" value="is variable_set rivergoto:paper_town"/>
+   </properties>
+  </object>
+  <object id="463" name="Destination - Timber" type="event" x="128" y="512" width="16" height="16">
+   <properties>
+    <property name="act1" value="set_variable rivergoto:nothing"/>
+    <property name="act2" value="transition_teleport player,spyder_timber_town.tmx,8,21,0.3"/>
+    <property name="act4" value="char_face player,up"/>
+    <property name="cond1" value="is variable_set rivergoto:timber_town"/>
+   </properties>
+  </object>
+  <object id="464" name="Destination - Candy" type="event" x="112" y="496" width="16" height="16">
+   <properties>
+    <property name="act1" value="set_variable rivergoto:nothing"/>
+    <property name="act2" value="transition_teleport player,spyder_candy_port.tmx,37,12,0.3"/>
+    <property name="act4" value="char_face player,down"/>
+    <property name="cond1" value="is variable_set rivergoto:candy_port"/>
+   </properties>
+  </object>
+  <object id="466" name="Environment Day" type="event" x="16" y="0" width="16" height="16">
+   <properties>
+    <property name="act1" value="set_environment grass"/>
+    <property name="cond1" value="not time_is stage_of_day,equals,night"/>
+    <property name="cond2" value="not environment_is grass"/>
+   </properties>
+  </object>
+  <object id="467" name="Environment Night" type="event" x="32" y="0" width="16" height="16">
+   <properties>
+    <property name="act1" value="set_environment night_grass"/>
+    <property name="cond1" value="is time_is stage_of_day,equals,night"/>
+    <property name="cond2" value="not environment_is night_grass"/>
+   </properties>
+  </object>
+  <object id="468" name="Sign: Flower Scoop" type="event" x="352" y="368" width="16" height="16">
+   <properties>
+    <property name="act1" value="translated_dialog spyder_multi_martsign"/>
+    <property name="cond1" value="is char_facing_tile player"/>
+    <property name="cond2" value="is button_pressed INTERACT"/>
+   </properties>
+  </object>
+  <object id="471" name="Teleport to Routed 1" type="event" x="400" y="624" width="16" height="16">
+   <properties>
+    <property name="act1" value="transition_teleport player,spyder_routed.tmx,5,0,0.3"/>
+    <property name="act2" value="char_face player,down"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_facing player,down"/>
+   </properties>
+  </object>
+  <object id="472" name="Teleport to Routed 2" type="event" x="416" y="624" width="16" height="16">
+   <properties>
+    <property name="act1" value="transition_teleport player,spyder_routed.tmx,6,0,0.3"/>
+    <property name="act2" value="char_face player,down"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_facing player,down"/>
+   </properties>
+  </object>
+  <object id="473" name="Teleport to Routed 3" type="event" x="432" y="624" width="16" height="16">
+   <properties>
+    <property name="act1" value="transition_teleport player,spyder_routed.tmx,7,0,0.3"/>
+    <property name="act2" value="char_face player,down"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_facing player,down"/>
+   </properties>
+  </object>
+  <object id="474" name="Teleport to Timber Town 1" type="event" x="0" y="512" width="16" height="16">
+   <properties>
+    <property name="act1" value="transition_teleport player,spyder_timber_town.tmx,39,12,0.3"/>
+    <property name="act2" value="char_face player,left"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_facing player,left"/>
+   </properties>
+  </object>
+  <object id="476" name="Teleport to Timber Town 2" type="event" x="0" y="528" width="16" height="16">
+   <properties>
+    <property name="act1" value="transition_teleport player,spyder_timber_town.tmx,39,13,0.3"/>
+    <property name="act2" value="char_face player,left"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_facing player,left"/>
+   </properties>
+  </object>
+  <object id="477" name="Teleport to Timber Town 3" type="event" x="0" y="544" width="16" height="16">
+   <properties>
+    <property name="act1" value="transition_teleport player,spyder_timber_town.tmx,39,14,0.3"/>
+    <property name="act2" value="char_face player,left"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_facing player,left"/>
+   </properties>
+  </object>
+  <object id="481" name="Create Monk no pass" type="event" x="496" y="272" width="16" height="16">
+   <properties>
+    <property name="act1" value="create_npc spyder_flower_monk,34,18"/>
+    <property name="cond1" value="not char_exists spyder_flower_monk"/>
+    <property name="cond2" value="not has_item player,dojo_pass"/>
+   </properties>
+  </object>
+  <object id="482" name="Talk Monk no pass" type="event" x="496" y="288" width="16" height="16">
+   <properties>
+    <property name="act1" value="translated_dialog spyder_flower_monk1"/>
+    <property name="behav1" value="talk spyder_flower_monk"/>
+    <property name="cond1" value="not has_item player,dojo_pass"/>
+   </properties>
+  </object>
+  <object id="483" name="Create Monk pass" type="event" x="480" y="272" width="16" height="16">
+   <properties>
+    <property name="act1" value="create_npc spyder_flower_monk,33,18"/>
+    <property name="cond1" value="not char_exists spyder_flower_monk"/>
+    <property name="cond2" value="is has_item player,dojo_pass"/>
+   </properties>
+  </object>
+  <object id="484" name="Talk Monk pass" type="event" x="480" y="288" width="16" height="16">
+   <properties>
+    <property name="act1" value="translated_dialog spyder_flower_monk2"/>
+    <property name="behav1" value="talk spyder_flower_monk"/>
+    <property name="cond1" value="is has_item player,dojo_pass"/>
+   </properties>
+  </object>
+  <object id="498" name="Teleport to Pet Shop 1" type="event" x="128" y="400" width="16" height="16">
+   <properties>
+    <property name="act1" value="transition_teleport player,spyder_flower_petshop.tmx,1,6,0.3"/>
+    <property name="act2" value="char_face player,right"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_facing player,right"/>
+   </properties>
+  </object>
+  <object id="499" name="Door locked" type="event" x="512" y="48" width="16" height="16">
+   <properties>
+    <property name="act1" value="translated_dialog spyder_door_locked"/>
+    <property name="cond1" value="is char_facing_tile player"/>
+    <property name="cond2" value="is button_pressed INTERACT"/>
+   </properties>
+  </object>
+  <object id="501" name="Play Music" type="event" x="0" y="0" width="16" height="16">
+   <properties>
+    <property name="act1" value="play_music music_07_town"/>
+    <property name="cond1" value="not music_playing music_07_town"/>
+   </properties>
+  </object>
+  <object id="475" name="Sign 1" type="event" x="96" y="256" width="16" height="16">
+   <properties>
+    <property name="act1" value="create_npc spyder_sign_flower1,6,16"/>
+    <property name="cond1" value="not char_exists spyder_sign_flower1"/>
+    <property name="cond2" value="not battle_outcome_count player,won,spyder_nimrod_tru,1"/>
+   </properties>
+  </object>
+  <object id="479" name="Sign 2" type="event" x="112" y="256" width="16" height="16">
+   <properties>
+    <property name="act1" value="create_npc spyder_sign_flower2,7,16"/>
+    <property name="cond1" value="not char_exists spyder_sign_flower2"/>
+    <property name="cond2" value="not battle_outcome_count player,won,spyder_nimrod_tru,1"/>
+   </properties>
+  </object>
+  <object id="478" name="Sign Alert" type="event" x="96" y="256" width="32" height="16">
+   <properties>
+    <property name="act1" value="translated_dialog spyder_flower_sign"/>
+    <property name="cond1" value="is char_facing_tile player"/>
+    <property name="cond2" value="is button_pressed INTERACT"/>
+   </properties>
+  </object>
+  <object id="502" name="Create Enforcer" type="event" x="336" y="128" width="16" height="16">
+   <properties>
+    <property name="act1" value="create_npc spyder_nimrod_bowie,19,10"/>
+    <property name="cond1" value="not char_exists spyder_nimrod_bowie"/>
+    <property name="cond2" value="not variable_set dojothrimonster:yes"/>
+   </properties>
+  </object>
+  <object id="503" name="Talk Enforcer" type="event" x="336" y="144" width="16" height="16">
+   <properties>
+    <property name="act1" value="translated_dialog spyder_flower_guard"/>
+    <property name="behav1" value="talk spyder_nimrod_bowie"/>
+   </properties>
+  </object>
+  <object id="504" name="Create Rockitten" type="event" x="48" y="336" width="16" height="16">
+   <properties>
+    <property name="act1" value="create_npc spyder_flower_rockitten,3,21"/>
+    <property name="act2" value="char_wander spyder_flower_rockitten,1,3,21,9,25"/>
+    <property name="cond1" value="not char_exists spyder_flower_rockitten"/>
+   </properties>
+  </object>
+  <object id="505" name="Create Conileaf" type="event" x="112" y="368" width="16" height="16">
+   <properties>
+    <property name="act1" value="create_npc spyder_flower_conileaf,7,23"/>
+    <property name="act2" value="char_wander spyder_flower_conileaf,1,3,21,9,25"/>
+    <property name="cond1" value="not char_exists spyder_flower_conileaf"/>
+   </properties>
+  </object>
+  <object id="506" name="Talk Rockitten" type="event" x="64" y="384" width="16" height="16">
+   <properties>
+    <property name="act1" value="translated_dialog rockitten"/>
+    <property name="behav1" value="talk spyder_flower_rockitten"/>
+   </properties>
+  </object>
+  <object id="507" name="Talk Conileaf" type="event" x="96" y="368" width="16" height="16">
+   <properties>
+    <property name="act1" value="translated_dialog conileaf"/>
+    <property name="behav1" value="talk spyder_flower_conileaf"/>
+   </properties>
+  </object>
+  <object id="508" name="Create Fisher" type="event" x="64" y="480" width="16" height="16">
+   <properties>
+    <property name="act1" value="create_npc spyder_flower_fisher,5,32"/>
+    <property name="cond1" value="not char_exists spyder_flower_fisher"/>
+   </properties>
+  </object>
+  <object id="509" name="Talk Fisher" type="event" x="64" y="496" width="16" height="16">
+   <properties>
+    <property name="act1" value="translated_dialog spyder_flower_fisher2"/>
+    <property name="behav1" value="talk spyder_flower_fisher"/>
+    <property name="cond2" value="not has_item player,fishing_rod"/>
+   </properties>
+  </object>
+  <object id="510" name="Talk Fisher (No Rod)" type="event" x="80" y="496" width="16" height="16">
+   <properties>
+    <property name="act1" value="translated_dialog spyder_flower_fisher1"/>
+    <property name="behav1" value="talk spyder_flower_fisher"/>
+    <property name="cond2" value="is has_item player,fishing_rod"/>
+   </properties>
+  </object>
+ </objectgroup>
+</map>

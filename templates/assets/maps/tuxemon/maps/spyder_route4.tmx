@@ -1,0 +1,577 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" compressionlevel="0" width="20" height="40" tilewidth="16" tileheight="16" infinite="0" nextlayerid="7" nextobjectid="103">
+ <properties>
+  <property name="east" value="route3"/>
+  <property name="edges" value="clamped"/>
+  <property name="map_type" value="route"/>
+  <property name="scenario" value="spyder"/>
+  <property name="slug" value="route4"/>
+  <property name="west" value="flower_city"/>
+ </properties>
+ <tileset firstgid="1" source="../gfx/tilesets/core_city_and_country.tsx"/>
+ <tileset firstgid="1441" source="../gfx/tilesets/core_outdoor.tsx"/>
+ <layer id="1" name="Tile Layer 1" width="20" height="40">
+  <data encoding="base64" compression="zlib">
+   eAHt0iERAAAMA7Gi4fpXWxdDAW/gL72k8oABBhhggAEGGGCAAQYeDAxMckTB
+  </data>
+ </layer>
+ <layer id="2" name="Tile Layer 2" width="20" height="40">
+  <data encoding="base64" compression="zlib">
+   eAGt1uFNw0AMhuGIn5Qx2I4dQLACs7BDWaE7wAzECo9wrXMuSD0p8d3nz+85TQg53y/L53qcbxS/Vs73etwq6mtJg/ay7hNHjKfTFmdnfWUfDQ8ze/47H/W4x+DvPLXHzkfn77h016xOfHww2yI/7nX2734/p3tSPXmNg5tzMad3/XV+3JqnH+Xx66Py6Hivd8tyao63VefHxas6nnwXcdTzVf0oD0c9nkg/yuPHxRHpwdsb8vy4tYZ+2XkP5N75cSuv07Mv8/hxsy/mnZ59mcePm30xp3fPXTxzmcePW3l0vpqPdebN/Dh8M171W6vLnOhjNPb6y/VRiz97X9mLv3L0Qc89yI0iP2710PG6+xzvnL33C6798Oji++/73vXy6yN8H+vflrXY8cKfc/y4kY9hLdp/y16fM48f99p5bJV5OLgdobsPcQ9i6B8Hd8v2Z72I8VzmgYObc2po1p5t64gGDq4YnlwX/u6a/b8bPX/4ee+8/+x7Tf3o2xRTz0djXMvo2zT0YNrzaIy62d56rbGrm+2t1+DleVc3+v26vWd67Df6/bq9Z3rwfgBfJGbu
+  </data>
+ </layer>
+ <layer id="3" name="Tile Layer 3" width="20" height="40">
+  <data encoding="base64" compression="zlib">
+   eAFjYBgFoyEwGgKjITAaAqMhMBoCoyEwMCFwgouB4SQQUwu8BZr1jormUctdo+aMhsBoCCBCAACenwOV
+  </data>
+ </layer>
+ <layer id="4" name="Above Player" width="20" height="40">
+  <data encoding="base64" compression="zlib">
+   eAHt0DEBAAAAwqD1T20LL4hAYcCAAQMGDBgwYMCAgc/AAAyAAAE=
+  </data>
+ </layer>
+ <objectgroup color="#ff0000" id="4" name="Collisions">
+  <object id="3" type="collision" x="32" y="0" width="288" height="32"/>
+  <object id="4" type="collision" x="32" y="608" width="176" height="32"/>
+  <object id="5" type="collision" x="32" y="512" width="32" height="96"/>
+  <object id="6" type="collision" x="64" y="576" width="32" height="32"/>
+  <object id="7" type="collision" x="64" y="544" width="16" height="32"/>
+  <object id="8" type="collision" x="112" y="544" width="208" height="32"/>
+  <object id="10" type="collision" x="224" y="576" width="96" height="32"/>
+  <object id="11" type="collision" x="240" y="608" width="80" height="32"/>
+  <object id="17" type="collision" x="96" y="64" width="32" height="400"/>
+  <object id="19" type="collision" x="64" y="416" width="32" height="32"/>
+  <object id="20" type="collision" x="64" y="176" width="32" height="32"/>
+  <object id="23" type="collision" x="32" y="336" width="32" height="32"/>
+  <object id="28" type="collision" x="128" y="304" width="32" height="32"/>
+  <object id="38" type="collision" x="208" y="608" width="32" height="32"/>
+  <object id="39" type="collision" x="96" y="576" width="32" height="32"/>
+  <object id="40" type="collision" x="80" y="32" width="32" height="32"/>
+  <object id="42" type="collision" x="0" y="0" width="32" height="64"/>
+  <object id="43" type="collision" x="0" y="96" width="32" height="416"/>
+  <object id="44" type="collision" x="0" y="512" width="32" height="32"/>
+  <object id="46" type="collision" x="288" y="64" width="32" height="480"/>
+ </objectgroup>
+ <objectgroup color="#ffff00" id="5" name="Events">
+  <object id="31" name="Teleport to Route 3" type="event" x="304" y="48" width="16" height="16">
+   <properties>
+    <property name="act1" value="transition_teleport player,spyder_route3.tmx,0,3,0.3"/>
+    <property name="act2" value="char_face player,right"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_facing player,right"/>
+   </properties>
+  </object>
+  <object id="33" name="Teleport to Flower City" type="event" x="0" y="64" width="16" height="16">
+   <properties>
+    <property name="act1" value="transition_teleport player,spyder_flower_city.tmx,39,4,0.3"/>
+    <property name="act2" value="char_face player,left"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_facing player,left"/>
+   </properties>
+  </object>
+  <object id="35" name="Teleport to Flower City" type="event" x="0" y="80" width="16" height="16">
+   <properties>
+    <property name="act1" value="transition_teleport player,spyder_flower_city.tmx,39,5,0.3"/>
+    <property name="act2" value="char_face player,left"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_facing player,left"/>
+   </properties>
+  </object>
+  <object id="45" name="Teleport to Route 3" type="event" x="304" y="32" width="16" height="16">
+   <properties>
+    <property name="act1" value="transition_teleport player,spyder_route3.tmx,0,2,0.3"/>
+    <property name="act2" value="char_face player,right"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_facing player,right"/>
+   </properties>
+  </object>
+  <object id="47" name="Create Marshall" type="event" x="32" y="464" width="16" height="16">
+   <properties>
+    <property name="act1" value="create_npc spyder_route4_marshall,2,29"/>
+    <property name="act2" value="char_face spyder_route4_marshall,right"/>
+    <property name="cond1" value="not char_exists spyder_route4_marshall"/>
+   </properties>
+  </object>
+  <object id="48" name="Talk Marshall" type="event" x="32" y="480" width="16" height="16">
+   <properties>
+    <property name="act1" value="char_talk spyder_route4_marshall,pre_battle"/>
+    <property name="act2" value="add_monster puparmor,16,spyder_route4_marshall,5,10"/>
+    <property name="act3" value="add_monster puparmor,16,spyder_route4_marshall,5,10"/>
+    <property name="act4" value="start_battle player,spyder_route4_marshall"/>
+    <property name="act5" value="char_talk spyder_route4_marshall,post_battle_lose"/>
+    <property name="behav1" value="talk spyder_route4_marshall"/>
+    <property name="cond1" value="not battle_outcome player,won,spyder_route4_marshall"/>
+   </properties>
+  </object>
+  <object id="49" name="encounter 3" type="event" x="128" y="48" width="32" height="176">
+   <properties>
+    <property name="act1" value="random_encounter spyder_route4,11"/>
+    <property name="act2" value="play_map_animation grass,0.1,noloop,player"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_moved player"/>
+   </properties>
+  </object>
+  <object id="50" name="encounter 3" type="event" x="128" y="224" width="16" height="16">
+   <properties>
+    <property name="act1" value="random_encounter spyder_route4"/>
+    <property name="act2" value="play_map_animation grass,0.1,noloop,player"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_moved player"/>
+   </properties>
+  </object>
+  <object id="51" name="encounter 3" type="event" x="256" y="224" width="16" height="16">
+   <properties>
+    <property name="act1" value="random_encounter spyder_route4,11"/>
+    <property name="act2" value="play_map_animation grass,0.1,noloop,player"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_moved player"/>
+   </properties>
+  </object>
+  <object id="52" name="encounter 3" type="event" x="112" y="32" width="16" height="16">
+   <properties>
+    <property name="act1" value="random_encounter spyder_route4,11"/>
+    <property name="act2" value="play_map_animation grass,0.1,noloop,player"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_moved player"/>
+   </properties>
+  </object>
+  <object id="53" name="encounter 3" type="event" x="112" y="48" width="16" height="16">
+   <properties>
+    <property name="act1" value="random_encounter spyder_route4,11"/>
+    <property name="act2" value="play_map_animation grass,0.1,noloop,player"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_moved player"/>
+   </properties>
+  </object>
+  <object id="54" name="encounter 3" type="event" x="128" y="32" width="16" height="16">
+   <properties>
+    <property name="act1" value="random_encounter spyder_route4,11"/>
+    <property name="act2" value="play_map_animation grass,0.1,noloop,player"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_moved player"/>
+   </properties>
+  </object>
+  <object id="55" name="encounter 3" type="event" x="240" y="240" width="32" height="112">
+   <properties>
+    <property name="act1" value="random_encounter spyder_route4,11"/>
+    <property name="act2" value="play_map_animation grass,0.1,noloop,player"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_moved player"/>
+   </properties>
+  </object>
+  <object id="56" name="encounter 3" type="event" x="256" y="352" width="16" height="16">
+   <properties>
+    <property name="act1" value="random_encounter spyder_route4,11"/>
+    <property name="act2" value="play_map_animation grass,0.1,noloop,player"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_moved player"/>
+   </properties>
+  </object>
+  <object id="57" name="encounter 3" type="event" x="144" y="336" width="16" height="16">
+   <properties>
+    <property name="act1" value="random_encounter spyder_route4,11"/>
+    <property name="act2" value="play_map_animation grass,0.1,noloop,player"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_moved player"/>
+   </properties>
+  </object>
+  <object id="58" name="encounter 3" type="event" x="256" y="400" width="16" height="16">
+   <properties>
+    <property name="act1" value="random_encounter spyder_route4,11"/>
+    <property name="act2" value="play_map_animation grass,0.1,noloop,player"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_moved player"/>
+   </properties>
+  </object>
+  <object id="59" name="encounter 3" type="event" x="256" y="464" width="16" height="16">
+   <properties>
+    <property name="act1" value="random_encounter spyder_route4,11"/>
+    <property name="act2" value="play_map_animation grass,0.1,noloop,player"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_moved player"/>
+   </properties>
+  </object>
+  <object id="60" name="encounter 3" type="event" x="240" y="496" width="16" height="16">
+   <properties>
+    <property name="act1" value="random_encounter spyder_route4,11"/>
+    <property name="act2" value="play_map_animation grass,0.1,noloop,player"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_moved player"/>
+   </properties>
+  </object>
+  <object id="61" name="encounter 3" type="event" x="144" y="496" width="16" height="16">
+   <properties>
+    <property name="act1" value="random_encounter spyder_route4,11"/>
+    <property name="act2" value="play_map_animation grass,0.1,noloop,player"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_moved player"/>
+   </properties>
+  </object>
+  <object id="62" name="encounter 3" type="event" x="128" y="432" width="16" height="16">
+   <properties>
+    <property name="act1" value="random_encounter spyder_route4,11"/>
+    <property name="act2" value="play_map_animation grass,0.1,noloop,player"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_moved player"/>
+   </properties>
+  </object>
+  <object id="63" name="encounter 3" type="event" x="128" y="352" width="32" height="80">
+   <properties>
+    <property name="act1" value="random_encounter spyder_route4,11"/>
+    <property name="act2" value="play_map_animation grass,0.1,noloop,player"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_moved player"/>
+   </properties>
+  </object>
+  <object id="64" name="encounter 3" type="event" x="240" y="416" width="32" height="48">
+   <properties>
+    <property name="act1" value="random_encounter spyder_route4,11"/>
+    <property name="act2" value="play_map_animation grass,0.1,noloop,player"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_moved player"/>
+   </properties>
+  </object>
+  <object id="65" name="encounter 3" type="event" x="80" y="496" width="32" height="64">
+   <properties>
+    <property name="act1" value="random_encounter spyder_route4,11"/>
+    <property name="act2" value="play_map_animation grass,0.1,noloop,player"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_moved player"/>
+   </properties>
+  </object>
+  <object id="66" name="encounter 3" type="event" x="96" y="560" width="16" height="16">
+   <properties>
+    <property name="act1" value="random_encounter spyder_route4,11"/>
+    <property name="act2" value="play_map_animation grass,0.1,noloop,player"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_moved player"/>
+   </properties>
+  </object>
+  <object id="67" name="encounter 3" type="event" x="112" y="512" width="16" height="32">
+   <properties>
+    <property name="act1" value="random_encounter spyder_route4,11"/>
+    <property name="act2" value="play_map_animation grass,0.1,noloop,player"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_moved player"/>
+   </properties>
+  </object>
+  <object id="68" name="encounter 3" type="event" x="64" y="512" width="16" height="32">
+   <properties>
+    <property name="act1" value="random_encounter spyder_route4,11"/>
+    <property name="act2" value="play_map_animation grass,0.1,noloop,player"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_moved player"/>
+   </properties>
+  </object>
+  <object id="69" name="encounter 3" type="event" x="160" y="480" width="80" height="32">
+   <properties>
+    <property name="act1" value="random_encounter spyder_route4,11"/>
+    <property name="act2" value="play_map_animation grass,0.1,noloop,player"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_moved player"/>
+   </properties>
+  </object>
+  <object id="70" name="Create Roger" type="event" x="192" y="320" width="16" height="16">
+   <properties>
+    <property name="act1" value="create_npc spyder_route4_roger,12,20,wander"/>
+    <property name="cond1" value="not char_exists spyder_route4_roger"/>
+   </properties>
+  </object>
+  <object id="71" name="Talk Roger" type="event" x="176" y="320" width="16" height="16">
+   <properties>
+    <property name="act1" value="char_talk spyder_route4_roger,pre_battle"/>
+    <property name="act2" value="add_monster rabbitosaur,16,spyder_route4_roger,5,10"/>
+    <property name="act3" value="start_battle player,spyder_route4_roger"/>
+    <property name="act4" value="char_talk spyder_route4_roger,post_battle_lose"/>
+    <property name="behav1" value="talk spyder_route4_roger"/>
+    <property name="cond1" value="not battle_outcome player,won,spyder_route4_roger"/>
+   </properties>
+  </object>
+  <object id="72" name="Create Wulf" type="event" x="32" y="192" width="16" height="16">
+   <properties>
+    <property name="act1" value="create_npc spyder_route4_wulf,2,12"/>
+    <property name="cond1" value="not char_exists spyder_route4_wulf"/>
+   </properties>
+  </object>
+  <object id="73" name="Talk Wulf" type="event" x="32" y="176" width="16" height="16">
+   <properties>
+    <property name="act1" value="char_talk spyder_route4_wulf,pre_battle"/>
+    <property name="act2" value="add_monster cowpignon,14,spyder_route4_wulf,5,10"/>
+    <property name="act3" value="add_monster cowpignon,14,spyder_route4_wulf,5,10"/>
+    <property name="act4" value="add_monster shybulb,14,spyder_route4_wulf,5,10"/>
+    <property name="act5" value="start_battle player,spyder_route4_wulf"/>
+    <property name="act6" value="char_talk spyder_route4_wulf,post_battle_lose"/>
+    <property name="behav1" value="talk spyder_route4_wulf"/>
+    <property name="cond1" value="not battle_outcome player,won,spyder_route4_wulf"/>
+   </properties>
+  </object>
+  <object id="74" name="Create Rincewind" type="event" x="224" y="80" width="16" height="16">
+   <properties>
+    <property name="act1" value="create_npc spyder_route4_rincewind,14,5"/>
+    <property name="act2" value="char_wander spyder_route4_rincewind,0.9"/>
+    <property name="cond1" value="not char_exists spyder_route4_rincewind"/>
+   </properties>
+  </object>
+  <object id="75" name="Talk Rincewind" type="event" x="208" y="80" width="16" height="16">
+   <properties>
+    <property name="act1" value="char_talk spyder_route4_rincewind,pre_battle"/>
+    <property name="act2" value="add_monster k9,16,spyder_route4_rincewind,5,10"/>
+    <property name="act3" value="add_monster k9,16,spyder_route4_rincewind,5,10"/>
+    <property name="act4" value="start_battle player,spyder_route4_rincewind"/>
+    <property name="act5" value="char_talk spyder_route4_rincewind,post_battle_lose"/>
+    <property name="behav1" value="talk spyder_route4_rincewind"/>
+    <property name="cond1" value="not battle_outcome player,won,spyder_route4_rincewind"/>
+   </properties>
+  </object>
+  <object id="76" name="Create Rosamund" type="event" x="192" y="480" width="16" height="16">
+   <properties>
+    <property name="act1" value="create_npc spyder_route4_rosamund,12,30"/>
+    <property name="cond1" value="not char_exists spyder_route4_rosamund"/>
+   </properties>
+  </object>
+  <object id="77" name="Talk Rosamund" type="event" x="176" y="480" width="16" height="16">
+   <properties>
+    <property name="act1" value="char_talk spyder_route4_rosamund,pre_battle"/>
+    <property name="act2" value="add_monster foofle,18,spyder_route4_rosamund,5,10"/>
+    <property name="act3" value="start_battle player,spyder_route4_rosamund"/>
+    <property name="act4" value="char_talk spyder_route4_rosamund,post_battle_lose"/>
+    <property name="behav1" value="talk spyder_route4_rosamund"/>
+    <property name="cond1" value="not battle_outcome player,won,spyder_route4_rosamund"/>
+   </properties>
+  </object>
+  <object id="78" name="Create Beck" type="event" x="48" y="320" width="16" height="16">
+   <properties>
+    <property name="act1" value="create_npc spyder_route4_beck,3,20"/>
+    <property name="act2" value="char_face spyder_route4_beck,right"/>
+    <property name="cond1" value="not char_exists spyder_route4_beck"/>
+   </properties>
+  </object>
+  <object id="79" name="Talk Beck" type="event" x="32" y="320" width="16" height="16">
+   <properties>
+    <property name="act1" value="char_talk spyder_route4_beck,pre_battle"/>
+    <property name="act2" value="add_monster katapill,14,spyder_route4_beck,5,10"/>
+    <property name="act3" value="add_monster tumbleworm,12,spyder_route4_beck,5,10"/>
+    <property name="act4" value="add_monster spighter,12,spyder_route4_beck,5,10"/>
+    <property name="act5" value="start_battle player,spyder_route4_beck"/>
+    <property name="act6" value="char_talk spyder_route4_beck,post_battle_lose"/>
+    <property name="behav1" value="talk spyder_route4_beck"/>
+    <property name="cond1" value="not battle_outcome player,won,spyder_route4_beck"/>
+   </properties>
+  </object>
+  <object id="81" name="Environment Day" type="event" x="16" y="0" width="16" height="16">
+   <properties>
+    <property name="act1" value="set_environment grass"/>
+    <property name="cond1" value="not time_is stage_of_day,equals,night"/>
+    <property name="cond2" value="not environment_is grass"/>
+   </properties>
+  </object>
+  <object id="87" name="Environment Night" type="event" x="32" y="0" width="16" height="16">
+   <properties>
+    <property name="act1" value="set_environment night_grass"/>
+    <property name="cond1" value="is time_is stage_of_day,equals,night"/>
+    <property name="cond2" value="not environment_is night_grass"/>
+   </properties>
+  </object>
+  <object id="82" name="Talk Marshall" type="event" x="48" y="464" width="48" height="16">
+   <properties>
+    <property name="act1" value="lock_controls"/>
+    <property name="act2" value="pathfind_to_char player,spyder_route4_marshall"/>
+    <property name="act3" value="char_face player,spyder_route4_marshall"/>
+    <property name="act4" value="char_talk spyder_route4_marshall,pre_battle"/>
+    <property name="act5" value="unlock_controls"/>
+    <property name="act6" value="add_monster puparmor,16,spyder_route4_marshall,5,10"/>
+    <property name="act7" value="add_monster puparmor,16,spyder_route4_marshall,5,10"/>
+    <property name="act8" value="start_battle player,spyder_route4_marshall"/>
+    <property name="act9" value="char_talk spyder_route4_marshall,post_battle_lose"/>
+    <property name="cond1" value="not battle_outcome player,won,spyder_route4_marshall"/>
+    <property name="cond2" value="is char_at player"/>
+    <property name="cond3" value="not char_defeated player"/>
+   </properties>
+  </object>
+  <object id="83" name="Talk Beck" type="event" x="64" y="320" width="32" height="16">
+   <properties>
+    <property name="act01" value="lock_controls"/>
+    <property name="act02" value="pathfind_to_char player,spyder_route4_beck"/>
+    <property name="act03" value="char_face player,spyder_route4_beck"/>
+    <property name="act04" value="char_talk spyder_route4_beck,pre_battle"/>
+    <property name="act05" value="unlock_controls"/>
+    <property name="act06" value="add_monster katapill,14,spyder_route4_beck,5,10"/>
+    <property name="act07" value="add_monster tumbleworm,12,spyder_route4_beck,5,10"/>
+    <property name="act08" value="add_monster spighter,12,spyder_route4_beck,5,10"/>
+    <property name="act09" value="start_battle player,spyder_route4_beck"/>
+    <property name="act10" value="char_talk spyder_route4_beck,post_battle_lose"/>
+    <property name="cond1" value="not battle_outcome player,won,spyder_route4_beck"/>
+    <property name="cond2" value="is char_at player"/>
+    <property name="cond3" value="not char_defeated player"/>
+   </properties>
+  </object>
+  <object id="84" name="Talk Wulf" type="event" x="32" y="208" width="16" height="48">
+   <properties>
+    <property name="act01" value="lock_controls"/>
+    <property name="act02" value="pathfind_to_char player,spyder_route4_wulf"/>
+    <property name="act03" value="char_face player,spyder_route4_wulf"/>
+    <property name="act04" value="char_talk spyder_route4_wulf,pre_battle"/>
+    <property name="act05" value="unlock_controls"/>
+    <property name="act06" value="add_monster cowpignon,14,spyder_route4_wulf,5,10"/>
+    <property name="act07" value="add_monster cowpignon,14,spyder_route4_wulf,5,10"/>
+    <property name="act08" value="add_monster shybulb,14,spyder_route4_wulf,5,10"/>
+    <property name="act09" value="start_battle player,spyder_route4_wulf"/>
+    <property name="act10" value="char_talk spyder_route4_wulf,post_battle_lose"/>
+    <property name="cond1" value="not battle_outcome player,won,spyder_route4_wulf"/>
+    <property name="cond2" value="is char_at player"/>
+    <property name="cond3" value="not char_defeated player"/>
+   </properties>
+  </object>
+  <object id="85" name="Talk Rosamund" type="event" x="192" y="496" width="16" height="16">
+   <properties>
+    <property name="act1" value="lock_controls"/>
+    <property name="act2" value="pathfind_to_char player,spyder_route4_rosamund"/>
+    <property name="act3" value="char_face player,spyder_route4_rosamund"/>
+    <property name="act4" value="char_talk spyder_route4_rosamund,pre_battle"/>
+    <property name="act5" value="unlock_controls"/>
+    <property name="act6" value="add_monster foofle,18,spyder_route4_rosamund,5,10"/>
+    <property name="act7" value="start_battle player,spyder_route4_rosamund"/>
+    <property name="act8" value="char_talk spyder_route4_rosamund,post_battle_lose"/>
+    <property name="cond1" value="not battle_outcome player,won,spyder_route4_rosamund"/>
+    <property name="cond2" value="is char_at player"/>
+    <property name="cond3" value="not char_defeated player"/>
+   </properties>
+  </object>
+  <object id="88" name="Billie" type="event" x="32" y="96" width="64" height="16">
+   <properties>
+    <property name="act01" value="char_stop player"/>
+    <property name="act02" value="lock_controls"/>
+    <property name="act03" value="create_npc spyder_billie,0,4"/>
+    <property name="act04" value="pathfind_to_char player,spyder_billie"/>
+    <property name="act05" value="char_face player,spyder_billie"/>
+    <property name="act06" value="char_face spyder_billie,player"/>
+    <property name="act07" value="unlock_controls"/>
+    <property name="act08" value="translated_dialog spyder_route4_billie1"/>
+    <property name="act20" value="add_monster billie_choice,18,spyder_billie,5,10"/>
+    <property name="act21" value="set_monster_attribute add_monster,gender,male"/>
+    <property name="act22" value="add_monster cardiwing,16,spyder_billie,5,10"/>
+    <property name="act23" value="set_monster_attribute add_monster,gender,female"/>
+    <property name="act24" value="add_monster eyesore,16,spyder_billie,5,10"/>
+    <property name="act25" value="set_monster_attribute add_monster,gender,female"/>
+    <property name="act26" value="set_monster_attribute add_monster,gender,male"/>
+    <property name="act30" value="start_battle player,spyder_billie"/>
+    <property name="act71" value="translated_dialog spyder_route4_billie2"/>
+    <property name="act75" value="pathfind spyder_billie,0,4"/>
+    <property name="act80" value="remove_npc spyder_billie"/>
+    <property name="act90" value="set_variable route4billie:yes"/>
+    <property name="cond1" value="not variable_set route4billie:yes"/>
+    <property name="cond2" value="is char_at player"/>
+   </properties>
+  </object>
+  <object id="89" name="Create Super Potion" type="event" x="272" y="528" width="16" height="16">
+   <properties>
+    <property name="act1" value="create_npc spyder_route4_super,17,33"/>
+    <property name="cond1" value="not char_exists spyder_route4_super"/>
+    <property name="cond2" value="not variable_set route4_super:yes"/>
+   </properties>
+  </object>
+  <object id="90" name="Super Potion" type="event" x="272" y="512" width="16" height="16">
+   <properties>
+    <property name="act1" value="translated_dialog super_potion,,center,center,center"/>
+    <property name="act2" value="add_item super_potion"/>
+    <property name="act3" value="remove_npc spyder_route4_super"/>
+    <property name="act4" value="set_variable route4_super:yes"/>
+    <property name="behav1" value="talk spyder_route4_super"/>
+   </properties>
+  </object>
+  <object id="91" name="Create Boost Ranged" type="event" x="32" y="48" width="16" height="16">
+   <properties>
+    <property name="act1" value="create_npc spyder_route4_boost,2,3"/>
+    <property name="cond1" value="not char_exists spyder_route4_boost"/>
+    <property name="cond2" value="not variable_set route4_boost:yes"/>
+   </properties>
+  </object>
+  <object id="92" name="Boost Ranged" type="event" x="16" y="48" width="16" height="16">
+   <properties>
+    <property name="act1" value="translated_dialog boost_ranged,,center,center,center"/>
+    <property name="act2" value="add_item boost_ranged"/>
+    <property name="act3" value="remove_npc spyder_route4_boost"/>
+    <property name="act4" value="set_variable route4_boost:yes"/>
+    <property name="behav1" value="talk spyder_route4_boost"/>
+   </properties>
+  </object>
+  <object id="93" name="Post Talk Rincewind" type="event" x="288" y="80" width="16" height="16">
+   <properties>
+    <property name="act1" value="char_talk spyder_route4_rincewind,post_battle_lose"/>
+    <property name="behav1" value="talk spyder_route4_rincewind"/>
+    <property name="cond1" value="is battle_outcome player,won,spyder_route4_rincewind"/>
+   </properties>
+  </object>
+  <object id="94" name="Post Talk Roger" type="event" x="144" y="320" width="16" height="16">
+   <properties>
+    <property name="act1" value="char_talk spyder_route4_roger,post_battle_lose"/>
+    <property name="behav1" value="talk spyder_route4_roger"/>
+    <property name="cond1" value="is battle_outcome player,won,spyder_route4_roger"/>
+   </properties>
+  </object>
+  <object id="95" name="Post Talk Rosamund" type="event" x="192" y="464" width="16" height="16">
+   <properties>
+    <property name="act1" value="char_talk spyder_route4_rosamund,post_battle_lose"/>
+    <property name="behav1" value="talk spyder_route4_rosamund"/>
+    <property name="cond1" value="is battle_outcome player,won,spyder_route4_rosamund"/>
+   </properties>
+  </object>
+  <object id="96" name="Post Talk Marshall" type="event" x="16" y="464" width="16" height="16">
+   <properties>
+    <property name="act1" value="char_talk spyder_route4_marshall,post_battle_lose"/>
+    <property name="behav1" value="talk spyder_route4_marshall"/>
+    <property name="cond1" value="is battle_outcome player,won,spyder_route4_marshall"/>
+   </properties>
+  </object>
+  <object id="97" name="Post Talk Beck" type="event" x="16" y="320" width="16" height="16">
+   <properties>
+    <property name="act1" value="char_talk spyder_route4_beck,post_battle_lose"/>
+    <property name="behav1" value="talk spyder_route4_beck"/>
+    <property name="cond1" value="is battle_outcome player,won,spyder_route4_beck"/>
+   </properties>
+  </object>
+  <object id="98" name="Post Talk Wulf" type="event" x="16" y="176" width="16" height="16">
+   <properties>
+    <property name="act1" value="char_talk spyder_route4_wulf,post_battle_lose"/>
+    <property name="behav1" value="talk spyder_route4_wulf"/>
+    <property name="cond1" value="is battle_outcome player,won,spyder_route4_wulf"/>
+   </properties>
+  </object>
+  <object id="99" name="Create Nurse" type="event" x="224" y="32" width="16" height="16">
+   <properties>
+    <property name="act1" value="create_npc spyder_route4_nurse,14,2"/>
+    <property name="cond1" value="not char_exists spyder_route4_nurse"/>
+   </properties>
+  </object>
+  <object id="100" name="Talk Nurse" type="event" x="224" y="16" width="16" height="16">
+   <properties>
+    <property name="act1" value="translated_dialog spyder_generic_nurse"/>
+    <property name="act11" value="char_stop player"/>
+    <property name="act12" value="lock_controls"/>
+    <property name="act13" value="screen_transition 1"/>
+    <property name="act14" value="wait 0.5"/>
+    <property name="act15" value="unlock_controls"/>
+    <property name="act20" value="set_monster_health"/>
+    <property name="act30" value="set_monster_status"/>
+    <property name="act40" value="translated_dialog spyder_output_nurse2"/>
+    <property name="behav1" value="talk spyder_route4_nurse"/>
+   </properties>
+  </object>
+  <object id="101" name="Create Box" type="event" x="272" y="176" width="16" height="16">
+   <properties>
+    <property name="act1" value="create_npc spyder_route4_tea,17,11"/>
+    <property name="cond1" value="not char_exists spyder_route4_tea"/>
+    <property name="cond2" value="not variable_set route4_tea:yes"/>
+   </properties>
+  </object>
+  <object id="102" name="Box" type="event" x="256" y="176" width="16" height="16">
+   <properties>
+    <property name="act1" value="translated_dialog ancient_tea,,center,center,center"/>
+    <property name="act2" value="add_item mystery_tea"/>
+    <property name="act3" value="remove_npc spyder_route4_tea"/>
+    <property name="act4" value="set_variable route4_tea:yes"/>
+    <property name="behav1" value="talk spyder_route4_tea"/>
+   </properties>
+  </object>
+ </objectgroup>
+</map>

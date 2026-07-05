@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.10" tiledversion="git" orientation="orthogonal" renderorder="right-down" compressionlevel="0" width="9" height="7" tilewidth="16" tileheight="16" infinite="0" nextlayerid="7" nextobjectid="37">
+ <properties>
+  <property name="edges" value="clamped"/>
+  <property name="inside" type="bool" value="true"/>
+  <property name="scenario" value="xero"/>
+  <property name="slug" value="maple_bedroom"/>
+  <property name="map_type" value="notype"/>
+ </properties>
+ <tileset firstgid="1" source="../gfx/tilesets/core_set pieces.tsx"/>
+ <tileset firstgid="1551" source="../gfx/tilesets/core_indoor_stairs.tsx"/>
+ <tileset firstgid="4521" source="../gfx/tilesets/core_indoor_walls.tsx"/>
+ <tileset firstgid="8385" source="../gfx/tilesets/core_indoor_floors.tsx"/>
+ <layer id="1" name="Tile Layer 1" width="9" height="7">
+  <data encoding="base64" compression="zlib">
+   eAHLEmVgyCKAjwHlCeH3CgwMQw0DADuXO84=
+  </data>
+ </layer>
+ <layer id="2" name="Tile Layer 2" width="9" height="7">
+  <data encoding="base64" compression="zlib">
+   eAFjYMAP5jNC5DcBqc1QpdxAmgeIX/AxMLwE4n1QNReBYpegarSAtDYQi/IzMIgBMT7gBJR3JqAGWX8GMgcHux1NnB/oRgGoO2FSALRbCL0=
+  </data>
+ </layer>
+ <layer id="3" name="Tile Layer 3" width="9" height="7">
+  <data encoding="base64" compression="zlib">
+   eAFjYBg44A+12oWfgcEViOkNAHVWAPc=
+  </data>
+ </layer>
+ <layer id="4" name="Above player" width="9" height="7">
+  <data encoding="base64" compression="zlib">
+   eAFjYCAfvOIjrFecn7CagVIBANIHAR8=
+  </data>
+ </layer>
+ <objectgroup color="#ff0000" id="5" name="Collisions">
+  <object id="1" type="collision" x="0" y="16" width="144" height="16"/>
+  <object id="6" type="collision" x="96" y="48" width="32" height="16"/>
+  <object id="7" type="collision" x="64" y="32" width="48" height="16"/>
+  <object id="32" type="collision" x="16" y="32" width="32" height="16"/>
+  <object id="33" type="collision" x="0" y="80" width="16" height="32"/>
+  <object id="35" type="collision" x="64" y="96" width="32" height="16"/>
+ </objectgroup>
+</map>

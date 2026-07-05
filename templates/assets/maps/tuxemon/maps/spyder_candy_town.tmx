@@ -1,0 +1,499 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" compressionlevel="0" width="40" height="40" tilewidth="16" tileheight="16" infinite="0" nextlayerid="8" nextobjectid="454">
+ <properties>
+  <property name="east" value="routec"/>
+  <property name="edges" value="clamped"/>
+  <property name="map_type" value="town"/>
+  <property name="north" value="route6"/>
+  <property name="scenario" value="spyder"/>
+  <property name="slug" value="candy_town"/>
+ </properties>
+ <tileset firstgid="1" source="../gfx/tilesets/core_city_and_country.tsx"/>
+ <tileset firstgid="1441" source="../gfx/tilesets/core_outdoor.tsx"/>
+ <tileset firstgid="4216" source="../gfx/tilesets/core_buildings.tsx"/>
+ <tileset firstgid="6566" source="../gfx/tilesets/core_set pieces.tsx"/>
+ <tileset firstgid="8116" source="../gfx/tilesets/core_outdoor_water.tsx"/>
+ <tileset firstgid="16308" source="../gfx/tilesets/core_outdoor_nature.tsx"/>
+ <layer id="1" name="Tile Layer 1" width="40" height="40">
+  <data encoding="base64" compression="zlib">
+   eAHtmE9KBTEMxiuCirp4G/UCop5BvYCnUNeCt9C1IHgIXbvRm4j/bqIJvo/5KOk0bWceT5hFaSbTNr+kaafT2VoIswWXY7F3IuVUyspGCA+bf2VV5EWzWPZa+fa3x/Wjlc/y2dK9bXV+XBf41Mq3I3mxO2J5krFb8g/+6Rhjltr1Ab4b4buoKLdzv3L9L6VdzfoFn/qnefdDeWblYaw7lz7ql9qP38XPQ/DFY/Lz+3oIHw3lu2L/i+PHPJDP5uuV/cc+W1t792cPHziXhe+ZcpD3by/fi8zjYaYcOb9vY8TPO3eYl746x3dFsfTGbxF81lrl9de3LpTvjvzi+KT03IblVPy8sbI4rfj1fbMRC+aCzHwla6FvDXhzHwyIBZ65Zj7Wo48VH9VZMeL+JTJsWX0mPv93ORc/Phsg5tP8dueuXPz4/RS/Li8RC44PZF6/vLejT0n+8VgY31PDltU2NSb6pPi+5BvGZ9VPObemxrLssg62WAc5NSb6pPhive7XJWd92NcatlgHOcV3IPZepcQcqec4nhzbnIxzB5i4TvFpG2XUc2YJp/ZL+ZDTMxfkPj60AWfuTFzy3vIZ9rj28HH7oWTkHMfUGntIPtyV7BX+C4NxbL4SX5EzPM/LxAcWnmfouC7xmfvFsv6T1ozl5XuUnGm9Z+O7tJg/9cz7rNUGPg95t6Z3TfcFd5hgtPjwTeK7Ne+dGfdh2XOXpSy83nWeLT5Lh5jizs1qM4SO7fwHvl/4KnXY
+  </data>
+ </layer>
+ <layer id="2" name="Tile Layer 4" width="40" height="40">
+  <data encoding="base64" compression="zlib">
+   eAHNl8lPVEEQhxsUE/CiCBi9cHYFBu9O3OLJ7aSs7n+BoolBhpMbuKE3hsEVTdQYE73grokQdrebN7eY6B/Apl/rVOy89JvpGXgPKvmomurqV79XvGWmp0CpXiiCYsP3JPN+XvmYX703r7dLTg5VGv2fk7Wf6PgFXpO8n6+ap1S1hxo++9V787qf5MzekhMvOs0aHUvez3vr5bNfvTcv9aafzvmZxzVjOe903txTF1WqHrR59+ncjkIV2w7bYCtsAZ0PyzqiSiVAm23OzeiJQRMch0b4WzwDf2zzu4+ep4VK3cPfhTuGvgrunQiUGfdQeTJXaeSm61Rs80t17Hi+/2oixZr/rtQrtvml2hG2vqnMryBPxfJBzies+bUvVCoOHZCAThAz5xdBW0XA+mzz60NPPwzAIAyBmKlPcuLDmt8oesZgHCZgEsSC0FeQq9R8C9JTe5mjmbPFx5LPEv2M8dKY5fMlgrZ0Jvdxurog1l30mfM7VKzUYWiAI3AUgjQXfeb8rqHnOtyAm9AFQZqLPt2/t/SfirfoeQfv4QN8hKCtbalSJrZ+b5L6ckqUyoU5MBfyIGh7gD4TWz+ZXzl6KiAClbAGsrWvC5T6lobvrJvadGwzmZ9tLdvcQ3o/SkO3o76e5P83Wy22fZ/p/SUNP1h3MZnfHr7v7YZ6qINacNlvq1nEu6fIoJi4BBYbuSXELibX33n0nIOz0Aot4LLfVrOO3usNNhBvhE1GbjOxi8n8nqFHf39+gn8M3VPQ59K3yuH9po8TxPXnos+1RubnWh92nVx/Yfd17Sfz28u1tw/2wwE4CLPJLqDnIrTBJbgMYu28i+PQYfgEcSdc8eR13VWYbnuOnhfwEl7BaxDro18/DBh+kHgIhj15XTcCYdoo/cZg3PATxJPw25PXdWoK7+5szmsZ/ZbDCsOvJF4Fqz15XVcGYdpO+u2CKsNXE9dArSev6+ogU2vKUSoGzZCpnaDfSThl+NPEZ6DFk9d1rZCpdaHrFtzOQl+mvbKpH0LXMIzMUn22czJ/v9nWZzpn/n6zaamJcv3Dp7W21eBz6ebXjrY4zJTJ/P4AL2BRdg==
+  </data>
+ </layer>
+ <layer id="3" name="Tile Layer 2" width="40" height="40">
+  <data encoding="base64" compression="zlib">
+   eAHtWEFuAjEMdHsDTkWIQ6XSfgEkrnAD3rCof9mvwGNaeERf0JYjcANHaETWRFpBHOIDK1kTZ4M9mdi7WojSXKsm0ZoNl/Qxnwv/PW65ODzyEv2MbauwaNjm92Wc3y/z+zPM0en3bZifdf1sdweR69+l4fO1VH+tZyqbbP6ZWq+/Ov2Gr/5u7j+2rt/9Fbku46N/r9NLrrZef3X9K/eT2u8bef5120TFy9mw74Hgh/nceGidGEh+1vpX8stVf3M+x5AV4nxz9i++2YGhGkut356o3LFt2WR+9w2/YQPK+85Prd/HE5XvbD22UP7cc7H8UvdvLL9Q/Y3e9FSP5Reqv09FfjOuuynb5Mb6C+mnp158pJB+8VH1IkA/oF5knUjQD6gTVS8KdJOol6EaCe8yYPXupQfdJF6u1JnBuwxYF1XqBt//nb9XjFOhn9eNpW7w/XX+XjFOhR3xv/8RG0mi1A==
+  </data>
+ </layer>
+ <layer id="4" name="Above Player" width="40" height="40">
+  <data encoding="base64" compression="zlib">
+   eAHtlk1OwlAUhW+ME2do4sCRiCNFR4LOAH9AXYKL4FdRhw6RXegmBDfgEoShTtiG3+QlL7WUptW+ht6TfHnt623f6WlvWhHVsiewvSGShx0owC6owifwuha+1kXlR4r9veAt7fmFfWbfq/L0BWHr/6quuS7SgjZ0oAuq5U9gtCUyhndwpaD+/cTXBKYJ+iut/E6ivinSgEu4gmtwJT9/d/jpwz08wCO4kp8/V1781v1vf4OcyPMChhyfpxuf929ebZT5N9YeLWAc4M+7ZlD/emuztD/jG1q0CLr3Pf6X96EIB3AIKk0giQS0f+OnfES/lqAMx3ACRhW+xVWoWeMp22dwbs2ZmgvmklST9VrQtsYO213oWXOm5pY5VXoS0P6N9yxMfmaMd7XsnW1y847ZSyLaHXtzM/vRrqZnpS2BH1XoQS0=
+  </data>
+ </layer>
+ <objectgroup color="#ff0000" id="5" name="Collisions">
+  <object id="108" type="collision" x="96" y="0" width="128" height="64"/>
+  <object id="109" type="collision" x="320" y="0" width="160" height="64"/>
+  <object id="110" type="collision" x="496" y="0" width="32" height="32"/>
+  <object id="111" type="collision" x="576" y="0" width="64" height="192"/>
+  <object id="113" type="collision" x="416" y="368" width="64" height="16"/>
+  <object id="115" type="collision" x="320" y="304" width="160" height="64"/>
+  <object id="120" type="collision" x="528" y="528" width="48" height="32"/>
+  <object id="125" type="collision" x="16" y="448" width="48" height="48"/>
+  <object id="126" type="collision" x="80" y="480" width="16" height="32"/>
+  <object id="127" type="collision" x="16" y="352" width="80" height="32"/>
+  <object id="129" type="collision" x="0" y="384" width="32" height="32"/>
+  <object id="130" type="collision" x="0" y="416" width="16" height="16"/>
+  <object id="131" type="collision" x="0" y="496" width="32" height="48"/>
+  <object id="134" type="collision" x="0" y="288" width="32" height="32"/>
+  <object id="135" type="collision" x="0" y="320" width="16" height="32"/>
+  <object id="136" type="collision" x="16" y="240" width="80" height="48"/>
+  <object id="138" type="collision" x="0" y="192" width="32" height="32"/>
+  <object id="139" type="collision" x="0" y="224" width="16" height="32"/>
+  <object id="141" type="collision" x="16" y="160" width="32" height="48"/>
+  <object id="142" type="collision" x="48" y="160" width="16" height="32"/>
+  <object id="143" type="collision" x="64" y="160" width="32" height="48"/>
+  <object id="144" type="collision" x="0" y="0" width="32" height="160"/>
+  <object id="146" type="collision" x="32" y="64" width="16" height="32"/>
+  <object id="147" type="collision" x="48" y="64" width="48" height="48"/>
+  <object id="152" type="collision" x="496" y="400" width="64" height="32"/>
+  <object id="155" type="collision" x="64" y="576" width="32" height="64"/>
+  <object id="156" type="collision" x="144" y="608" width="32" height="32"/>
+  <object id="160" type="collision" x="192" y="608" width="384" height="32"/>
+  <object id="161" type="collision" x="448" y="576" width="64" height="32"/>
+  <object id="163" type="collision" x="608" y="576" width="32" height="64"/>
+  <object id="176" type="collision" x="128" y="464" width="208" height="80"/>
+  <object id="177" type="collision" x="128" y="544" width="96" height="16"/>
+  <object id="178" type="collision" x="240" y="544" width="96" height="16"/>
+  <object id="206" type="collision" x="32" y="544" width="32" height="32"/>
+  <object id="207" type="collision" x="64" y="448" width="32" height="32"/>
+  <object id="208" type="collision" x="608" y="192" width="32" height="64"/>
+  <object id="215" type="collision" x="320" y="368" width="80" height="16"/>
+  <object id="218" type="collision" x="464" y="272" width="16" height="32"/>
+  <object id="219" type="collision" x="480" y="288" width="64" height="48"/>
+  <object id="220" type="collision" x="496" y="336" width="48" height="16"/>
+  <object id="224" type="collision" x="128" y="224" width="16" height="16"/>
+  <object id="227" type="collision" x="48" y="384" width="48" height="16"/>
+  <object id="234" type="collision" x="80" y="288" width="16" height="16"/>
+  <object id="235" type="collision" x="32" y="288" width="32" height="16"/>
+  <object id="451" type="collision" x="32" y="0" width="64" height="16"/>
+ </objectgroup>
+ <objectgroup color="#ffff00" id="6" name="Events">
+  <object id="94" name="Play Music" type="event" x="0" y="0" width="16" height="16">
+   <properties>
+    <property name="act1" value="play_music music_town_theme"/>
+    <property name="cond1" value="not music_playing music_town_theme"/>
+   </properties>
+  </object>
+  <object id="95" name="Teleport to Route 6" type="event" x="480" y="0" width="16" height="16">
+   <properties>
+    <property name="act1" value="transition_teleport player,spyder_route6.tmx,30,19,0.3"/>
+    <property name="act2" value="char_face player,up"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_facing player,up"/>
+   </properties>
+  </object>
+  <object id="100" name="Teleport to Sea Route" type="event" x="624" y="448" width="16" height="128">
+   <properties>
+    <property name="act1" value="transition_teleport player,spyder_routec.tmx,0,8,0.3"/>
+    <property name="act2" value="char_face player,right"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_facing player,right"/>
+   </properties>
+  </object>
+  <object id="102" name="Teleport to Route 6" type="event" x="224" y="0" width="16" height="16">
+   <properties>
+    <property name="act1" value="transition_teleport player,spyder_route6.tmx,14,19,0.3"/>
+    <property name="act2" value="char_face player,up"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_facing player,up"/>
+   </properties>
+  </object>
+  <object id="103" name="Teleport to Route 6" type="event" x="240" y="0" width="16" height="16">
+   <properties>
+    <property name="act1" value="transition_teleport player,spyder_route6.tmx,15,19,0.3"/>
+    <property name="act2" value="char_face player,up"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_facing player,up"/>
+   </properties>
+  </object>
+  <object id="104" name="Teleport to Route 6" type="event" x="256" y="0" width="16" height="16">
+   <properties>
+    <property name="act1" value="transition_teleport player,spyder_route6.tmx,16,19,0.3"/>
+    <property name="act2" value="char_face player,up"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_facing player,up"/>
+   </properties>
+  </object>
+  <object id="105" name="Teleport to Route 6" type="event" x="272" y="0" width="16" height="16">
+   <properties>
+    <property name="act1" value="transition_teleport player,spyder_route6.tmx,17,19,0.3"/>
+    <property name="act2" value="char_face player,up"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_facing player,up"/>
+   </properties>
+  </object>
+  <object id="106" name="Teleport to Route 6" type="event" x="288" y="0" width="16" height="16">
+   <properties>
+    <property name="act1" value="transition_teleport player,spyder_route6.tmx,18,19,0.3"/>
+    <property name="act2" value="char_face player,up"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_facing player,up"/>
+   </properties>
+  </object>
+  <object id="107" name="Teleport to Route 6" type="event" x="304" y="0" width="16" height="16">
+   <properties>
+    <property name="act1" value="transition_teleport player,spyder_route6.tmx,19,19,0.3"/>
+    <property name="act2" value="char_face player,up"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_facing player,up"/>
+   </properties>
+  </object>
+  <object id="180" name="Teleport to Candy House 1" type="event" x="64" y="480" width="16" height="16">
+   <properties>
+    <property name="act1" value="transition_teleport player,spyder_candy_house1.tmx,6,7,0.3"/>
+    <property name="act2" value="char_face player,up"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_facing player,up"/>
+   </properties>
+  </object>
+  <object id="182" name="Teleport to Hospital" type="event" x="224" y="544" width="16" height="16">
+   <properties>
+    <property name="act1" value="transition_teleport player,spyder_candy_center.tmx,6,10,0.3"/>
+    <property name="act2" value="char_face player,up"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_facing player,up"/>
+   </properties>
+  </object>
+  <object id="183" name="Teleport to Greenwash" type="event" x="400" y="368" width="16" height="16">
+   <properties>
+    <property name="act1" value="transition_teleport player,spyder_greenwash.tmx,6,31,0.3"/>
+    <property name="act2" value="char_face player,up"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_facing player,up"/>
+   </properties>
+  </object>
+  <object id="186" name="Teleport all infected" type="event" x="576" y="48" width="16" height="16">
+   <properties>
+    <property name="act05" value="wait 0.5"/>
+    <property name="act10" value="translated_dialog spyder_enforcer_candy3"/>
+    <property name="act15" value="wait 1"/>
+    <property name="act20" value="translated_dialog spyder_enforcer_candy4"/>
+    <property name="act25" value="wait 1"/>
+    <property name="act30" value="set_variable confiscation_done:yes"/>
+    <property name="act40" value="transition_teleport player,spyder_candy_cafe.tmx,5,3,0.3"/>
+    <property name="act50" value="remove_npc spyder_candy_henrik"/>
+    <property name="cond1" value="is variable_set confiscation_candy:yes"/>
+    <property name="cond3" value="is party_infected player,spyderbite,all"/>
+    <property name="cond4" value="not variable_set confiscation_done:yes"/>
+   </properties>
+  </object>
+  <object id="185" name="Entry Candy" type="event" x="224" y="48" width="352" height="16">
+   <properties>
+    <property name="act01" value="char_stop player"/>
+    <property name="act02" value="lock_controls"/>
+    <property name="act03" value="create_npc spyder_candy_henrik,6,4"/>
+    <property name="act04" value="pathfind_to_char player,spyder_candy_henrik,down"/>
+    <property name="act05" value="unlock_controls"/>
+    <property name="act07" value="char_face spyder_candy_henrik,up"/>
+    <property name="act10" value="translated_dialog spyder_enforcer_candy1"/>
+    <property name="act20" value="set_variable confiscation_candy:yes"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="not variable_set confiscation_candy:yes"/>
+   </properties>
+  </object>
+  <object id="193" name="Seen Candy" type="event" x="176" y="48" width="16" height="16">
+   <properties>
+    <property name="act1" value="set_variable seencandy:yes"/>
+    <property name="act2" value="add_tracker player,candy_town"/>
+    <property name="cond2" value="not tracker player,candy_town"/>
+   </properties>
+  </object>
+  <object id="197" name="Teleport to Candy Scoop" type="event" x="48" y="192" width="16" height="16">
+   <properties>
+    <property name="act1" value="transition_teleport player,spyder_candy_scoop.tmx,5,10,0.3"/>
+    <property name="act2" value="char_face player,up"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_facing player,up"/>
+   </properties>
+  </object>
+  <object id="203" name="Teleport to Route 6" type="event" x="528" y="0" width="16" height="16">
+   <properties>
+    <property name="act1" value="transition_teleport player,spyder_route6.tmx,33,19,0.3"/>
+    <property name="act2" value="char_face player,up"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_facing player,up"/>
+   </properties>
+  </object>
+  <object id="204" name="Teleport to Route 6" type="event" x="544" y="0" width="16" height="16">
+   <properties>
+    <property name="act1" value="transition_teleport player,spyder_route6.tmx,34,19,0.3"/>
+    <property name="act2" value="char_face player,up"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_facing player,up"/>
+   </properties>
+  </object>
+  <object id="212" name="Environment Day" type="event" x="112" y="0" width="16" height="16">
+   <properties>
+    <property name="act1" value="set_environment grass"/>
+    <property name="cond1" value="not time_is stage_of_day,equals,night"/>
+    <property name="cond2" value="not char_sprite player,swimmer"/>
+    <property name="cond3" value="not environment_is grass"/>
+   </properties>
+  </object>
+  <object id="221" name="Environment Night" type="event" x="96" y="0" width="16" height="16">
+   <properties>
+    <property name="act1" value="set_environment night_grass"/>
+    <property name="cond1" value="is time_is stage_of_day,equals,night"/>
+    <property name="cond2" value="not char_sprite player,swimmer"/>
+    <property name="cond3" value="not environment_is night_grass"/>
+   </properties>
+  </object>
+  <object id="214" name="Teleport to Greenwash" type="event" x="480" y="336" width="16" height="16">
+   <properties>
+    <property name="act1" value="transition_teleport player,spyder_greenwash_greenhouse.tmx,25,15,0.3"/>
+    <property name="act2" value="char_face player,up"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_facing player,up"/>
+   </properties>
+  </object>
+  <object id="216" name="Create Guard" type="event" x="400" y="384" width="16" height="16">
+   <properties>
+    <property name="act1" value="create_npc spyder_greenwash_guard,25,24"/>
+    <property name="cond1" value="not char_exists spyder_greenwash_guard"/>
+    <property name="cond2" value="not battle_outcome player,won,spyder_greenwash_looten"/>
+   </properties>
+  </object>
+  <object id="217" name="Talk Guard" type="event" x="384" y="384" width="16" height="16">
+   <properties>
+    <property name="act1" value="translated_dialog spyder_greenwash_guard"/>
+    <property name="behav1" value="talk spyder_greenwash_guard"/>
+   </properties>
+  </object>
+  <object id="223" name="Teleport to Candy House 3" type="event" x="32" y="96" width="16" height="16">
+   <properties>
+    <property name="act1" value="transition_teleport player,spyder_candy_house3.tmx,6,7,0.3"/>
+    <property name="act2" value="char_face player,up"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_facing player,up"/>
+   </properties>
+  </object>
+  <object id="226" name="Mart Sign" type="event" x="128" y="224" width="16" height="16">
+   <properties>
+    <property name="act1" value="translated_dialog spyder_multi_martsign"/>
+    <property name="cond1" value="is char_facing_tile player"/>
+    <property name="cond2" value="is button_pressed INTERACT"/>
+   </properties>
+  </object>
+  <object id="228" name="Teleport to Candy House 2" type="event" x="32" y="384" width="16" height="16">
+   <properties>
+    <property name="act1" value="transition_teleport player,spyder_candy_house2.tmx,6,7,0.3"/>
+    <property name="act2" value="char_face player,up"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_facing player,up"/>
+   </properties>
+  </object>
+  <object id="209" name="Teleport to Candy House Back" type="event" x="32" y="48" width="16" height="16">
+   <properties>
+    <property name="act1" value="transition_teleport player,spyder_candy_house3.tmx,3,2,0.3"/>
+    <property name="act2" value="char_face player,down"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_facing player,down"/>
+   </properties>
+  </object>
+  <object id="201" name="Teleport to Candy Cafe" type="event" x="64" y="288" width="16" height="16">
+   <properties>
+    <property name="act1" value="transition_teleport player,spyder_candy_cafe.tmx,8,11,0.3"/>
+    <property name="act2" value="char_face player,up"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_facing player,up"/>
+   </properties>
+  </object>
+  <object id="211" name="Create Eliane" type="event" x="80" y="16" width="16" height="16">
+   <properties>
+    <property name="act1" value="create_npc spyder_candy_eliane,5,1"/>
+    <property name="act2" value="char_face spyder_candy_eliane,left"/>
+    <property name="cond1" value="not char_exists spyder_candy_eliane"/>
+   </properties>
+  </object>
+  <object id="222" name="Talk Eliane 1" type="event" x="96" y="16" width="16" height="16">
+   <properties>
+    <property name="act1" value="translated_dialog spyder_candy_eliane1"/>
+    <property name="act2" value="set_random_variable elianeoutput,cureall:restoration:potion:tea:refreshing_slice:antidote_grapes:cure_festering"/>
+    <property name="act3" value="random_integer luckgiveegg,1,10"/>
+    <property name="act4" value="set_variable elianetalkedtoday:yes"/>
+    <property name="behav1" value="talk spyder_candy_eliane"/>
+    <property name="cond0" value="is button_pressed INTERACT"/>
+    <property name="cond1" value="is cooldown_days 1,elianeflower"/>
+   </properties>
+  </object>
+  <object id="195" name="Talk Eliane 2" type="event" x="96" y="32" width="16" height="16">
+   <properties>
+    <property name="act1" value="translated_dialog spyder_candy_eliane2"/>
+    <property name="behav1" value="talk spyder_candy_eliane"/>
+    <property name="cond0" value="is button_pressed INTERACT"/>
+    <property name="cond1" value="is variable_set elianetalkedtoday:yes"/>
+   </properties>
+  </object>
+  <object id="194" name="Get cureall" type="event" x="144" y="48" width="16" height="16">
+   <properties>
+    <property name="act1" value="translated_dialog spyder_candy_eliane3"/>
+    <property name="act2" value="translated_dialog cureall,,center,center,center"/>
+    <property name="act3" value="add_item elianeoutput"/>
+    <property name="act4" value="set_variable elianeoutput:none"/>
+    <property name="act5" value="set_variable elianetalkedtoday:no"/>
+    <property name="cond1" value="is variable_set elianeoutput:cureall"/>
+   </properties>
+  </object>
+  <object id="192" name="Get restoration" type="event" x="128" y="48" width="16" height="16">
+   <properties>
+    <property name="act1" value="translated_dialog spyder_candy_eliane3"/>
+    <property name="act2" value="translated_dialog restoration,,center,center,center"/>
+    <property name="act3" value="add_item elianeoutput"/>
+    <property name="act4" value="set_variable elianeoutput:none"/>
+    <property name="act5" value="set_variable elianetalkedtoday:no"/>
+    <property name="cond1" value="is variable_set elianeoutput:restoration"/>
+   </properties>
+  </object>
+  <object id="173" name="Get potion" type="event" x="112" y="48" width="16" height="16">
+   <properties>
+    <property name="act1" value="translated_dialog spyder_candy_eliane3"/>
+    <property name="act2" value="translated_dialog potion,,center,center,center"/>
+    <property name="act3" value="add_item elianeoutput"/>
+    <property name="act4" value="set_variable elianeoutput:none"/>
+    <property name="act5" value="set_variable elianetalkedtoday:no"/>
+    <property name="cond1" value="is variable_set elianeoutput:potion"/>
+   </properties>
+  </object>
+  <object id="181" name="Get tea" type="event" x="96" y="48" width="16" height="16">
+   <properties>
+    <property name="act1" value="translated_dialog spyder_candy_eliane3"/>
+    <property name="act2" value="translated_dialog tea,,center,center,center"/>
+    <property name="act3" value="add_item elianeoutput"/>
+    <property name="act4" value="set_variable elianeoutput:none"/>
+    <property name="act5" value="set_variable elianetalkedtoday:no"/>
+    <property name="cond1" value="is variable_set elianeoutput:tea"/>
+   </properties>
+  </object>
+  <object id="500" name="Get refreshing_slice" type="event" x="80" y="48" width="16" height="16">
+   <properties>
+    <property name="act1" value="translated_dialog spyder_candy_eliane3"/>
+    <property name="act2" value="translated_dialog refreshing_slice,,center,center,center"/>
+    <property name="act3" value="add_item elianeoutput"/>
+    <property name="act4" value="set_variable elianeoutput:none"/>
+    <property name="act5" value="set_variable elianetalkedtoday:no"/>
+    <property name="cond1" value="is variable_set elianeoutput:refreshing_slice"/>
+   </properties>
+  </object>
+  <object id="501" name="Get antidote_grapes" type="event" x="64" y="48" width="16" height="16">
+   <properties>
+    <property name="act1" value="translated_dialog spyder_candy_eliane3"/>
+    <property name="act2" value="translated_dialog antidote_grapes,,center,center,center"/>
+    <property name="act3" value="add_item elianeoutput"/>
+    <property name="act4" value="set_variable elianeoutput:none"/>
+    <property name="act5" value="set_variable elianetalkedtoday:no"/>
+    <property name="cond1" value="is variable_set elianeoutput:antidote_grapes"/>
+   </properties>
+  </object>
+  <object id="502" name="Get cure_festering" type="event" x="48" y="48" width="16" height="16">
+   <properties>
+    <property name="act1" value="translated_dialog spyder_candy_eliane3"/>
+    <property name="act2" value="translated_dialog cure_festering,,center,center,center"/>
+    <property name="act3" value="add_item elianeoutput"/>
+    <property name="act4" value="set_variable elianeoutput:none"/>
+    <property name="act5" value="set_variable elianetalkedtoday:no"/>
+    <property name="cond1" value="is variable_set elianeoutput:cure_festering"/>
+   </properties>
+  </object>
+  <object id="443" name="Teleport to Candy Port" type="event" x="176" y="624" width="16" height="16">
+   <properties>
+    <property name="act1" value="transition_teleport player,spyder_candy_port.tmx,11,0,0.3"/>
+    <property name="act2" value="char_face player,down"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_facing player,down"/>
+   </properties>
+  </object>
+  <object id="444" name="Teleport to Candy Port" type="event" x="592" y="624" width="16" height="16">
+   <properties>
+    <property name="act1" value="transition_teleport player,spyder_candy_port.tmx,37,0,0.3"/>
+    <property name="act2" value="char_face player,down"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_facing player,down"/>
+   </properties>
+  </object>
+  <object id="447" name="Seen Candy + Not Infected" type="event" x="464" y="16" width="16" height="16">
+   <properties>
+    <property name="act05" value="wait 0.5"/>
+    <property name="act10" value="translated_dialog spyder_enforcer_candy2"/>
+    <property name="act15" value="wait 0.5"/>
+    <property name="act20" value="lock_controls"/>
+    <property name="act30" value="pathfind spyder_candy_henrik,21,5"/>
+    <property name="act40" value="set_variable confiscation_done:yes"/>
+    <property name="act50" value="remove_npc spyder_candy_henrik"/>
+    <property name="act60" value="unlock_controls"/>
+    <property name="cond1" value="is variable_set confiscation_candy:yes"/>
+    <property name="cond3" value="is party_infected player,spyderbite,none"/>
+    <property name="cond4" value="not variable_set confiscation_done:yes"/>
+    <property name="cond5" value="not variable_set party_sick:yes"/>
+   </properties>
+  </object>
+  <object id="448" name="Seen Candy + Infected" type="event" x="464" y="32" width="16" height="16">
+   <properties>
+    <property name="act05" value="wait 0.5"/>
+    <property name="act10" value="translated_dialog spyder_enforcer_candy3"/>
+    <property name="act15" value="wait 1"/>
+    <property name="act20" value="translated_dialog spyder_enforcer_candy4"/>
+    <property name="act25" value="wait 1"/>
+    <property name="act27" value="lock_controls"/>
+    <property name="act30" value="quarantine player,spyderbite,in"/>
+    <property name="act40" value="set_variable party_sick:yes"/>
+    <property name="act45" value="pathfind spyder_candy_henrik,21,5"/>
+    <property name="act50" value="set_variable confiscation_done:yes"/>
+    <property name="act60" value="remove_npc spyder_candy_henrik"/>
+    <property name="act70" value="unlock_controls"/>
+    <property name="cond1" value="is variable_set confiscation_candy:yes"/>
+    <property name="cond2" value="not variable_set party_sick:yes"/>
+    <property name="cond3" value="is party_infected player,spyderbite,some"/>
+    <property name="cond4" value="not variable_set confiscation_done:yes"/>
+   </properties>
+  </object>
+  <object id="449" name="Swim Encounters Day" type="event" x="32" y="0" width="16" height="16">
+   <properties>
+    <property name="act1" value="random_encounter spyder_routec,0.15"/>
+    <property name="cond1" value="is char_sprite player,swimmer"/>
+    <property name="cond2" value="is current_state WorldState"/>
+    <property name="cond3" value="is check_char_parameter player,moving,1"/>
+    <property name="cond4" value="is environment_is ocean"/>
+   </properties>
+  </object>
+  <object id="450" name="Swim Encounters Night" type="event" x="48" y="0" width="16" height="16">
+   <properties>
+    <property name="act1" value="random_encounter spyder_routec,0.25"/>
+    <property name="cond1" value="is char_sprite player,swimmer"/>
+    <property name="cond2" value="is current_state WorldState"/>
+    <property name="cond3" value="is check_char_parameter player,moving,1"/>
+    <property name="cond4" value="is environment_is night_ocean"/>
+   </properties>
+  </object>
+  <object id="452" name="Create TM Leaf Barrage" type="event" x="224" y="448" width="16" height="16">
+   <properties>
+    <property name="act1" value="create_npc spyder_candy_tmleafbarrage,14,28"/>
+    <property name="cond1" value="not char_exists spyder_candy_tmleafbarrage"/>
+    <property name="cond2" value="not variable_set candy_tmleafbarrage:yes"/>
+   </properties>
+  </object>
+  <object id="453" name="TM Leaf Barrage" type="event" x="224" y="384" width="16" height="16">
+   <properties>
+    <property name="act1" value="translated_dialog tm_leaf_barrage,,center,center,center"/>
+    <property name="act2" value="add_item tm_leaf_barrage"/>
+    <property name="act3" value="remove_npc spyder_candy_tmleafbarrage"/>
+    <property name="act4" value="set_variable candy_tmleafbarrage:yes"/>
+    <property name="behav1" value="talk spyder_candy_tmleafbarrage"/>
+    <property name="cond1" value="not variable_set candy_tmleafbarrage:yes"/>
+   </properties>
+  </object>
+ </objectgroup>
+</map>

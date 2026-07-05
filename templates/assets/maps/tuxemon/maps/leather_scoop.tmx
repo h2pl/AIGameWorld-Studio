@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.10" tiledversion="git" orientation="orthogonal" renderorder="right-down" width="13" height="11" tilewidth="16" tileheight="16" infinite="0" nextlayerid="7" nextobjectid="26">
+ <properties>
+  <property name="edges" value="clamped"/>
+  <property name="inside" type="bool" value="true"/>
+  <property name="scenario" value="xero"/>
+  <property name="slug" value="leather_scoop"/>
+  <property name="map_type" value="shop"/>
+ </properties>
+ <tileset firstgid="1" source="../gfx/tilesets/core_city_and_country.tsx"/>
+ <tileset firstgid="1441" source="../gfx/tilesets/core_indoor_floors.tsx"/>
+ <tileset firstgid="5305" source="../gfx/tilesets/core_indoor_walls.tsx"/>
+ <tileset firstgid="9169" source="../gfx/tilesets/core_set pieces.tsx"/>
+ <layer id="1" name="Layer 1" width="13" height="11">
+  <data encoding="base64" compression="zlib">
+   eJxjkWRgYCERG5GBE8jAhlyjeDBjANZlI2Y=
+  </data>
+ </layer>
+ <layer id="2" name="Layer 2" width="13" height="11">
+  <data encoding="base64" compression="zlib">
+   eJxjYCAfmGmQxkcGq1QYGAyA8oYaEPZqIF6jgioHAzeh4ieBtD9QPEADwj4FxKfR5ND1kAJw6ZEHijcAcaMKhA0C1UC6RgW/nvlAvABJj6gqA8NsIFtcFbe5hAA2cwmZY87FwGABxZZc2M3xYkBgH3UGhlSgujQoTgdiX3VMcwFfjSLA
+  </data>
+ </layer>
+ <layer id="3" name="Layer 3" width="13" height="11">
+  <data encoding="base64" compression="zlib">
+   eJxjYKAv2KlCup5dg1RPrQp59gwXAACoigT3
+  </data>
+ </layer>
+ <layer id="4" name="Above Player" width="13" height="11">
+  <data encoding="base64" compression="zlib">
+   eJxjYKAveKVKuh5ONeq7g1TgrY4pVqPCwDBPhfrmUgqUkDAtAQCI4wPr
+  </data>
+ </layer>
+ <objectgroup color="#ff0000" id="5" name="Collisions">
+  <object id="12" type="collision" x="0" y="160" width="64" height="16"/>
+  <object id="13" type="collision" x="0" y="0" width="48" height="128"/>
+  <object id="14" type="collision" x="48" y="0" width="160" height="48"/>
+  <object id="17" type="collision" x="64" y="48" width="96" height="16"/>
+  <object id="18" type="collision" x="176" y="48" width="32" height="16"/>
+  <object id="22" type="collision" x="144" y="80" width="32" height="32"/>
+  <object id="23" type="collision" x="160" y="128" width="32" height="32"/>
+  <object id="24" type="collision" x="80" y="112" width="32" height="32"/>
+  <object id="25" type="collision" x="128" y="160" width="16" height="16"/>
+ </objectgroup>
+ <objectgroup color="#ffff00" id="6" name="Events">
+  <object id="15" name="Teleport to Leather Town" type="event" x="80" y="160" width="32" height="16">
+   <properties>
+    <property name="act1" value="transition_teleport player,leather_town.tmx,24,10,0.3"/>
+    <property name="act2" value="char_face player,down"/>
+    <property name="cond1" value="is char_at player"/>
+    <property name="cond2" value="is char_facing player,down"/>
+   </properties>
+  </object>
+  <object id="19" name="employee" type="event" x="16" y="80" width="16" height="16">
+   <properties>
+    <property name="act10" value="create_npc tuxemart_keeper,1,5,stand"/>
+    <property name="act20" value="char_face tuxemart_keeper,right"/>
+    <property name="act30" value="set_economy tuxemart_keeper,leather_scoop"/>
+    <property name="cond10" value="not char_exists tuxemart_keeper"/>
+   </properties>
+  </object>
+  <object id="20" name="open shop" type="event" x="32" y="80" width="16" height="16">
+   <properties>
+    <property name="act10" value="open_shop tuxemart_keeper,both_item"/>
+    <property name="cond10" value="is char_facing_tile player"/>
+    <property name="cond20" value="is button_pressed INTERACT"/>
+   </properties>
+  </object>
+  <object id="21" name="capture devices" type="event" x="32" y="96" width="16" height="16">
+   <properties>
+    <property name="act10" value="translated_dialog cash_register"/>
+    <property name="cond10" value="is char_facing_tile player"/>
+    <property name="cond20" value="is button_pressed INTERACT"/>
+   </properties>
+  </object>
+ </objectgroup>
+</map>

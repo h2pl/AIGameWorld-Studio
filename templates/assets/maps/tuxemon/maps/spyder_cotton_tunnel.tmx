@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" compressionlevel="0" width="40" height="20" tilewidth="16" tileheight="16" infinite="0" nextlayerid="10" nextobjectid="111">
+ <properties>
+  <property name="edges" value="clamped"/>
+  <property name="inside" type="bool" value="true"/>
+  <property name="map_type" value="dungeon"/>
+  <property name="scenario" value="spyder"/>
+  <property name="slug" value="cotton_tunnel"/>
+ </properties>
+ <tileset firstgid="1" source="../gfx/tilesets/core_city_and_country.tsx"/>
+ <tileset firstgid="1441" source="../gfx/tilesets/core_outdoor.tsx"/>
+ <layer id="1" name="Lowest Level" width="40" height="20">
+  <data encoding="base64" compression="zlib">
+   eAFbwMvAsGAUj4bBaBoYTQOjaWA0DYymgdE0MJoGRmQaODoa7yMy3gey/Q8AJiwc5A==
+  </data>
+ </layer>
+ <layer id="2" name="Pit" width="40" height="20">
+  <data encoding="base64" compression="zlib">
+   eAG7y8TAcHcUUxQGDFDQyMzAQE/cwYdqH4gPAujxCREdPOSo+yiLi9HwG97hB/IdchxT5lva6B51H2XhOhp+lIUfTDcoHAczGIzuQ3YTMnuwhCOymyKBbSpsGN2tIDWUAJCdyBiXWTA1uOSJEcfmH5AYzGxiaGLsIVcNPd0HAH2lnUQ=
+  </data>
+ </layer>
+ <layer id="3" name="Walls" width="40" height="20">
+  <data encoding="base64" compression="zlib">
+   eAHdldFNBDEMRFfQEFALSEA1QDXwTyHcP1ALfkIjjazxsssJPs5SlL0k9ozHTm5ZTtvuzvfl93G2LIw99lwYjztxiP9SPvDDf4txXvwmH850+6x8Xmtc1l4aV8GHGLe1Dr/7Yb/jcF78Jh/OdIPfew2w0liL9V/8pMUp8Xsovenbp1CTXiN+H1PfNf3eCj/1pdboz4sNZzq/5HMIudJ/7qseTrVOa/TnWn7qUcfAR/pTAx/9Dk/89O64b/qmvo6t/HxWDlqbakItiOU28Uv3NtWEOlMXYae580tnWNO5zs+11jvac1RuU+y1dXAdo9dBmBM/58tbmLDkm/Z+Wuu56m4xe97CcD7U1+0v+K3xFyfO8C2ddU86P+33Gmy5B+Lhd0u1016fnZ90lqbo1vlNd0A+PX76DaZs793GT5z5vq5Y9AHGfFNjwpy0TVp/R8xvj+tLXYgrnfFzforjs/urD/CZtPV+79+H8uvm+mrP3z3xcx6ugf+nSjP1n+IdMyd+woGHsNSPPefpd9LiNzy34IL1BZMZE1I=
+  </data>
+ </layer>
+ <layer id="4" name="Above Player" width="40" height="20">
+  <data encoding="base64" compression="zlib">
+   eAHt0DEBAAAAwqD1T20LL4hAYcCAAQMGDBgwYMCAgc/AAAyAAAE=
+  </data>
+ </layer>
+ <objectgroup color="#ff0000" id="5" name="Collisions">
+  <object id="58" type="collision" x="48" y="128" width="224" height="32"/>
+  <object id="59" type="collision" x="0" y="272" width="96" height="32"/>
+  <object id="60" type="collision" x="0" y="0" width="16" height="272"/>
+  <object id="61" type="collision" x="16" y="0" width="480" height="48"/>
+  <object id="62" type="collision" x="592" y="48" width="48" height="96"/>
+  <object id="66" type="collision" x="96" y="256" width="80" height="32"/>
+  <object id="67" type="collision" x="160" y="288" width="16" height="16"/>
+  <object id="68" type="collision" x="96" y="192" width="80" height="48"/>
+  <object id="69" type="collision" x="48" y="160" width="64" height="32"/>
+  <object id="70" type="collision" x="48" y="64" width="96" height="64"/>
+  <object id="71" type="collision" x="256" y="48" width="16" height="64"/>
+  <object id="72" type="collision" x="208" y="288" width="208" height="32"/>
+  <object id="73" type="collision" x="208" y="176" width="144" height="96"/>
+  <object id="74" type="collision" x="352" y="128" width="64" height="112"/>
+  <object id="75" type="collision" x="304" y="128" width="48" height="48"/>
+  <object id="76" type="collision" x="416" y="208" width="64" height="112"/>
+  <object id="77" type="collision" x="448" y="48" width="32" height="144"/>
+  <object id="78" type="collision" x="480" y="208" width="48" height="64"/>
+  <object id="79" type="collision" x="480" y="160" width="96" height="32"/>
+  <object id="80" type="collision" x="560" y="192" width="16" height="80"/>
+  <object id="81" type="collision" x="576" y="240" width="32" height="64"/>
+  <object id="82" type="collision" x="608" y="144" width="32" height="80"/>
+  <object id="83" type="collision" x="512" y="128" width="80" height="16"/>
+  <object id="108" type="collision" x="496" y="0" width="144" height="32"/>
+  <object id="109" type="collision" x="512" y="32" width="48" height="16"/>
+  <object id="110" type="collision" x="576" y="32" width="48" height="16"/>
+ </objectgroup>
+</map>

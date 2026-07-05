@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.8" tiledversion="1.8.0" orientation="orthogonal" renderorder="right-down" compressionlevel="0" width="15" height="16" tilewidth="16" tileheight="16" infinite="0" nextlayerid="8" nextobjectid="33">
+ <properties>
+  <property name="edges" value="clamped"/>
+  <property name="inside" type="bool" value="true"/>
+  <property name="scenario" value="xero"/>
+  <property name="slug" value="wayfarer_inn2"/>
+  <property name="map_type" value="dungeon"/>
+ </properties>
+ <tileset firstgid="1" name="core_indoor_walls" tilewidth="16" tileheight="16" tilecount="3864" columns="46">
+  <image source="../gfx/tilesets/core_indoor_walls.png" width="736" height="1344"/>
+ </tileset>
+ <tileset firstgid="3865" name="core_indoor_floors" tilewidth="16" tileheight="16" tilecount="3864" columns="46">
+  <image source="../gfx/tilesets/core_indoor_floors.png" width="736" height="1344"/>
+ </tileset>
+ <tileset firstgid="7729" name="core_set pieces" tilewidth="16" tileheight="16" tilecount="1550" columns="31">
+  <image source="../gfx/tilesets/core_set pieces.png" width="496" height="800"/>
+ </tileset>
+ <tileset firstgid="9279" name="core_indoor_stairs" tilewidth="16" tileheight="16" tilecount="2970" columns="45">
+  <image source="../gfx/tilesets/core_indoor_stairs.png" width="720" height="1056"/>
+ </tileset>
+ <layer id="1" name="Tile Layer 1" width="15" height="16">
+  <data encoding="base64" compression="zlib">
+   eAG9UdsNwkAMuw14rlP1ugNb8FiTlhWYA/UXW4olKypH+aGSlZwTX+LeppRyCRwsb3Gs7YAOGAPV8hbHWg9Q+8RAoiI/ITrIqe7xFy3v+6R94f4jsA3QD/sHRHlnnIPXXPbcwcmj/JCviZ8WtOxz8F5pnVfuc/fR6zXmt8R7nf+Z5zOi+7oG/1ihzX7lS3Ny9J1z7dvZtXwj35k536n1yW/eWe+0Rru0I/dqfZr7b+0bgJRdjw==
+  </data>
+ </layer>
+ <layer id="2" name="Tile Layer 2" width="15" height="16">
+  <data encoding="base64" compression="zlib">
+   eAFjYKAMGMsxMJgAMTkgCKgvmAS9d4QRthQC9RWRqRdhCnEsThGEOmQ2QhTBildkYEgAYnzgqSADw3MgfgbEyKAOqK+egF5HIQYGZyB2AmJqgflAOxcQsJcYu5iAZjBSwRxi7CKkZhowbbwFuuUdEBMTJ8jmbQXq5VFiYOAFYmLiBFkviK0N1KcDxJSCtUSEJQCn/hRN
+  </data>
+ </layer>
+ <layer id="3" name="Tile Layer 3" width="15" height="16">
+  <data encoding="base64" compression="zlib">
+   eAFjYBgcwEudfHdEKGHXWw40U18euxy1RF8qYjfJVo6BwQ6I8QEOHO6OAeqLJaBXHYdefPbRWo4ZGBYsOMKD1naPVPMBQqUFSg==
+  </data>
+ </layer>
+ <layer id="4" name="Tile Layer 4" width="15" height="16">
+  <data encoding="base64" compression="zlib">
+   eAFjYBgFoyGACIEnCgwMT4F4FAyNEAAAbskCCg==
+  </data>
+ </layer>
+ <layer id="5" name="Above Player" width="15" height="16">
+  <data encoding="base64" compression="zlib">
+   eAFjYBj8QEB+8LtxoF3YoMjA0AjElILHCgwMj4B4FAyNEAAAc2UDeA==
+  </data>
+ </layer>
+ <objectgroup color="#ffff00" id="6" name="Events">
+  <object id="17" name="Go downstairs" type="event" x="64" y="32" width="16" height="16">
+   <properties>
+    <property name="act10" value="transition_teleport player,wayfarer_inn1.tmx,3,2,0.3"/>
+    <property name="act20" value="char_face player,left"/>
+    <property name="cond10" value="is char_at player"/>
+    <property name="cond20" value="is char_facing player,left"/>
+   </properties>
+  </object>
+  <object id="23" name="Go to the other downstairs" type="event" x="160" y="48" width="16" height="16">
+   <properties>
+    <property name="act10" value="transition_teleport player,wayfarer_inn1.tmx,11,3,0.3"/>
+    <property name="act20" value="char_face player,right"/>
+    <property name="cond10" value="is char_at player"/>
+    <property name="cond20" value="is char_facing player,right"/>
+   </properties>
+  </object>
+  <object id="31" name="Play Music" type="event" x="0" y="0" width="16" height="16">
+   <properties>
+    <property name="act10" value="play_music music_cathedral_theme"/>
+    <property name="cond10" value="not music_playing music_cathedral_theme"/>
+   </properties>
+  </object>
+ </objectgroup>
+ <objectgroup color="#ff0000" id="7" name="Collisions">
+  <object id="2" type="collision" x="0" y="0" width="16" height="256"/>
+  <object id="4" type="collision" x="32" y="176" width="48" height="48"/>
+  <object id="5" type="collision" x="112" y="224" width="16" height="32"/>
+  <object id="6" type="collision" x="32" y="112" width="16" height="48"/>
+  <object id="7" type="collision" x="48" y="128" width="64" height="32"/>
+  <object id="9" type="collision" x="32" y="64" width="80" height="32"/>
+  <object id="10" type="collision" x="96" y="96" width="16" height="32"/>
+  <object id="11" type="collision" x="16" y="0" width="224" height="32"/>
+  <object id="12" type="collision" x="128" y="32" width="16" height="112"/>
+  <object id="13" type="collision" x="144" y="64" width="64" height="32"/>
+  <object id="15" type="collision" x="144" y="128" width="32" height="16"/>
+  <object id="16" type="collision" x="192" y="144" width="32" height="16"/>
+  <object id="18" type="collision" x="48" y="32" width="16" height="32"/>
+  <object id="19" type="collision" x="64" y="48" width="16" height="16"/>
+  <object id="20" type="collision" x="224" y="32" width="16" height="144"/>
+  <object id="21" type="collision" x="128" y="176" width="96" height="16"/>
+  <object id="22" type="collision" x="96" y="240" width="16" height="16"/>
+  <object id="25" type="collision" x="176" y="48" width="16" height="16"/>
+  <object id="26" type="collision" x="80" y="96" width="16" height="16"/>
+  <object id="28" type="collision" x="80" y="176" width="48" height="32"/>
+  <object id="29" type="collision" x="112" y="208" width="16" height="16"/>
+  <object id="30" type="collision-line" x="160" y="48">
+   <polyline points="0,0 16,0"/>
+  </object>
+ </objectgroup>
+</map>

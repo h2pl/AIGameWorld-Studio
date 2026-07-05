@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.8" tiledversion="1.8.0" orientation="orthogonal" renderorder="right-down" compressionlevel="0" width="24" height="22" tilewidth="16" tileheight="16" infinite="0" nextlayerid="7" nextobjectid="40">
+ <properties>
+  <property name="edges" value="clamped"/>
+  <property name="inside" type="bool" value="true"/>
+  <property name="scenario" value="xero"/>
+  <property name="slug" value="mansion_basement"/>
+  <property name="map_type" value="dungeon"/>
+ </properties>
+ <tileset firstgid="1" source="../gfx/tilesets/core_city_and_country.tsx"/>
+ <tileset firstgid="1441" name="core_indoor_floors" tilewidth="16" tileheight="16" tilecount="3864" columns="46">
+  <image source="../gfx/tilesets/core_indoor_floors.png" width="736" height="1344"/>
+ </tileset>
+ <tileset firstgid="5305" name="core_indoor_walls" tilewidth="16" tileheight="16" tilecount="3864" columns="46">
+  <image source="../gfx/tilesets/core_indoor_walls.png" width="736" height="1344"/>
+ </tileset>
+ <tileset firstgid="9169" name="core_outdoor" tilewidth="16" tileheight="16" tilecount="2775" columns="37">
+  <image source="../gfx/tilesets/core_outdoor.png" width="592" height="1200"/>
+ </tileset>
+ <tileset firstgid="11944" name="core_indoor_stairs" tilewidth="16" tileheight="16" tilecount="2970" columns="45">
+  <image source="../gfx/tilesets/core_indoor_stairs.png" width="720" height="1056"/>
+ </tileset>
+ <layer id="1" name="Tile Layer 1" width="24" height="22">
+  <data encoding="base64" compression="zlib">
+   eAFjYICAZC4GBlpgqPE0MRvkXhCghbthZtLafJg9ozRt43E0fEfDlxZpAFwAIRHUtgPJaDBz1HzUdDwaPqjhgZ4+aB0+AKZu0KM=
+  </data>
+ </layer>
+ <layer id="2" name="Tile Layer 2" width="24" height="22">
+  <data encoding="base64" compression="zlib">
+   eAHFlEsOAWEQhP+1G7CyII6AK7gHruERJ8BFuIQI1xGPja5kKilljCEenbR/uqf706pnbKopNWu3vsvJocbzHjtnG5xD+Dh61U85Odz3vMfKwPUx4ycz9OUZ8u1KSp3wbvijOva+w+8HdxA+LMk/x0zQbR1O07lWkaeul6idB3cRvizJp/6zB/xR5Kmrfi9m8Ri5Hj4ye0cf9uLM49el4Bt8wd89P9R6n+3E99ISDcFpyG64I92jz69aU/OJMKdyDf6zeuej55P2C75rWPSfgv8TtY3sifrriffFNcQzR+399OexqBa90MfNGXrf73mstbj+J597Uc19Xo9fmZ970d/oPI9f4bNW+f7+eswentrLnM+kNf7+ekwGT+1lrojPmrLnL/hX4luTaw==
+  </data>
+ </layer>
+ <layer id="3" name="Tile Layer 3" width="24" height="22">
+  <data encoding="base64" compression="zlib">
+   eAG1lE0KwjAQhecMulIEq27d6BVUBG+iiEdxI3gQ76R3cOc86CtDfmyStgNDMpM336RtGpE82+XJG/WsmfkTu/bwl8WuY5nxd+KL72s/V5oJ8UtZobo++XNtAF+aRn3x9/pOj8qFo8e17vGPf6s1HMBIscqILP+g9X182xg/tD+edfQuMbv/UH3orFN3SejZxierdBySf9bnG5Lf9sy8Q6yO+3nWScau1o0tIzbH9ySPGsQLDej4t3gOkcu1EJ8M8CoGCeNr6ov+8aHG/dDF2vg57PdG5KM+lI22ImN113CuY2bv5pimS37VpTih9qQa9176AaTzJ+Y=
+  </data>
+ </layer>
+ <layer id="4" name="Above Player" width="24" height="22">
+  <data encoding="base64" compression="zlib">
+   eAFjYBgFwyEE5IGeAGGl4eCZUT+MhsBoCIyGwDALgeFYNgMAj/oAgw==
+  </data>
+ </layer>
+ <objectgroup color="#ff0000" id="5" name="Collisions">
+  <object id="1" type="collision" x="0" y="0" width="16" height="224"/>
+  <object id="2" type="collision" x="16" y="0" width="368" height="32"/>
+  <object id="3" type="collision" x="368" y="32" width="16" height="320"/>
+  <object id="4" type="collision" x="240" y="192" width="128" height="32"/>
+  <object id="5" type="collision" x="16" y="192" width="176" height="32"/>
+  <object id="6" type="collision" x="48" y="128" width="96" height="32"/>
+  <object id="7" type="collision" x="32" y="112" width="32" height="32"/>
+  <object id="8" type="collision" x="16" y="64" width="32" height="32"/>
+  <object id="9" type="collision" x="64" y="32" width="16" height="16"/>
+  <object id="10" type="collision" x="80" y="32" width="16" height="96"/>
+  <object id="11" type="collision" x="128" y="64" width="48" height="32"/>
+  <object id="12" type="collision" x="176" y="32" width="16" height="128"/>
+  <object id="13" type="collision" x="240" y="32" width="16" height="128"/>
+  <object id="14" type="collision" x="224" y="144" width="16" height="16"/>
+  <object id="15" type="collision" x="144" y="128" width="16" height="16"/>
+  <object id="16" type="collision" x="160" y="96" width="16" height="16"/>
+  <object id="17" type="collision" x="256" y="128" width="80" height="32"/>
+  <object id="18" type="collision" x="272" y="80" width="64" height="16"/>
+  <object id="19" type="collision" x="320" y="96" width="16" height="32"/>
+  <object id="20" type="collision" x="176" y="224" width="16" height="96"/>
+  <object id="21" type="collision" x="64" y="224" width="16" height="128"/>
+  <object id="22" type="collision" x="240" y="224" width="16" height="96"/>
+  <object id="23" type="collision" x="96" y="256" width="48" height="32"/>
+  <object id="24" type="collision" x="128" y="288" width="16" height="64"/>
+  <object id="25" type="collision" x="304" y="320" width="16" height="32"/>
+  <object id="26" type="collision" x="320" y="336" width="16" height="16"/>
+  <object id="27" type="collision" x="256" y="224" width="80" height="16"/>
+  <object id="28" type="collision" x="288" y="240" width="32" height="16"/>
+  <object id="29" type="collision" x="304" y="256" width="16" height="16"/>
+  <object id="30" type="collision" x="352" y="224" width="16" height="16"/>
+  <object id="31" type="collision" x="192" y="304" width="16" height="16"/>
+  <object id="32" type="collision" x="160" y="224" width="16" height="16"/>
+  <object id="33" type="collision" x="352" y="176" width="16" height="16"/>
+  <object id="34" type="collision-line" x="96" y="288">
+   <polyline points="0,0 0,32"/>
+  </object>
+  <object id="38" type="collision-line" x="80" y="352">
+   <polyline points="0,0 288,0"/>
+  </object>
+ </objectgroup>
+ <objectgroup color="#ffff00" id="6" name="Events">
+  <object id="35" name="Teleport to Middle" type="event" x="96" y="304" width="16" height="16">
+   <properties>
+    <property name="act10" value="transition_teleport player,mansion.tmx,1,15,0.3"/>
+    <property name="act20" value="char_face player,top"/>
+    <property name="cond10" value="is char_at player"/>
+    <property name="cond20" value="is char_facing player,top"/>
+   </properties>
+  </object>
+  <object id="36" name="Teleport to Middle" type="event" x="112" y="304" width="16" height="16">
+   <properties>
+    <property name="act10" value="transition_teleport player,mansion.tmx,2,15,0.3"/>
+    <property name="act20" value="char_face player,up"/>
+    <property name="cond10" value="is char_at player"/>
+    <property name="cond20" value="is char_facing player,up"/>
+   </properties>
+  </object>
+  <object id="37" name="Play Music" type="event" x="0" y="0" width="16" height="16">
+   <properties>
+    <property name="act10" value="play_music music_jester_theme"/>
+    <property name="cond10" value="not music_playing music_jester_theme"/>
+   </properties>
+  </object>
+ </objectgroup>
+</map>

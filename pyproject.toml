@@ -14,6 +14,9 @@ dependencies = [
     "pillow>=11.0",
     "openai>=1.0",
     "pytiled-parser>=2.2.9",
+    "llama-index-core>=0.14.23",
+    "llama-index-embeddings-huggingface>=0.7.0",
+    "llama-index-vector-stores-chroma>=0.5.5",
 ]
 
 [dependency-groups]

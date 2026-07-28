@@ -4,7 +4,7 @@ from pathlib import Path
 
 import yaml
 
-from src.validator.validate import ValidationResult, format_report, validate_template
+from src.services.validator import ValidationResult, format_report, validate_template
 
 
 def _write_yaml(path: Path, data: dict):

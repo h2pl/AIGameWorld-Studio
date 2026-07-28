@@ -4,9 +4,9 @@ from pathlib import Path
 
 import yaml
 
-from src.pipeline.world_pack.params import GenerateParams
-from src.pipeline.world_pack.skeleton import generate_skeleton
-from src.validator.validate import validate_template
+from src.domain.params import GenerateParams
+from src.services.generator.world_pack import generate_skeleton
+from src.services.validator import validate_template
 
 
 def test_generate_creates_all_entity_types(tmp_path: Path):

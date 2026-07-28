@@ -4,7 +4,7 @@ from pathlib import Path
 
 from PIL import Image
 
-from src.pipeline.assets.character import (
+from src.services.generator.assets_recolor import (
     _BASE_TEMPLATE,
     ROLE_COLORS,
     SKIN_COLORS,

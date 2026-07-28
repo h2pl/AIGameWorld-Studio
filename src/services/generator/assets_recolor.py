@@ -7,7 +7,7 @@
 
 from pathlib import Path
 
-from src.pipeline.world_pack.params import GenerateParams
+from src.domain.params import GenerateParams
 
 # 肤色映射 / Skin color → RGB
 SKIN_COLORS = {
@@ -54,7 +54,7 @@ def generate_character_sprites(
     sprites_dir.mkdir(parents=True, exist_ok=True)
 
     if method == "ai":
-        from src.pipeline.ai_assets.character import generate_ai_sprites
+        from src.services.generator.assets_ai import generate_ai_sprites
 
         return generate_ai_sprites(characters, sprites_dir, params)
 

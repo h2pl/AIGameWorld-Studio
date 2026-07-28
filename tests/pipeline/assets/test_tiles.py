@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from src.pipeline.assets.tiles import TILESET_STYLES, generate_tileset
+from src.services.generator.assets_tiles import TILESET_STYLES, generate_tileset
 
 
 def test_tileset_styles_coverage():

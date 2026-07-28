@@ -2,8 +2,8 @@
 
 from pathlib import Path
 
-from src.pipeline.world_pack.nodes import node_skeleton, node_validate
-from src.pipeline.world_pack.params import GenerateParams
+from src.services.generator.filler import node_skeleton, node_validate
+from src.domain.params import GenerateParams
 
 
 def test_node_skeleton_creates_files(tmp_path: Path):

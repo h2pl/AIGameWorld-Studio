@@ -200,9 +200,9 @@ def _interactive_prompt(parser, args):
 
 async def _generate(args) -> int:
     """LLM 管线生成 world-pack / LLM pipeline generate world-pack."""
-    from src.graph.graph import generate_world_pack
-    from src.pipeline.world_pack.params import GenerateParams
-    from src.pipeline.world_pack.skeleton import generate_skeleton
+    from src.services.generator.filler import generate_world_pack
+    from src.domain.params import GenerateParams
+    from src.services.generator.world_pack import generate_skeleton
 
     params = GenerateParams(
         world_name=args.name,
@@ -257,7 +257,7 @@ async def _validate(args) -> int:
         print(f"Error: world-pack not found: {args.path}", file=sys.stderr)
         return 1
 
-    from src.validator.validate import format_report, validate_template
+    from src.services.validator import format_report, validate_template
 
     result = validate_template(args.path)
     print(format_report(result))

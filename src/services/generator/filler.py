@@ -9,9 +9,9 @@ from src.llm.client import get_model, llm_generate
 
 # 骨架 / Skeleton
 from src.llm.utils import write_yaml_entities
-from src.pipeline.world_pack.params import GenerateParams
-from src.pipeline.world_pack.skeleton import generate_skeleton
-from src.validator.validate import validate_template as validate_world_pack
+from src.domain.params import GenerateParams
+from src.services.generator.world_pack import generate_skeleton
+from src.services.validator import validate_template as validate_world_pack
 
 
 # Meta / Meta description
@@ -86,3 +86,70 @@ async def node_llm_fill(
 def node_validate(output_dir: Path):
     """校验 / Validate."""
     return validate_world_pack(output_dir)
+
+
+# ── 主入口（替代 LangGraph） / Main entry (replaces LangGraph) ──
+
+
+async def generate_world_pack(params: GenerateParams) -> Path:
+    """生成世界包 / Generate world pack.
+
+    纯函数编排，替代 LangGraph：
+    skeleton → meta → story → lore → pcs → npcs → items → scenes → objects → validate(→retry)
+    """
+    out = node_skeleton(Path(params.output_dir), params)
+    theme = params.theme or params.world_name
+
+    # 顺序执行 LLM 填充 / Sequential LLM fill
+    await node_generate_meta(out, theme)
+    await node_generate_story_setup(out, params.world_name, theme)
+
+    # 带重试的填充 / Fill with retry
+    for attempt in range(params.max_retries):
+        await node_llm_fill(out, "lore", "lore", "lore", params.num_lore, params.world_name, theme)
+        await node_llm_fill(out, "pc", "player_characters", "player_character", params.num_pcs, params.world_name, theme)
+        await node_llm_fill(out, "npc", "actors", "actor", params.num_actors, params.world_name, theme)
+        await node_llm_fill(out, "item", "items", "item", params.num_items, params.world_name, theme)
+        await node_llm_fill(out, "scene", "scenes", "scene", params.num_scenes, params.world_name, theme)
+        await node_llm_fill(out, "scene_object", "scene_objects", "scene_object", params.num_scene_objects, params.world_name, theme)
+
+        result = node_validate(out)
+        if result.is_valid:
+            break
+
+    # 素材生成 / Assets generation
+    if params.assets_method != "skip":
+        await _generate_assets(out, params)
+
+    return out
+
+
+async def _generate_assets(output_dir: Path, params: GenerateParams):
+    """生成素材 / Generate assets."""
+    import yaml as _yaml
+
+    def _read_yaml_dir(d: Path) -> list[dict]:
+        if not d.exists():
+            return []
+        return [_yaml.safe_load(f.read_text("utf-8")) for f in d.glob("*.yaml") if _yaml.safe_load(f.read_text("utf-8"))]
+
+    chars = _read_yaml_dir(output_dir / "player_characters") + _read_yaml_dir(output_dir / "actors")
+
+    if params.assets_method == "ai":
+        from src.services.generator.assets_ai import generate_ai_sprites
+
+        sprites_dir = output_dir / "sprites"
+        sprites_dir.mkdir(exist_ok=True)
+        generate_ai_sprites(chars, sprites_dir, params)
+    else:
+        from src.services.generator.assets_recolor import generate_character_sprites
+
+        if chars:
+            generate_character_sprites(chars, output_dir, method="recolor")
+        scenes = _read_yaml_dir(output_dir / "scenes")
+        if scenes:
+            from src.services.generator.assets_tiles import generate_tileset
+            from src.services.generator.assets_layout import generate_layout
+
+            generate_tileset(scenes, output_dir)
+            generate_layout(scenes, output_dir)

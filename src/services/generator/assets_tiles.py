@@ -6,7 +6,7 @@
 
 from pathlib import Path
 
-from src.pipeline.world_pack.params import GenerateParams
+from src.domain.params import GenerateParams
 
 # 场景类型 → 瓦片集样式 / Scene type → tileset style
 TILESET_STYLES = {

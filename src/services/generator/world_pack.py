@@ -5,7 +5,7 @@ from pathlib import Path
 
 from ruamel.yaml import YAML
 
-from src.pipeline.world_pack.params import GenerateParams
+from src.domain.params import GenerateParams
 
 # YAML 读写（保留注释）/ YAML read/write with comment preservation
 _yaml = YAML()

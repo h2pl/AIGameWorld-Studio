@@ -6,7 +6,7 @@ import os
 import urllib.request
 from pathlib import Path
 
-from src.pipeline.world_pack.params import GenerateParams
+from src.domain.params import GenerateParams
 
 
 def generate_ai_sprites(

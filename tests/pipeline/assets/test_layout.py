@@ -3,7 +3,7 @@
 import json
 from pathlib import Path
 
-from src.pipeline.assets.layout import COLS, ROWS, generate_layout
+from src.services.generator.assets_layout import COLS, ROWS, generate_layout
 
 
 def test_generate_layout_basic(tmp_path: Path):

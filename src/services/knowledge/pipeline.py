@@ -27,10 +27,16 @@ class KnowledgePipeline:
 
         self._collection = chroma_client.get_collection(self.collection_name)
 
+        # BGE-M3 本地路径（ModelScope 下载）
+        import os
+        _bge_path = os.path.expanduser(
+            "~/.cache/huggingface/hub/models/BAAI--bge-m3/snapshots/master"
+        )
+
         self._pipeline = IngestionPipeline(
             transformations=[
                 SentenceSplitter(chunk_size=500, chunk_overlap=50),
-                HuggingFaceEmbedding(model_name="BAAI/bge-m3"),
+                HuggingFaceEmbedding(model_name=_bge_path, trust_remote_code=True),
             ],
             vector_store=ChromaVectorStore(chroma_collection=self._collection),
         )

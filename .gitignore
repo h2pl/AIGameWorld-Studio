@@ -11,6 +11,7 @@ venv/
 # IDE
 .idea/
 .vscode/
+.trae/
 
 # Generated
 output/
@@ -23,3 +24,28 @@ dist/
 .DS_Store
 Thumbs.db
 warcraft_world/
+
+# --- Project specific: AIGameWorld-Studio ---
+
+# Data: SQLite db files (metadata + knowledge base SQLite + Qdrant)
+*.db
+*.sqlite3
+*.sqlite
+data/
+qdrant/
+
+# Staging: crawled temporary files / staging dirs
+knowledge-bases/
+
+# Server logs
+.serve_stdout.log
+.serve_stderr.log
+
+# E2E test temporary files
+.backend.pid
+e2e-result.json
+*-e2e.txt
+
+# Scrapy debug / min standalone scripts
+scripts/_debug_*.py
+scripts/_scrapy_standalone_min.py

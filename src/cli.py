@@ -1,13 +1,16 @@
 # CLI 入口 / CLI Entry
 # 生成管线: CLI params → LangGraph → LLM fill → validate → world-pack
 
+# 标准库导入
 import argparse
 import asyncio
 import sys
 from pathlib import Path
 
+# 默认生成参数配置（各实体数量 + LLM 重试次数）
 _DEFAULTS = {"pc": 2, "actor": 2, "scene": 2, "item": 5, "scene_object": 2, "lore": 1, "max_retries": 3}
 
+# CLI 帮助示例文本（generate / kb / import 用法）
 _EXAMPLES = """
 示例 / Examples:
   aw-studio generate -i                                         # 交互式输入所有参数
@@ -16,9 +19,19 @@ _EXAMPLES = """
   aw-studio generate --skeleton-only                            # 仅骨架（不调 LLM）
   aw-studio validate world-packs/custom/my_world                # 校验 world-pack
 
+  知识库 / Knowledge base:
+  aw-studio kb index my_world                                   # 增量索引 world-pack 的 knowledge/ 目录
+  aw-studio kb index my_world --force                           # 全量重建（先清空再入库）
+  aw-studio kb search my_world "索伦的弱点" -k 5                 # 语义检索，返回前 5 条
+  aw-studio kb search my_world "索伦的弱点" --meta              # 连同 metadata + relevance 一起输出
+  aw-studio kb clear my_world                                   # 清空 my_world 的知识库 collection
+  aw-studio kb stats my_world                                   # 查看统计（chunk 数 / 目录）
+
   导入到 AIGameWorld 引擎:
   aw import world-packs/custom/my_world                         # world-pack → Domain → SQLite + ChromaDB
 """
+
+# 同步主入口（包装 asyncio.run，捕获 Ctrl+C）
 
 
 def main():
@@ -30,6 +43,7 @@ def main():
         return 130
 
 
+# 异步主入口：构建 argparse 解析器 + 按子命令分发到对应 handler
 async def _main() -> int:
     parser = argparse.ArgumentParser(
         prog="aw-studio",
@@ -40,6 +54,7 @@ async def _main() -> int:
     sub = parser.add_subparsers(dest="command", metavar="COMMAND")
     sub.required = True
 
+    # === generate 子命令：LLM 生成 world-pack ===
     # --- generate world-pack ---
     gen = sub.add_parser(
         "generate",
@@ -81,6 +96,7 @@ async def _main() -> int:
         help="仅生成骨架（不调 LLM，用于测试）",
     )
 
+    # === validate 子命令：校验 world-pack 结构合法性 ===
     # --- validate world-pack ---
     val = sub.add_parser(
         "validate",
@@ -90,6 +106,7 @@ async def _main() -> int:
     )
     val.add_argument("path", type=Path, help="world-pack 目录 / World pack directory")
 
+    # === serve 子命令：启动 YAML Web 查看器 ===
     # --- serve world-pack viewer ---
     srv = sub.add_parser(
         "serve",
@@ -102,13 +119,122 @@ async def _main() -> int:
     )
     srv.add_argument("--port", type=int, default=8888, help="端口 (default: 8888)")
 
+    # ── kb: knowledge base ──────────────────────────────────────────
+    kb = sub.add_parser(
+        "kb",
+        help="知识库管理 / Knowledge base (index/search/clear/stats)",
+        epilog=(
+            "示例:\n"
+            "  aw-studio kb index my_world\n"
+            "  aw-studio kb index my_world --force\n"
+            '  aw-studio kb search my_world "boss 位置" -k 5 --meta\n'
+            "  aw-studio kb clear my_world\n"
+            "  aw-studio kb stats my_world"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    kb_sub = kb.add_subparsers(dest="kb_command", metavar="SUBCOMMAND")
+    kb_sub.required = True
+
+    # === kb index 子命令：增量/全量索引 knowledge/ 目录 ===
+    kb_idx = kb_sub.add_parser(
+        "index",
+        help="增量/全量索引 world-pack knowledge/ 目录 / Index knowledge dir",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    kb_idx.add_argument("world_id", type=str, help="world id / pack id")
+    kb_idx.add_argument(
+        "-d",
+        "--dir",
+        type=Path,
+        default=None,
+        help="world-pack 根目录（默认 world-packs/custom/<world_id>）",
+    )
+    kb_idx.add_argument(
+        "--force",
+        action="store_true",
+        help="全量重建：先清空 collection 再重新索引（默认：增量 SHA256 更新）",
+    )
+    kb_idx.add_argument(
+        "--chroma-path",
+        type=Path,
+        default=Path("data/chroma"),
+        help="ChromaDB persist 目录 (default: data/chroma)",
+    )
+
+    # === kb search 子命令：语义检索知识库 ===
+    kb_s = kb_sub.add_parser(
+        "search",
+        help="语义检索 / Semantic search in knowledge base",
+    )
+    kb_s.add_argument("world_id", type=str, help="world id / pack id")
+    kb_s.add_argument("query", type=str, help="自然语言查询")
+    kb_s.add_argument("-k", "--top-k", type=int, default=5, help="返回前 N 条 (default: 5)")
+    kb_s.add_argument(
+        "--min-score",
+        type=float,
+        default=0.0,
+        help="最小 cosine similarity 阈值 0~1 (default: 0)",
+    )
+    kb_s.add_argument(
+        "--meta",
+        action="store_true",
+        help="输出 metadata + relevance（默认只输出文本）",
+    )
+    kb_s.add_argument(
+        "--chroma-path",
+        type=Path,
+        default=Path("data/chroma"),
+        help="ChromaDB persist 目录 (default: data/chroma)",
+    )
+
+    # === kb clear 子命令：清空知识库 collection ===
+    kb_clr = kb_sub.add_parser("clear", help="清空知识库 collection / Clear knowledge collection")
+    kb_clr.add_argument("world_id", type=str, help="world id / pack id")
+    kb_clr.add_argument(
+        "--chroma-path",
+        type=Path,
+        default=Path("data/chroma"),
+        help="ChromaDB persist 目录 (default: data/chroma)",
+    )
+
+    # === kb stats 子命令：知识库 chunk/文件数统计 ===
+    kb_st = kb_sub.add_parser("stats", help="知识库统计 / Knowledge base stats")
+    kb_st.add_argument("world_id", type=str, help="world id / pack id")
+    kb_st.add_argument(
+        "-d",
+        "--dir",
+        type=Path,
+        default=None,
+        help="world-pack 根目录（默认 world-packs/custom/<world_id>）",
+    )
+    kb_st.add_argument(
+        "--chroma-path",
+        type=Path,
+        default=Path("data/chroma"),
+        help="ChromaDB persist 目录 (default: data/chroma)",
+    )
+
+    # 解析命令行参数
     args = parser.parse_args()
 
+    # generate --interactive 分支：进入交互模式逐字段输入
     if args.command == "generate" and args.interactive:
         args = _interactive_prompt(gen, args)
         if args is None:
             return 0  # 用户取消 / User cancelled
 
+    # kb 子命令分发：按 kb_command 映射到对应 handler
+    if args.command == "kb":
+        _kb_handlers = {
+            "index": _kb_index,
+            "search": _kb_search,
+            "clear": _kb_clear,
+            "stats": _kb_stats,
+        }
+        return await _kb_handlers[args.kb_command](args)
+
+    # 主命令分发：generate / validate / serve
     return await {"generate": _generate, "validate": _validate, "serve": _serve}[args.command](args)
 
 
@@ -116,6 +242,7 @@ async def _main() -> int:
 # Interactive prompt
 # ═══════════════════════════════════════════════════════════════
 
+# 交互模式字段定义：(属性名, 提示标签, 默认值, 类型转换)
 _INTERACTIVE_FIELDS = [
     ("name", "世界显示名 / Display name", "my_world", str),
     ("pack_id", "目录名 & id（ASCII）/ Pack ID", "自动生成", str),
@@ -132,6 +259,7 @@ _INTERACTIVE_FIELDS = [
 ]
 
 
+# 单字段交互输入提示：支持默认值 + 类型转换 + 数字校验重试
 def _prompt(label: str, default, cast=str) -> str | int | None:
     """单步输入提示 / Single step input prompt."""
     if isinstance(default, bool):
@@ -151,6 +279,7 @@ def _prompt(label: str, default, cast=str) -> str | int | None:
     return raw
 
 
+# 交互式参数输入流程：逐字段提示 → 校验必填 → 组装 Namespace 返回
 def _interactive_prompt(parser, args):
     """交互式模式 / Interactive mode — 逐步输入所有参数."""
     print("AIGameWorld Studio — 交互式生成 / Interactive Generation")
@@ -198,6 +327,7 @@ def _interactive_prompt(parser, args):
 # ═══════════════════════════════════════════════════════════════
 
 
+# generate 命令 handler：骨架模式直接输出，完整模式调 LLM 管线
 async def _generate(args) -> int:
     """LLM 管线生成 world-pack / LLM pipeline generate world-pack."""
     from src.services.generator.filler import generate_world_pack
@@ -243,6 +373,7 @@ async def _generate(args) -> int:
     return 0
 
 
+# serve 命令 handler：转发到 src.serve.run 启动 Web UI
 async def _serve(args) -> int:
     """启动 YAML Web 查看器 / Launch YAML web viewer."""
     from src.serve import run
@@ -251,6 +382,7 @@ async def _serve(args) -> int:
     return 0
 
 
+# validate 命令 handler：调用 validator 校验 YAML 结构并输出报告
 async def _validate(args) -> int:
     """校验 world-pack 结构合法性 / Validate world pack."""
     if not args.path.exists():
@@ -264,6 +396,137 @@ async def _validate(args) -> int:
     if result.is_valid:
         print("[OK] world-pack validation passed")
     return 0 if result.is_valid else 1
+
+
+# ═══════════════════════════════════════════════════════════════
+# Knowledge base (kb) handlers
+# ═══════════════════════════════════════════════════════════════
+
+
+# 构造统一的 KnowledgeManager：初始化 Chroma PersistentClient + 路径解析
+def _make_kb_manager(args):
+    """构造 KnowledgeManager（统一 PersistentClient 初始化）."""
+    import chromadb
+    from src.services.knowledge import KnowledgeManager
+
+    chroma_path = Path(args.chroma_path).expanduser().resolve()
+    chroma_path.mkdir(parents=True, exist_ok=True)
+    client = chromadb.PersistentClient(path=str(chroma_path))
+
+    base_dir = getattr(args, "dir", None)
+    return KnowledgeManager(
+        world_id=args.world_id,
+        chroma_client=client,
+        base_dir=base_dir,
+    )
+
+
+# kb index handler：增量/全量索引 knowledge/ 目录并输出统计
+async def _kb_index(args) -> int:
+    """索引 knowledge/ 目录.
+
+    --force: 清空 collection + 索引表后再全量重建；默认增量 SHA256。
+    """
+    kb = _make_kb_manager(args)
+    if args.force:
+        print(f"[kb] force reindex world={args.world_id}")
+    else:
+        print(f"[kb] incremental index world={args.world_id}")
+    print(f"     base_dir={kb.base_dir}")
+    print(f"     knowledge_dir={kb.knowledge_dir}")
+
+    result = await kb.index(force=bool(args.force))
+    if not result.get("ok"):
+        err = result.get("error", "unknown error")
+        print(f"[FAIL] {err}", file=sys.stderr)
+        print(f"       将写入文件到: {kb.knowledge_dir}", file=sys.stderr)
+        return 1
+
+    info = result.get("indexed", {})
+    files = info.get("files", 0)
+    chunks = info.get("chunks", 0)
+    skipped = info.get("skipped", False)
+    total_chunks = result.get("total_chunks", 0)
+    if skipped:
+        print(f"[OK] 无变更，跳过（所有文件 SHA256 未变）。当前 chunks = {total_chunks}")
+    else:
+        print(f"[OK] 索引文件 {files} 个 → {chunks} chunks。当前总数 = {total_chunks}")
+    return 0
+
+
+# kb search handler：按 query 做语义检索，按 --meta 决定输出格式
+async def _kb_search(args) -> int:
+    """语义检索.
+
+    默认纯文本输出；加 --meta 显示 metadata + relevance score。
+    """
+    import json as _json
+
+    kb = _make_kb_manager(args)
+    # 系统生成的 metadata 太长（_node_content / document_id...），CLI 输出时过滤掉，只保留用户自定义的
+    _SYS_META_KEYS = {
+        "_node_content",
+        "_node_type",
+        "doc_id",
+        "document_id",
+        "ref_doc_id",
+    }
+
+    def _clean_meta(m: dict) -> dict:
+        return {k: v for k, v in (m or {}).items() if k not in _SYS_META_KEYS}
+
+    if args.meta:
+        hits = kb.search_with_meta(
+            args.query,
+            top_k=args.top_k,
+            min_score=args.min_score,
+        )
+        if not hits:
+            print("(no hits)")
+            return 0
+        for i, h in enumerate(hits, 1):
+            score = f"{h['score_cosine_sim']:.3f}"
+            dist = f"{h['distance']:.4f}"
+            meta = _clean_meta(h.get("metadata") or {})
+            title = meta.get("title") or meta.get("file_name") or meta.get("file_path") or "-"
+            source_type = meta.get("source_type", "-")
+            print(f"[{i}] score={score} dist={dist} type={source_type}  {title}")
+            print(f"    {h['text'][:300]}{'...' if len(h['text']) > 300 else ''}")
+            if meta:
+                print(f"    meta: {_json.dumps(meta, ensure_ascii=False, default=str)}")
+            print()
+    else:
+        hits = kb.search(args.query, top_k=args.top_k, min_score=args.min_score)
+        if not hits:
+            print("(no hits)")
+            return 0
+        for i, h in enumerate(hits, 1):
+            # 去掉开头的 BOM（如果有），避免输出乱码
+            display = h[1:] if h and h[0] == "\ufeff" else h
+            print(f"[{i}] {display}")
+    return 0
+
+
+# kb clear handler：清空指定 world 的向量 collection（不删除源文件）
+async def _kb_clear(args) -> int:
+    """清空知识库 collection（不删文件）."""
+    kb = _make_kb_manager(args)
+    stats_before = kb.stats()
+    print(f"[kb] clear collection={stats_before['collection']}")
+    result = kb.clear()
+    print(f"[OK] {result}")
+    return 0
+
+
+# kb stats handler：输出知识库 chunk 数 / 目录等统计信息 (JSON)
+async def _kb_stats(args) -> int:
+    """打印知识库统计."""
+    import json as _json
+
+    kb = _make_kb_manager(args)
+    stats = kb.stats()
+    print(_json.dumps(stats, ensure_ascii=False, indent=2))
+    return 0
 
 
 if __name__ == "__main__":

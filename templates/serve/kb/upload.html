@@ -1,0 +1,151 @@
+{% extends "kb/base.html" %}
+{% block title %}上传 · 知识库{% endblock %}
+{% block body %}
+
+<div class="section-title">⬆️ 上传文档 / Upload</div>
+
+<div class="card">
+  <div class="form-row">
+    <label for="world_id">World Pack</label>
+    <select id="world_id"></select>
+  </div>
+  <div class="form-row">
+    <label for="source_type">知识库目录 / Source Type</label>
+    <select id="source_type">
+      <option value="lore">📜 lore · 世界观 / 设定 / 门派</option>
+      <option value="documents" selected>📄 documents · 攻略 / 文档 / 剧情</option>
+      <option value="images">🖼️ images · 图片（OCR 后索引）</option>
+      <option value="videos">🎥 videos · 视频（抽帧 OCR 后索引）</option>
+    </select>
+  </div>
+  <div class="form-row" style="grid-template-columns: 160px 1fr 1fr;">
+    <label for="prefix">文件名前缀（可选）</label>
+    <input id="prefix" type="text" placeholder="如 2026-07-29_  （自动加在保存文件名前）">
+    <div class="text-muted small">保存到：<code id="save_hint">world-packs/custom/{world_id}/knowledge/{source_type}/{file}</code></div>
+  </div>
+</div>
+
+<div id="drop_zone" class="drop-zone" tabindex="0">
+  <h3>📂 拖文件到这里，或点击选择（支持多选）</h3>
+  <p>.md / .pdf / .png / .jpg / .jpeg / .webp / .mp4 / .webm · 也可以直接粘 Markdown 文本，下方单独有框</p>
+  <input id="file_input" type="file" multiple style="display:none;">
+</div>
+
+<div class="card" style="margin-top: 1.5rem;">
+  <div class="form-row">
+    <label>或者粘贴 Markdown</label>
+    <textarea id="paste_md" rows="6" placeholder="---&#10;title: 你的文档标题&#10;tags: [标签1, 标签2]&#10;---&#10;&#10;这里是正文 Markdown"></textarea>
+  </div>
+  <div class="form-row">
+    <label for="paste_name">粘贴 → 文件名</label>
+    <input id="paste_name" type="text" value="pasted_document.md">
+  </div>
+  <div style="text-align:right; margin-top:.5rem;">
+    <button id="save_paste" class="btn btn-ghost">💾 仅保存到 knowledge 目录</button>
+    <button id="save_paste_and_index" class="btn">💾 保存并 → 立即索引</button>
+  </div>
+</div>
+
+<div id="upload_list"></div>
+<div id="result_area"></div>
+
+<script>
+const worldSel = document.getElementById('world_id');
+const sourceSel = document.getElementById('source_type');
+const prefixEl = document.getElementById('prefix');
+const saveHint = document.getElementById('save_hint');
+const dropZone = document.getElementById('drop_zone');
+const fileInput = document.getElementById('file_input');
+const uploadList = document.getElementById('upload_list');
+const resultArea = document.getElementById('result_area');
+const savePasteBtn = document.getElementById('save_paste');
+const savePasteAndIndexBtn = document.getElementById('save_paste_and_index');
+const pasteText = document.getElementById('paste_md');
+const pasteName = document.getElementById('paste_name');
+
+function updateHint(){
+  saveHint.innerHTML = `world-packs/custom/${KB.escape(worldSel.value||'{world_id}')}/knowledge/${KB.escape(sourceSel.value)}/${KB.escape(prefixEl.value)}<i>文件名</i>`;
+}
+worldSel.addEventListener('change', updateHint);
+sourceSel.addEventListener('change', updateHint);
+prefixEl.addEventListener('input', updateHint);
+
+KB.setupWorldPicker(worldSel, updateHint);
+
+// 拖拽上传
+['dragenter','dragover'].forEach(ev=>dropZone.addEventListener(ev, e=>{ e.preventDefault(); dropZone.classList.add('drag-over'); }));
+['dragleave','drop'].forEach(ev=>dropZone.addEventListener(ev, e=>{ e.preventDefault(); dropZone.classList.remove('drag-over'); }));
+dropZone.addEventListener('click', ()=>fileInput.click());
+dropZone.addEventListener('drop', e=>{ if (e.dataTransfer?.files?.length) handleFiles(e.dataTransfer.files); });
+fileInput.addEventListener('change', e=>{ handleFiles(e.target.files); });
+
+async function handleFiles(fileList){
+  const files = Array.from(fileList);
+  if (!files.length || !worldSel.value){
+    if (!worldSel.value) alert('请先选择 World Pack');
+    return;
+  }
+  const worldId = worldSel.value, source = sourceSel.value, prefix = prefixEl.value;
+  uploadList.innerHTML = files.map(f=>`<div class="card" style="padding:.75rem 1rem; margin-bottom:.5rem;">
+    <div class="flex-between">
+      <div><b>${KB.escape(f.name)}</b> <span class="text-muted small">${KB.fmtSize(f.size)}</span></div>
+      <span class="text-muted small" data-file="${KB.escape(f.name)}">待上传</span>
+    </div>
+  </div>`).join('');
+  for (const f of files) {
+    const statusSpan = document.querySelector(`[data-file="${f.name.replace(/"/g,'&quot;')}"]`);
+    try {
+      const content = await f.arrayBuffer();
+      const fd = new FormData();
+      fd.append('file', new Blob([content], { type: f.type }), f.name);
+      statusSpan.textContent = '上传中...';
+      const r = await KB.json(`/api/kb/${worldId}/upload?source_type=${encodeURIComponent(source)}&prefix=${encodeURIComponent(prefix)}`, {
+        method: 'POST',
+        body: fd,
+      });
+      statusSpan.innerHTML = `<span class="tag tag-status-done">已保存 ${r.file_name}</span>`;
+    } catch(e) {
+      statusSpan.innerHTML = `<span class="tag tag-status-deleted">错误: ${KB.escape(e.message.slice(0,60))}</span>`;
+    }
+  }
+  resultArea.innerHTML = `
+    <div class="alert alert-info">
+      已完成。点击 <a href="/kb/docs" class="tag tag-score">📄 去文档列表</a>，
+      或立即 <button class="btn btn-sm btn-ghost" onclick="doIndexNow()">🔄 立即索引当前 pack</button>
+    </div>`;
+}
+
+async function saveText(andIndex){
+  if (!worldSel.value){ alert('请先选 World Pack'); return; }
+  const name = pasteName.value.trim() || 'pasted.md';
+  const text = pasteText.value || '';
+  if (!text.trim()){ alert('粘贴内容不能为空'); return; }
+  const worldId = worldSel.value, source = sourceSel.value, prefix = prefixEl.value;
+  try {
+    const r = await KB.json(`/api/kb/${worldId}/upload-text?source_type=${encodeURIComponent(source)}&prefix=${encodeURIComponent(prefix)}&file_name=${encodeURIComponent(name)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/markdown' },
+      body: text,
+    });
+    resultArea.innerHTML = `<div class="alert alert-success">✅ 已保存：<code>${KB.escape(r.file_name)}</code> (${r.file_size} B)</div>`;
+    pasteText.value = '';
+    if (andIndex) await doIndexNow();
+  } catch(e) {
+    resultArea.innerHTML = `<div class="alert alert-error">保存失败：${KB.escape(e.message)}</div>`;
+  }
+}
+
+savePasteBtn.onclick = ()=>saveText(false);
+savePasteAndIndexBtn.onclick = ()=>saveText(true);
+
+window.doIndexNow = async function(){
+  if (!worldSel.value){ alert('请先选 World Pack'); return; }
+  resultArea.innerHTML = `<div class="alert alert-warn">🔄 正在索引 ${worldSel.value} ...</div>`;
+  try {
+    const r = await KB.json(`/api/kb/${worldSel.value}/index`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({force:false}) });
+    if (!r.ok){ resultArea.innerHTML = `<div class="alert alert-error">索引失败：${KB.escape(r.error||'')}</div>`; return; }
+    resultArea.innerHTML = `<div class="alert alert-success">✅ 索引完成：files=${r.files} new=${r.new_files} skipped=${r.skipped_files} chunks=${r.chunks} · <a href="/kb/docs" class="tag tag-score">去文档列表</a></div>`;
+  } catch(e) { resultArea.innerHTML = `<div class="alert alert-error">${KB.escape(e.message)}</div>`; }
+};
+</script>
+{% endblock %}

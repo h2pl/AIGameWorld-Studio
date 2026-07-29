@@ -1,0 +1,84 @@
+{% extends "kb/base.html" %}
+{% block title %}任务 / 审计 · 知识库{% endblock %}
+{% block body %}
+
+<div class="section-title flex-between">
+  <span>🕓 索引任务 & 审计 <span class="badge" id="total_badge">-</span></span>
+  <select id="world_id"></select>
+</div>
+
+<div class="section-title"><span>🧾 最近 50 条索引任务</span></div>
+<div id="jobs_area"></div>
+
+<div class="section-title"><span>📝 最近 100 条审计日志</span></div>
+<div id="audit_area"></div>
+
+<script>
+const worldSel = document.getElementById('world_id');
+const jobsArea = document.getElementById('jobs_area');
+const auditArea = document.getElementById('audit_area');
+const badge = document.getElementById('total_badge');
+
+async function refresh(){
+  if (!worldSel.value) return;
+  const wid = worldSel.value;
+  const [jobs, audit] = await Promise.all([
+    KB.json(`/api/kb/${wid}/jobs?limit=50`),
+    KB.json(`/api/kb/${wid}/audit?limit=100`),
+  ]);
+  badge.textContent = `jobs ${jobs.jobs.length} · audit ${audit.audit.length}`;
+  renderJobs(jobs.jobs);
+  renderAudit(audit.audit);
+}
+
+function renderJobs(rows){
+  if (!rows.length){ jobsArea.innerHTML = `<div class="empty">暂无任务记录</div>`; return; }
+  jobsArea.innerHTML = `<table class="table">
+    <thead><tr><th>ID</th><th>mode</th><th>status</th><th>progress</th><th>files (total/done)</th><th>chunks</th>
+      <th>created_at</th><th>duration</th><th>error</th></tr></thead>
+    <tbody>
+    ${rows.map(j=>{
+      const pct = j.progress||0;
+      const dur = j.started_at && j.finished_at ? `${(j.finished_at-j.started_at)/1000}s` : '-';
+      return `<tr>
+        <td class="nowrap"><code>${KB.escape(String(j.id).slice(0,12))}…</code></td>
+        <td class="nowrap"><span class="tag">${KB.escape(j.mode||'')}</span></td>
+        <td class="nowrap">${KB.statusTag(j.status)}</td>
+        <td style="min-width:160px;"><div class="progress"><span style="width:${pct}%;"></span></div>
+          <div class="small text-muted">${pct}%</div></td>
+        <td class="nowrap">${j.file_total||0} / ${j.file_done||0}</td>
+        <td class="nowrap"><b>${j.chunk_total||0}</b></td>
+        <td class="nowrap text-muted small">${KB.fmtTs(j.created_at)}</td>
+        <td class="nowrap text-muted small">${dur}</td>
+        <td class="nowrap">${j.error_msg? `<span class="tag tag-status-deleted" title="${KB.escape(j.error_msg)}">${KB.escape(j.error_msg.slice(0,40))}</span>`: '-'}</td>
+      </tr>`;
+    }).join('')}
+    </tbody>
+  </table>`;
+}
+
+function renderAudit(rows){
+  if (!rows.length){ auditArea.innerHTML = `<div class="empty">暂无审计记录</div>`; return; }
+  auditArea.innerHTML = `<table class="table">
+    <thead><tr><th>created_at</th><th>op</th><th>actor</th><th>job_id</th><th>query / details</th></tr></thead>
+    <tbody>
+    ${rows.map(a=>{
+      const extra = [];
+      if (a.query_text) extra.push(`<span>q: <code>${KB.escape(a.query_text.slice(0,80))}</code></span>`);
+      if (a.filters_json) extra.push(`<span>filters: <code>${KB.escape(a.filters_json.slice(0,60))}</code></span>`);
+      if (a.result_json) extra.push(`<span class="text-muted small">res: ${KB.escape(a.result_json.slice(0,80))}</span>`);
+      return `<tr>
+        <td class="nowrap text-muted small">${KB.fmtTs(a.created_at)}</td>
+        <td class="nowrap"><span class="tag">${KB.escape(a.op||'')}</span></td>
+        <td class="nowrap"><b>${KB.escape(a.actor||'')}</b></td>
+        <td class="nowrap">${a.job_id?`<code>${KB.escape(String(a.job_id).slice(0,10))}…</code>`:'-'}</td>
+        <td>${extra.join(' · ')||(a.error_msg? `<span class="tag tag-status-deleted">${KB.escape(a.error_msg.slice(0,60))}</span>`:'')}</td>
+      </tr>`;
+    }).join('')}
+    </tbody>
+  </table>`;
+}
+
+KB.setupWorldPicker(worldSel, refresh);
+</script>
+{% endblock %}

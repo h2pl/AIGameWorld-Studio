@@ -1,0 +1,164 @@
+{% extends "kb/base.html" %}
+{% block title %}搜索 · 知识库{% endblock %}
+{% block body %}
+
+<div class="section-title">🔍 语义检索 <span class="badge">BGE-M3 + Chroma</span></div>
+
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="form-row">
+    <label for="world_id">World Pack</label>
+    <select id="world_id"></select>
+  </div>
+  <div class="form-row">
+    <label for="query">查询内容</label>
+    <input id="query" type="text" placeholder="比如：血魔教在哪里？新手任务怎么做？" style="font-size: 1rem; padding: .75rem;">
+  </div>
+  <div class="form-row">
+    <label for="top_k">Top K</label>
+    <div class="inline-flex" style="gap:1rem; align-items:center;">
+      <input id="top_k" type="range" min="1" max="20" value="5">
+      <span id="top_k_label" class="tag tag-score">5</span>
+      <input id="min_score" type="range" min="0" max="100" value="20">
+      <span id="min_label" class="text-muted small">min score 0.20</span>
+    </div>
+  </div>
+  <div style="margin-top: 1rem; display:flex; gap:.75rem; align-items:center;">
+    <button id="search_btn" class="btn">开始检索</button>
+    <button id="reindex_btn" class="btn btn-ghost">🔄 重建索引 (force)</button>
+    <button id="stats_btn" class="btn btn-ghost">📊 查看 stats</button>
+    <span id="status" class="text-muted small"></span>
+  </div>
+</div>
+
+<div id="stats_area"></div>
+<div id="result_area"></div>
+
+<script>
+const worldSel = document.getElementById('world_id');
+const queryEl = document.getElementById('query');
+const topKEl = document.getElementById('top_k');
+const topKLabel = document.getElementById('top_k_label');
+const minEl = document.getElementById('min_score');
+const minLabel = document.getElementById('min_label');
+const resultArea = document.getElementById('result_area');
+const statsArea = document.getElementById('stats_area');
+const statusEl = document.getElementById('status');
+const searchBtn = document.getElementById('search_btn');
+const reindexBtn = document.getElementById('reindex_btn');
+const statsBtn = document.getElementById('stats_btn');
+
+topKEl.addEventListener('input', e=> topKLabel.textContent = e.target.value);
+minEl.addEventListener('input', e=>{
+  const v = (Number(e.target.value)/100).toFixed(2);
+  minLabel.textContent = 'min score ' + v;
+});
+
+function setStatus(s, kind='info'){
+  statusEl.textContent = s;
+  statusEl.className = 'small ' + (kind==='error' ? 'text-danger' : 'text-muted');
+}
+
+async function refreshStats(worldId){
+  const s = await KB.json(`/api/kb/${worldId}/stats`);
+  const bySrc = Object.entries(s.by_source_type||{}).map(([k,v])=>`<span class="tag">${k}:${v}</span>`).join(' ');
+  statsArea.innerHTML = `
+    <div class="alert alert-info" style="display:flex; flex-wrap:wrap; gap:1rem;">
+      <div>📦 <b>${s.world_id}</b> · collection: <code>${s.collection}</code></div>
+      <div>📄 docs：<b>${s.documents||0}</b>　🧩 chunks (meta): <b>${s.chunks_in_meta||0}</b> / vector: <b>${s.total_chunks||0}</b></div>
+      <div>✅ 完成任务: <b>${s.successful_jobs||0}</b></div>
+      <div>${bySrc||'<span class="text-muted small">暂无按 source_type 统计</span>'}</div>
+    </div>`;
+}
+
+async function doSearch(){
+  const worldId = worldSel.value;
+  const q = queryEl.value.trim();
+  if (!worldId || !q) { setStatus('请选择 World Pack 并输入查询', 'error'); return; }
+  setStatus('正在 embedding + 检索...');
+  searchBtn.disabled = true;
+  const start = Date.now();
+  try {
+    const res = await KB.json(`/api/kb/${worldId}/search`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        query: q,
+        top_k: Number(topKEl.value),
+        min_score: Number(minEl.value)/100,
+      })
+    });
+    const t = ((Date.now()-start)/1000).toFixed(2);
+    setStatus(`找到 ${res.hits.length} 条结果，耗时 ${t}s`);
+    renderHits(res.hits);
+  } catch(e) {
+    setStatus('检索失败: ' + e.message, 'error');
+    resultArea.innerHTML = `<div class="alert alert-error">${KB.escape(e.message)}</div>`;
+  } finally {
+    searchBtn.disabled = false;
+  }
+}
+
+function renderHits(hits){
+  if (!hits.length){ resultArea.innerHTML = `<div class="empty">无结果（可能所有 chunk 的 score 低于 min_score，试试把 min_score 调低）</div>`; return; }
+  resultArea.innerHTML = hits.map((h,i)=>{
+    const m = h.metadata || {};
+    const title = KB.escape(m.title||m.file_name||'(无标题)');
+    const docId = m.doc_id ? `<code>doc_id=${KB.escape(String(m.doc_id).slice(0,8))}…</code>` : '';
+    const chunkIdx = typeof m.chunk_index==='number' ? `chunk ${m.chunk_index+1}${m.chunk_count?'/'+m.chunk_count:''}` : '';
+    const tags = [
+      KB.sourceTag(m.source_type||'?'),
+      `<span class="tag tag-score">score ${(h.score||0).toFixed(3)}</span>`,
+      chunkIdx ? `<span class="tag">${chunkIdx}</span>` : '',
+      docId ? `<span class="tag">${docId}</span>` : '',
+    ].filter(Boolean).join(' ');
+    return `<article class="hit">
+      <header><h3 class="hit-title">${i+1}. ${title}</h3> ${tags}</header>
+      <pre>${KB.escape(h.text||'')}</pre>
+      <div class="hit-meta">
+        <span>📁 file:</span> <code>${KB.escape(m.file_name||'?')}</code>
+        ${m.file_path? `<span>· path:</span><code>${KB.escape(String(m.file_path).slice(-60))}</code>`:''}
+        ${typeof h.distance==='number' ? `<span>· vector distance:</span><code>${h.distance.toFixed(5)}</code>` : ''}
+      </div>
+    </article>`;
+  }).join('');
+}
+
+async function doReindex(force){
+  const worldId = worldSel.value;
+  if (!worldId){ setStatus('请选择一个 World Pack','error'); return; }
+  setStatus(`正在${force?'全量':'增量'}索引（同步阻塞，上传的 MD/PDF 越多越慢）...`);
+  reindexBtn.disabled = searchBtn.disabled = true;
+  try {
+    const r = await KB.json(`/api/kb/${worldId}/index`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ force: !!force })
+    });
+    if (!r.ok){
+      setStatus('索引失败: ' + (r.error||'unknown'), 'error');
+      resultArea.innerHTML = `<div class="alert alert-error">${KB.escape(r.error||'')}</div>`;
+      return;
+    }
+    setStatus(`✅ ${force?'force ':''}索引完成 → files=${r.files} new=${r.new_files} skipped=${r.skipped_files} chunks=${r.chunks}`);
+    resultArea.innerHTML = `
+      <div class="alert alert-success">
+        <b>索引完成</b>（job_id=${r.job_id? KB.escape(r.job_id.slice(0,12))+'…':'同步'}）<br>
+        files 总数: <b>${r.files}</b>　新增: <b>${r.new_files}</b>　跳过(SHA256 相同): <b>${r.skipped_files}</b>　chunks 入库: <b>${r.chunks}</b>　total_chunks=<b>${r.total_chunks}</b>
+      </div>`;
+    refreshStats(worldId);
+  } catch(e) {
+    setStatus('索引异常: '+e.message, 'error');
+    resultArea.innerHTML = `<div class="alert alert-error">${KB.escape(e.message)}</div>`;
+  } finally {
+    reindexBtn.disabled = searchBtn.disabled = false;
+  }
+}
+
+// 初始化：pack 下拉
+KB.setupWorldPicker(worldSel, (wid)=> refreshStats(wid));
+searchBtn.addEventListener('click', doSearch);
+reindexBtn.addEventListener('click', ()=>doReindex(true));
+statsBtn.addEventListener('click', ()=>refreshStats(worldSel.value));
+queryEl.addEventListener('keydown', e=>{ if (e.key==='Enter') doSearch(); });
+</script>
+{% endblock %}

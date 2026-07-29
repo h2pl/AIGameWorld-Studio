@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>知识库 · AIGameWorld Studio</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
+
+header { background: #1e293b; padding: 1rem 1.5rem; border-bottom: 2px solid #334155; }
+header .brand { display: flex; align-items: center; justify-content: space-between; }
+header h1 { font-size: 1.2rem; color: #38bdf8; }
+header .sub { color: #94a3b8; font-size: .85rem; margin-top: .25rem; }
+
+nav { display: flex; gap: 0; padding: 0 1.5rem; background: #1e293b; border-bottom: 1px solid #334155; overflow-x: auto; }
+nav a { padding: .75rem 1.25rem; color: #94a3b8; text-decoration: none; font-size: .9rem; border-bottom: 2px solid transparent; white-space: nowrap; cursor: pointer; }
+nav a:hover, nav a.active { color: #38bdf8; border-bottom-color: #38bdf8; }
+
+.layout { display: grid; grid-template-columns: 320px 1fr; gap: 1rem; max-width: 1600px; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
+
+.sidebar { display: flex; flex-direction: column; gap: 1rem; }
+
+.panel { background: #1e293b; border-radius: 8px; border: 1px solid #334155; }
+.panel-head { padding: .85rem 1rem; border-bottom: 1px solid #334155; font-size: .9rem; font-weight: 600; color: #38bdf8; display: flex; align-items: center; justify-content: space-between; }
+.panel-body { padding: 1rem; }
+
+.tabs { display: flex; border-bottom: 1px solid #334155; }
+.tab { padding: .6rem 1rem; font-size: .85rem; color: #94a3b8; cursor: pointer; border-bottom: 2px solid transparent; }
+.tab.active { color: #38bdf8; border-bottom-color: #38bdf8; }
+.tab-content { padding: 1rem; }
+.tab-pane { display: none; }
+.tab-pane.active { display: block; }
+
+.section { max-width: none; }
+.section-title { font-size: 1.05rem; color: #64748b; margin-bottom: 1rem; padding-bottom: .5rem; border-bottom: 1px solid #1e293b; display: flex; align-items: center; justify-content: space-between; }
+.section-title .badge { color: #38bdf8; margin-left: .5rem; font-weight: 400; }
+
+.container { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+.card { background: #1e293b; border-radius: 8px; padding: 1.25rem; border: 1px solid #334155; transition: .2s; }
+.card:hover { border-color: #38bdf8; }
+
+.tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: .75rem; border: 1px solid #334155; color: #cbd5e1; }
+.tag-lore      { background: rgba(168,85,247,.12); border-color: rgba(168,85,247,.35); color: #c084fc; }
+.tag-documents { background: rgba(59,130,246,.12); border-color: rgba(59,130,246,.35); color: #60a5fa; }
+.tag-image     { background: rgba(34,197,94,.12); border-color: rgba(34,197,94,.35); color: #4ade80; }
+.tag-video     { background: rgba(245,158,11,.12); border-color: rgba(245,158,11,.35); color: #fbbf24; }
+.tag-status-done    { background: rgba(34,197,94,.12); border-color: rgba(34,197,94,.35); color: #4ade80; }
+.tag-status-deleted { background: rgba(239,68,68,.12); border-color: rgba(239,68,68,.35); color: #f87171; }
+.tag-status-parsing { background: rgba(234,179,8,.12); border-color: rgba(234,179,8,.35); color: #facc15; }
+.tag-score { background: rgba(56,189,248,.12); border-color: rgba(56,189,248,.35); color: #38bdf8; font-weight: 600; }
+
+.form-row { display: grid; grid-template-columns: 1fr; gap: .4rem; padding: .4rem 0; }
+.form-row label { color: #94a3b8; font-size: .85rem; }
+.form-row-inline { display: grid; grid-template-columns: 110px 1fr; gap: .75rem; align-items: center; padding: .3rem 0; }
+.form-row-inline label { color: #94a3b8; font-size: .85rem; }
+.form-row input, .form-row select, .form-row textarea,
+.form-row-inline input, .form-row-inline select, .form-row-inline textarea {
+    background: #0f172a; color: #e2e8f0; border: 1px solid #334155; border-radius: 6px;
+    padding: .45rem .65rem; font-size: .85rem; font-family: inherit; width: 100%;
+}
+.form-row input:focus, .form-row select:focus, .form-row textarea:focus,
+.form-row-inline input:focus, .form-row-inline select:focus {
+    outline: none; border-color: #38bdf8; box-shadow: 0 0 0 2px rgba(56,189,248,.2);
+}
+
+.btn {
+    background: linear-gradient(135deg, #38bdf8, #0ea5e9); color: #0f172a;
+    padding: .5rem 1rem; border: none; border-radius: 6px;
+    font-weight: 600; font-size: .85rem; cursor: pointer; transition: .2s;
+}
+.btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(56,189,248,.3); }
+.btn:disabled { background: #334155; color: #64748b; cursor: not-allowed; transform: none; box-shadow: none; }
+.btn-danger { background: linear-gradient(135deg, #ef4444, #b91c1c); color: #fff; }
+.btn-ghost { background: transparent; color: #38bdf8; border: 1px solid #38bdf8; }
+.btn-ghost:hover { background: rgba(56,189,248,.1); }
+.btn-sm { padding: .25rem .55rem; font-size: .75rem; }
+
+.drop-zone {
+    border: 2px dashed #334155; border-radius: 10px;
+    padding: 2rem 1rem; text-align: center; color: #64748b;
+    margin: 1rem 0; transition: .2s; background: rgba(30, 41, 59, .4); cursor: pointer;
+}
+.drop-zone.drag-over { border-color: #38bdf8; color: #38bdf8; background: rgba(56,189,248,.06); }
+.drop-zone h3 { margin-bottom: .5rem; color: #94a3b8; font-weight: 500; font-size: 1rem; }
+.drop-zone p { font-size: .8rem; }
+
+.table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+.table th, .table td { padding: .6rem .75rem; border-bottom: 1px solid #1e293b; text-align: left; }
+.table th { color: #64748b; font-weight: 500; background: #1e293b; border-bottom: 1px solid #334155; text-transform: uppercase; font-size: .7rem; letter-spacing: .05em; }
+.table tr:hover td { background: rgba(30, 41, 59, .5); }
+.table .nowrap { white-space: nowrap; }
+
+.empty { text-align: center; padding: 2rem 1rem; color: #475569; font-size: .9rem; border: 1px dashed #1e293b; border-radius: 8px; margin: 1rem 0; }
+
+.hit { background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 1rem 1.1rem; margin-bottom: .75rem; }
+.hit header { background: none; padding: 0; border: none; margin-bottom: .4rem; display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
+.hit .hit-title { color: #e2e8f0; font-weight: 600; }
+.hit pre { background: #0f172a; padding: .75rem; border-radius: 6px; color: #cbd5e1; font-size: .8rem; line-height: 1.55; white-space: pre-wrap; word-break: break-word; border: 1px solid #1e293b; }
+.hit .hit-meta { margin-top: .5rem; color: #64748b; font-size: .75rem; display: flex; gap: .5rem; flex-wrap: wrap; }
+.hit .hit-meta code { background: #0f172a; padding: 1px 6px; border-radius: 4px; font-size: .7rem; color: #94a3b8; border: 1px solid #1e293b; }
+
+.progress { background: #0f172a; border-radius: 99px; overflow: hidden; height: 10px; border: 1px solid #1e293b; }
+.progress > span { display: block; height: 100%; background: linear-gradient(90deg, #38bdf8, #22c55e); transition: width .3s ease; }
+
+.alert { padding: .75rem 1rem; border-radius: 6px; font-size: .85rem; margin: .75rem 0; border: 1px solid transparent; }
+.alert-info    { background: rgba(56,189,248,.1); border-color: rgba(56,189,248,.3); color: #7dd3fc; }
+.alert-success { background: rgba(34,197,94,.1); border-color: rgba(34,197,94,.3); color: #86efac; }
+.alert-error   { background: rgba(239,68,68,.1); border-color: rgba(239,68,68,.3); color: #fca5a5; }
+.alert-warn    { background: rgba(234,179,8,.1); border-color: rgba(234,179,8,.3); color: #fde047; }
+
+.header-links { display: flex; gap: 1rem; font-size: .85rem; }
+.header-links a { color: #64748b; text-decoration: none; }
+.header-links a:hover { color: #38bdf8; }
+
+.text-right { text-align: right; }
+.text-muted { color: #64748b; }
+.small { font-size: .75rem; }
+.flex-between { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+.inline-flex { display: inline-flex; gap: .35rem; align-items: center; }
+.flex-wrap { flex-wrap: wrap; }
+.gap-1 { gap: .5rem; }
+.mt-1 { margin-top: .5rem; }
+.mt-2 { margin-top: 1rem; }
+.mb-1 { margin-bottom: .5rem; }
+.mb-2 { margin-bottom: 1rem; }
+.nowrap { white-space: nowrap; }
+.page-pane { display: none; }
+.page-pane.active { display: block; }
+
+code { background: #0f172a; padding: 1px 6px; border-radius: 4px; font-size: .8rem; color: #94a3b8; border: 1px solid #1e293b; }
+
+select#topic_select {
+    background: #0f172a; color: #e2e8f0; border: 1px solid #334155; border-radius: 6px;
+    padding: .45rem .65rem; font-size: .85rem; width: 100%;
+}
+
+.topic-info { font-size: .8rem; color: #94a3b8; margin-top: .5rem; }
+.topic-info b { color: #e2e8f0; }
+
+.binding-result {
+    background: #0f172a; border: 1px solid #334155; border-radius: 6px;
+    padding: .6rem .75rem; font-size: .8rem; margin-top: .5rem;
+}
+
+@media (max-width: 960px) {
+    .layout { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div>
+      <h1>📚 AIGameWorld Studio · 知识库（Topic 版）</h1>
+      <div class="sub">主题中心 · 知识管理 + 语义检索 · Chroma + BGE-M3</div>
+    </div>
+    <div class="header-links">
+      <a href="/crawler">🕷️ 爬虫</a>
+      <a href="/docs">📖 API (Swagger)</a>
+      <a href="/redoc">🔎 ReDoc</a>
+      <a href="/health">❤️ Health</a>
+    </div>
+  </div>
+</header>
+
+<nav>
+  <a class="active" data-page="search">🔍 搜索</a>
+  <a data-page="upload">⬆️ 上传</a>
+  <a data-page="docs">📄 文档列表</a>
+  <a data-page="jobs">🕓 任务 / 审计</a>
+</nav>
+
+<div class="layout">
+
+<!-- ============== 侧边栏 ============== -->
+<aside class="sidebar">
+
+  <!-- 主题面板 -->
+  <div class="panel">
+    <div class="panel-head">
+      <span>🎯 主题管理</span>
+      <button class="btn btn-sm btn-ghost" id="btn_refresh_topics">🔄</button>
+    </div>
+
+    <div class="tabs">
+      <div class="tab active" data-tab="pick">选择主题</div>
+      <div class="tab" data-tab="new">新建主题</div>
+    </div>
+
+    <!-- Tab 1：选择主题 -->
+    <div class="tab-content">
+      <div class="tab-pane active" id="tab_pick">
+        <select id="topic_select"></select>
+        <div class="topic-info" id="topic_info">
+          未选择主题
+        </div>
+      </div>
+
+      <!-- Tab 2：新建主题 -->
+      <div class="tab-pane" id="tab_new">
+        <div class="form-row">
+          <label>topic_id（短 slug）</label>
+          <input id="nt_id" type="text" placeholder="如 mordor_lore">
+        </div>
+        <div class="form-row">
+          <label>name（显示名）</label>
+          <input id="nt_name" type="text" placeholder="如 魔多世界设定">
+        </div>
+        <div class="form-row">
+          <label>description（描述）</label>
+          <textarea id="nt_desc" rows="2" placeholder="可选"></textarea>
+        </div>
+        <div class="form-row">
+          <label>tags（逗号分隔）</label>
+          <input id="nt_tags" type="text" placeholder="如 lore, fantasy, mordor">
+        </div>
+        <div class="mt-2 text-right">
+          <button class="btn btn-ghost btn-sm" id="nt_clear">清空</button>
+          <button class="btn btn-sm" id="nt_create">创建主题</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- World 绑定面板 -->
+  <div class="panel">
+    <div class="panel-head">🔗 World 绑定</div>
+    <div class="panel-body">
+      <div class="form-row">
+        <label>world_id</label>
+        <input id="bw_world_id" type="text" placeholder="如 mordor">
+      </div>
+      <div class="mt-1 text-right inline-flex flex-wrap gap-1" style="justify-content: flex-end;">
+        <button class="btn btn-sm btn-ghost" id="bw_check">查绑定</button>
+        <button class="btn btn-sm" id="bw_bind">绑定</button>
+        <button class="btn btn-sm btn-danger" id="bw_unbind">解绑</button>
+      </div>
+      <div id="bw_result" style="margin-top:.75rem;"></div>
+    </div>
+  </div>
+
+</aside>
+
+<!-- ============== 主内容 ============== -->
+<main class="section">
+
+  <!-- 页面：搜索 -->
+  <div class="page-pane active" id="page_search">
+    <div class="section-title">🔍 语义检索 <span class="badge">BGE-M3 + Chroma</span></div>
+
+    <div class="card mb-2">
+      <div class="form-row-inline">
+        <label>查询内容</label>
+        <input id="query" type="text" placeholder="比如：血魔教在哪里？新手任务怎么做？" style="font-size: 1rem; padding: .65rem;">
+      </div>
+      <div class="form-row-inline">
+        <label>Top K</label>
+        <div class="inline-flex" style="gap:1rem; align-items:center;">
+          <input id="top_k" type="range" min="1" max="20" value="5">
+          <span id="top_k_label" class="tag tag-score">5</span>
+          <input id="min_score" type="range" min="0" max="100" value="20">
+          <span id="min_label" class="text-muted small">min score 0.20</span>
+        </div>
+      </div>
+      <div style="margin-top: 1rem; display:flex; gap:.75rem; align-items:center; flex-wrap:wrap;">
+        <button id="search_btn" class="btn">开始检索</button>
+        <button id="reindex_btn" class="btn btn-ghost">🔄 重建索引 (force)</button>
+        <button id="stats_btn" class="btn btn-ghost">📊 查看 stats</button>
+        <button id="clear_btn" class="btn btn-danger">🗑️ 清空知识库</button>
+        <span id="status" class="text-muted small"></span>
+      </div>
+    </div>
+
+    <div id="stats_area"></div>
+    <div id="result_area"></div>
+  </div>
+
+  <!-- 页面：上传 -->
+  <div class="page-pane" id="page_upload">
+    <div class="section-title">⬆️ 上传文档 / Upload</div>
+
+    <div class="card">
+      <div class="form-row-inline">
+        <label>知识库目录</label>
+        <select id="source_type">
+          <option value="lore">📜 lore · 世界观 / 设定 / 门派</option>
+          <option value="documents" selected>📄 documents · 攻略 / 文档 / 剧情</option>
+          <option value="images">🖼️ images · 图片（OCR 后索引）</option>
+          <option value="videos">🎥 videos · 视频（抽帧 OCR 后索引）</option>
+        </select>
+      </div>
+      <div class="form-row-inline">
+        <label>文件名前缀</label>
+        <div class="inline-flex" style="gap:1rem; align-items:center; width:100%;">
+          <input id="prefix" type="text" placeholder="如 2026-07-29_" style="flex:1;">
+          <div class="text-muted small">保存到：<code id="save_hint">knowledge/{source_type}/{prefix}<i>文件名</i></code></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="drop_zone" class="drop-zone" tabindex="0">
+      <h3>📂 拖文件到这里，或点击选择（支持多选）</h3>
+      <p>.md / .pdf / .png / .jpg / .jpeg / .webp / .mp4 / .webm</p>
+      <input id="file_input" type="file" multiple style="display:none;">
+    </div>
+
+    <div class="card mt-2">
+      <div class="form-row-inline">
+        <label>或者粘贴 Markdown</label>
+        <textarea id="paste_md" rows="6" placeholder="---&#10;title: 你的文档标题&#10;tags: [标签1, 标签2]&#10;---&#10;&#10;这里是正文 Markdown"></textarea>
+      </div>
+      <div class="form-row-inline">
+        <label>粘贴 → 文件名</label>
+        <input id="paste_name" type="text" value="pasted_document.md">
+      </div>
+      <div style="text-align:right; margin-top:.5rem;">
+        <button id="save_paste" class="btn btn-ghost btn-sm">💾 仅保存</button>
+        <button id="save_paste_and_index" class="btn btn-sm">💾 保存并立即索引</button>
+      </div>
+    </div>
+
+    <div id="upload_list"></div>
+    <div id="upload_result"></div>
+  </div>
+
+  <!-- 页面：文档列表 -->
+  <div class="page-pane" id="page_docs">
+    <div class="section-title flex-between">
+      <span>📄 所有文档 <span class="badge" id="docs_total_badge">-</span></span>
+      <span class="text-right inline-flex gap-1" style="flex-wrap:wrap; justify-content:flex-end;">
+        <label class="inline-flex"><input type="checkbox" id="chk_del" style="margin-right:.3rem;"> 含已软删</label>
+        <button class="btn btn-ghost btn-sm" id="btn_refresh_docs">🔄 刷新</button>
+      </span>
+    </div>
+
+    <div id="docs_stats" style="margin-bottom:1rem;"></div>
+    <div id="docs_table"></div>
+  </div>
+
+  <!-- 页面：任务 -->
+  <div class="page-pane" id="page_jobs">
+    <div class="section-title flex-between">
+      <span>🕓 索引任务 & 审计 <span class="badge" id="jobs_total_badge">-</span></span>
+      <button class="btn btn-ghost btn-sm" id="btn_refresh_jobs">🔄 刷新</button>
+    </div>
+
+    <div class="section-title"><span>🧾 最近 50 条索引任务</span></div>
+    <div id="jobs_area"></div>
+
+    <div class="section-title mt-2"><span>📝 最近 100 条审计日志</span></div>
+    <div id="audit_area"></div>
+  </div>
+
+</main>
+</div>
+
+<script>
+// ============== 通用工具 ==============
+const KB = {
+  KEY_TOPIC: 'aw_kb_topic_id',
+  getTopic(){ return localStorage.getItem(this.KEY_TOPIC) || ''; },
+  setTopic(t){ localStorage.setItem(this.KEY_TOPIC, t); },
+  async json(url, opts={}){
+    const res = await fetch(url, Object.assign({ headers: { 'Accept': 'application/json' } }, opts));
+    if (!res.ok) {
+      const t = await res.text();
+      throw new Error(`HTTP ${res.status}: ${t.slice(0,200)}`);
+    }
+    return res.json();
+  },
+  fmtSize(n){
+    if (n<1024) return n+' B';
+    if (n<1024*1024) return (n/1024).toFixed(1)+' KB';
+    return (n/1024/1024).toFixed(2)+' MB';
+  },
+  fmtTs(ts){
+    if (!ts) return '-';
+    const d = new Date(typeof ts==='string' ? ts : (ts>9999999999 ? ts : ts*1000));
+    return d.toLocaleString();
+  },
+  sourceTag(source){
+    const m = { lore:'tag-lore', documents:'tag-documents', image:'tag-image', video:'tag-video' };
+    return `<span class="tag ${m[source]||''}">${source}</span>`;
+  },
+  statusTag(s){
+    const m = { done:'tag-status-done', deleted:'tag-status-deleted', parsing:'tag-status-parsing', failed:'tag-status-deleted', active:'tag-status-done' };
+    return `<span class="tag ${m[s]||''}">${s}</span>`;
+  },
+  escape(s){ return String(s??'').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+};
+
+// ============== 页面导航 ==============
+document.querySelectorAll('nav a[data-page]').forEach(a=>{
+  a.addEventListener('click', ()=>{
+    document.querySelectorAll('nav a[data-page]').forEach(x=>x.classList.remove('active'));
+    a.classList.add('active');
+    const pg = a.dataset.page;
+    document.querySelectorAll('.page-pane').forEach(p=>p.classList.remove('active'));
+    document.getElementById('page_'+pg).classList.add('active');
+    if (pg==='docs') refreshDocs();
+    if (pg==='jobs') refreshJobs();
+    if (pg==='search') refreshStats();
+  });
+});
+
+// ============== 主题 Tab 切换 ==============
+document.querySelectorAll('.tab').forEach(t=>{
+  t.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
+    document.getElementById('tab_'+t.dataset.tab).classList.add('active');
+  });
+});
+
+// ============== 主题：下拉列表加载 ==============
+const topicSel = document.getElementById('topic_select');
+const topicInfo = document.getElementById('topic_info');
+let cachedTopics = [];
+
+async function refreshTopicList(){
+  try {
+    const r = await KB.json('/api/kb/topics');
+    cachedTopics = r.topics || [];
+    const cur = KB.getTopic();
+    topicSel.innerHTML = cachedTopics.length
+      ? cachedTopics.map(t=>`<option value="${KB.escape(t.topic_id)}">${KB.escape(t.name)} (${KB.escape(t.topic_id)})</option>`).join('')
+      : '<option value="">（暂无主题，请先新建）</option>';
+    if (cur && cachedTopics.some(t=>t.topic_id===cur)){
+      topicSel.value = cur;
+    } else if (cachedTopics[0]) {
+      KB.setTopic(cachedTopics[0].topic_id);
+      topicSel.value = cachedTopics[0].topic_id;
+    }
+    updateTopicInfo();
+  } catch(e) {
+    topicInfo.innerHTML = `<span style="color:#f87171;">加载失败：${KB.escape(e.message)}</span>`;
+  }
+}
+
+function updateTopicInfo(){
+  const tid = topicSel.value;
+  if (!tid){ topicInfo.innerHTML = '未选择主题'; return; }
+  const t = cachedTopics.find(x=>x.topic_id===tid);
+  if (!t){ topicInfo.innerHTML = `topic_id: <b>${KB.escape(tid)}</b>`; return; }
+  topicInfo.innerHTML = `
+    <div>name: <b>${KB.escape(t.name)}</b></div>
+    <div>chunks: <b>${t.chunks_in_collection||0}</b> · status: ${KB.statusTag(t.status)}</div>
+    ${t.description?`<div style="margin-top:.25rem;">${KB.escape(t.description)}</div>`:''}
+    ${(t.tags&&t.tags.length)?`<div style="margin-top:.25rem;">${t.tags.map(x=>`<span class="tag">#${KB.escape(x)}</span>`).join(' ')}</div>`:''}
+  `;
+}
+
+topicSel.addEventListener('change', ()=>{
+  KB.setTopic(topicSel.value);
+  updateTopicInfo();
+  const curPage = document.querySelector('nav a.active').dataset.page;
+  if (curPage==='search') refreshStats();
+  if (curPage==='docs') refreshDocs();
+  if (curPage==='jobs') refreshJobs();
+  updateSaveHint();
+});
+
+document.getElementById('btn_refresh_topics').onclick = refreshTopicList;
+
+// ============== 主题：新建 ==============
+document.getElementById('nt_clear').onclick = ()=>{
+  document.getElementById('nt_id').value='';
+  document.getElementById('nt_name').value='';
+  document.getElementById('nt_desc').value='';
+  document.getElementById('nt_tags').value='';
+};
+
+document.getElementById('nt_create').onclick = async ()=>{
+  const id = document.getElementById('nt_id').value.trim();
+  const name = document.getElementById('nt_name').value.trim();
+  const desc = document.getElementById('nt_desc').value.trim();
+  const tagsRaw = document.getElementById('nt_tags').value.trim();
+  if (!id){ alert('topic_id 必填'); return; }
+  const tags = tagsRaw ? tagsRaw.split(/[,，]/).map(s=>s.trim()).filter(Boolean) : [];
+  try {
+    await KB.json('/api/kb/topics', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ topic_id:id, name:name||id, description:desc||null, tags, status:'active' })
+    });
+    alert('✅ 主题创建成功');
+    document.getElementById('nt_clear').click();
+    await refreshTopicList();
+    topicSel.value = id;
+    KB.setTopic(id);
+    updateTopicInfo();
+    document.querySelector('.tab[data-tab="pick"]').click();
+  } catch(e){
+    alert('创建失败: '+e.message);
+  }
+};
+
+// ============== World 绑定 ==============
+const bwWorldId = document.getElementById('bw_world_id');
+const bwResult = document.getElementById('bw_result');
+
+function showBindingMsg(html, kind='info'){
+  bwResult.innerHTML = `<div class="alert alert-${kind}">${html}</div>`;
+}
+
+document.getElementById('bw_check').onclick = async ()=>{
+  const wid = bwWorldId.value.trim();
+  if (!wid){ alert('请填 world_id'); return; }
+  try {
+    const b = await KB.json(`/api/kb/bindings/${encodeURIComponent(wid)}`);
+    showBindingMsg(`
+      <div>当前绑定：</div>
+      <div class="binding-result">
+        world_id: <b>${KB.escape(b.world_id)}</b><br>
+        topic_id: <b>${KB.escape(b.topic_id)}</b><br>
+        priority: <b>${b.priority||0}</b>
+      </div>
+    `, 'info');
+  } catch(e) {
+    showBindingMsg(`暂无绑定或查询失败：${KB.escape(e.message)}`, 'warn');
+  }
+};
+
+document.getElementById('bw_bind').onclick = async ()=>{
+  const wid = bwWorldId.value.trim();
+  const tid = topicSel.value;
+  if (!wid){ alert('请填 world_id'); return; }
+  if (!tid){ alert('请先选择主题'); return; }
+  try {
+    const r = await KB.json('/api/kb/bindings', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ world_id:wid, topic_id:tid, priority:0 })
+    });
+    showBindingMsg(`✅ 绑定成功：world <b>${KB.escape(r.world_id)}</b> → topic <b>${KB.escape(r.topic_id)}</b>`, 'success');
+  } catch(e) {
+    showBindingMsg(`绑定失败：${KB.escape(e.message)}`, 'error');
+  }
+};
+
+document.getElementById('bw_unbind').onclick = async ()=>{
+  const wid = bwWorldId.value.trim();
+  if (!wid){ alert('请填 world_id'); return; }
+  if (!confirm(`确认解绑 world_id=${wid}？`)) return;
+  try {
+    const r = await KB.json(`/api/kb/bindings/${encodeURIComponent(wid)}`, { method:'DELETE' });
+    showBindingMsg(`✅ 解绑成功，删除了 <b>${r.removed_rows}</b> 行绑定`, 'success');
+  } catch(e) {
+    showBindingMsg(`解绑失败：${KB.escape(e.message)}`, 'error');
+  }
+};
+
+// ============== 搜索页 ==============
+const queryEl = document.getElementById('query');
+const topKEl = document.getElementById('top_k');
+const topKLabel = document.getElementById('top_k_label');
+const minEl = document.getElementById('min_score');
+const minLabel = document.getElementById('min_label');
+const resultArea = document.getElementById('result_area');
+const statsArea = document.getElementById('stats_area');
+const statusEl = document.getElementById('status');
+const searchBtn = document.getElementById('search_btn');
+const reindexBtn = document.getElementById('reindex_btn');
+const statsBtn = document.getElementById('stats_btn');
+const clearBtn = document.getElementById('clear_btn');
+
+topKEl.addEventListener('input', e=> topKLabel.textContent = e.target.value);
+minEl.addEventListener('input', e=>{
+  const v = (Number(e.target.value)/100).toFixed(2);
+  minLabel.textContent = 'min score ' + v;
+});
+
+function setStatus(s, kind){
+  statusEl.textContent = s;
+  statusEl.className = 'small ' + (kind==='error' ? 'text-danger' : 'text-muted');
+}
+
+async function refreshStats(){
+  const tid = topicSel.value;
+  if (!tid) return;
+  try {
+    const s = await KB.json(`/api/kb/${tid}/stats`);
+    const bySrc = Object.entries(s.by_source_type||{}).map(([k,v])=>`<span class="tag">${k}:${v}</span>`).join(' ');
+    statsArea.innerHTML = `
+      <div class="alert alert-info" style="display:flex; flex-wrap:wrap; gap:1rem;">
+        <div>🎯 <b>${s.topic_id}</b> · collection: <code>${s.collection}</code></div>
+        <div>📄 docs：<b>${s.documents||0}</b>　🧩 chunks (meta): <b>${s.chunks_in_meta||0}</b> / vector: <b>${s.total_chunks||0}</b></div>
+        <div>✅ 完成任务: <b>${s.successful_jobs||0}</b></div>
+        <div>${bySrc||'<span class="text-muted small">暂无按 source_type 统计</span>'}</div>
+      </div>`;
+  } catch(e) {
+    statsArea.innerHTML = `<div class="alert alert-error">stats 加载失败: ${KB.escape(e.message)}</div>`;
+  }
+}
+
+async function doSearch(){
+  const tid = topicSel.value;
+  const q = queryEl.value.trim();
+  if (!tid || !q){ setStatus('请选择主题并输入查询', 'error'); return; }
+  setStatus('正在 embedding + 检索...');
+  searchBtn.disabled = true;
+  const start = Date.now();
+  try {
+    const res = await KB.json(`/api/kb/${tid}/search`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        query: q,
+        top_k: Number(topKEl.value),
+        min_score: Number(minEl.value)/100,
+      })
+    });
+    const t = ((Date.now()-start)/1000).toFixed(2);
+    setStatus(`找到 ${res.hits.length} 条结果，耗时 ${t}s`);
+    renderHits(res.hits);
+  } catch(e) {
+    setStatus('检索失败: ' + e.message, 'error');
+    resultArea.innerHTML = `<div class="alert alert-error">${KB.escape(e.message)}</div>`;
+  } finally {
+    searchBtn.disabled = false;
+  }
+}
+
+function renderHits(hits){
+  if (!hits.length){ resultArea.innerHTML = `<div class="empty">无结果（可能所有 chunk 的 score 低于 min_score，试试把 min_score 调低）</div>`; return; }
+  resultArea.innerHTML = hits.map((h,i)=>{
+    const m = h.metadata || {};
+    const title = KB.escape(m.title||m.file_name||'(无标题)');
+    const docId = m.doc_id ? `<code>doc_id=${KB.escape(String(m.doc_id).slice(0,8))}…</code>` : '';
+    const chunkIdx = typeof m.chunk_index==='number' ? `chunk ${m.chunk_index+1}${m.chunk_count?'/'+m.chunk_count:''}` : '';
+    const tags = [
+      KB.sourceTag(m.source_type||'?'),
+      `<span class="tag tag-score">score ${(h.score||0).toFixed(3)}</span>`,
+      chunkIdx ? `<span class="tag">${chunkIdx}</span>` : '',
+      docId ? `<span class="tag">${docId}</span>` : '',
+    ].filter(Boolean).join(' ');
+    return `<article class="hit">
+      <header><h3 class="hit-title">${i+1}. ${title}</h3> ${tags}</header>
+      <pre>${KB.escape(h.text||'')}</pre>
+      <div class="hit-meta">
+        <span>📁 file:</span> <code>${KB.escape(m.file_name||'?')}</code>
+        ${m.file_path? `<span>· path:</span><code>${KB.escape(String(m.file_path).slice(-60))}</code>`:''}
+        ${typeof h.distance==='number' ? `<span>· vector distance:</span><code>${h.distance.toFixed(5)}</code>` : ''}
+      </div>
+    </article>`;
+  }).join('');
+}
+
+async function doReindex(force){
+  const tid = topicSel.value;
+  if (!tid){ setStatus('请先选择主题','error'); return; }
+  setStatus(`正在${force?'全量':'增量'}索引（同步阻塞，上传的 MD/PDF 越多越慢）...`);
+  reindexBtn.disabled = searchBtn.disabled = true;
+  try {
+    const r = await KB.json(`/api/kb/${tid}/index`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ force: !!force })
+    });
+    if (!r.ok){
+      setStatus('索引失败: ' + (r.error||'unknown'), 'error');
+      resultArea.innerHTML = `<div class="alert alert-error">${KB.escape(r.error||'')}</div>`;
+      return;
+    }
+    setStatus(`✅ ${force?'force ':''}索引完成 → files=${r.files} new=${r.new_files} skipped=${r.skipped_files} chunks=${r.chunks}`);
+    resultArea.innerHTML = `
+      <div class="alert alert-success">
+        <b>索引完成</b>（job_id=${r.job_id? KB.escape(r.job_id.slice(0,12))+'…':'同步'}）<br>
+        files 总数: <b>${r.files}</b>　新增: <b>${r.new_files}</b>　跳过(SHA256 相同): <b>${r.skipped_files}</b>　chunks 入库: <b>${r.chunks}</b>　total_chunks=<b>${r.total_chunks}</b>
+      </div>`;
+    refreshStats();
+    refreshTopicList();
+  } catch(e) {
+    setStatus('索引异常: '+e.message, 'error');
+    resultArea.innerHTML = `<div class="alert alert-error">${KB.escape(e.message)}</div>`;
+  } finally {
+    reindexBtn.disabled = searchBtn.disabled = false;
+  }
+}
+
+clearBtn.onclick = async ()=>{
+  const tid = topicSel.value;
+  if (!tid){ alert('请先选择主题'); return; }
+  if (!confirm(`⚠️ 确认清空主题 ${tid} 的所有知识库数据？（Chroma + SQLite 文档都会被清理）`)) return;
+  try {
+    const r = await KB.json(`/api/kb/${tid}`, { method:'DELETE' });
+    alert(`✅ 已清空：soft_deleted=${r.soft_deleted_documents} docs，total_chunks 现为 ${r.total_chunks}`);
+    refreshStats();
+    refreshTopicList();
+  } catch(e) {
+    alert('清空失败: '+e.message);
+  }
+};
+
+searchBtn.addEventListener('click', doSearch);
+reindexBtn.addEventListener('click', ()=>doReindex(true));
+statsBtn.addEventListener('click', ()=>refreshStats());
+queryEl.addEventListener('keydown', e=>{ if (e.key==='Enter') doSearch(); });
+
+// ============== 上传页 ==============
+const sourceSel = document.getElementById('source_type');
+const prefixEl = document.getElementById('prefix');
+const saveHint = document.getElementById('save_hint');
+const dropZone = document.getElementById('drop_zone');
+const fileInput = document.getElementById('file_input');
+const uploadList = document.getElementById('upload_list');
+const uploadResult = document.getElementById('upload_result');
+const savePasteBtn = document.getElementById('save_paste');
+const savePasteAndIndexBtn = document.getElementById('save_paste_and_index');
+const pasteText = document.getElementById('paste_md');
+const pasteName = document.getElementById('paste_name');
+
+function updateSaveHint(){
+  saveHint.innerHTML = `knowledge/${KB.escape(sourceSel.value)}/${KB.escape(prefixEl.value)}<i>文件名</i>`;
+}
+sourceSel.addEventListener('change', updateSaveHint);
+prefixEl.addEventListener('input', updateSaveHint);
+updateSaveHint();
+
+['dragenter','dragover'].forEach(ev=>dropZone.addEventListener(ev, e=>{ e.preventDefault(); dropZone.classList.add('drag-over'); }));
+['dragleave','drop'].forEach(ev=>dropZone.addEventListener(ev, e=>{ e.preventDefault(); dropZone.classList.remove('drag-over'); }));
+dropZone.addEventListener('click', ()=>fileInput.click());
+dropZone.addEventListener('drop', e=>{ if (e.dataTransfer?.files?.length) handleFiles(e.dataTransfer.files); });
+fileInput.addEventListener('change', e=>{ handleFiles(e.target.files); });
+
+async function handleFiles(fileList){
+  const files = Array.from(fileList);
+  const tid = topicSel.value;
+  if (!files.length || !tid){
+    if (!tid) alert('请先选择主题');
+    return;
+  }
+  const source = sourceSel.value, prefix = prefixEl.value;
+  uploadList.innerHTML = files.map(f=>`<div class="card" style="padding:.75rem 1rem; margin-bottom:.5rem;">
+    <div class="flex-between">
+      <div><b>${KB.escape(f.name)}</b> <span class="text-muted small">${KB.fmtSize(f.size)}</span></div>
+      <span class="text-muted small" data-file="${KB.escape(f.name)}">待上传</span>
+    </div>
+  </div>`).join('');
+  for (const f of files) {
+    const statusSpan = document.querySelector(`[data-file="${f.name.replace(/"/g,'&quot;')}"]`);
+    try {
+      const content = await f.arrayBuffer();
+      const fd = new FormData();
+      fd.append('file', new Blob([content], { type: f.type }), f.name);
+      statusSpan.textContent = '上传中...';
+      const r = await KB.json(`/api/kb/${tid}/upload?source_type=${encodeURIComponent(source)}&prefix=${encodeURIComponent(prefix)}`, {
+        method: 'POST',
+        body: fd,
+      });
+      statusSpan.innerHTML = `<span class="tag tag-status-done">已保存 ${r.file_name}</span>`;
+    } catch(e) {
+      statusSpan.innerHTML = `<span class="tag tag-status-deleted">错误: ${KB.escape(e.message.slice(0,60))}</span>`;
+    }
+  }
+  uploadResult.innerHTML = `
+    <div class="alert alert-info">
+      已完成。点击左侧「任务/审计」查看进度，
+      或立即 <button class="btn btn-sm btn-ghost" onclick="doIndexNow(false)">🔄 立即增量索引</button>
+      <button class="btn btn-sm btn-ghost" onclick="doIndexNow(true)">💥 全量重建</button>
+    </div>`;
+}
+
+async function saveText(andIndex){
+  const tid = topicSel.value;
+  if (!tid){ alert('请先选主题'); return; }
+  const name = pasteName.value.trim() || 'pasted.md';
+  const text = pasteText.value || '';
+  if (!text.trim()){ alert('粘贴内容不能为空'); return; }
+  const source = sourceSel.value, prefix = prefixEl.value;
+  try {
+    const r = await KB.json(`/api/kb/${tid}/upload-text?source_type=${encodeURIComponent(source)}&prefix=${encodeURIComponent(prefix)}&file_name=${encodeURIComponent(name)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/markdown' },
+      body: text,
+    });
+    uploadResult.innerHTML = `<div class="alert alert-success">✅ 已保存：<code>${KB.escape(r.file_name)}</code> (${r.file_size} B)</div>`;
+    pasteText.value = '';
+    if (andIndex) await doIndexNow(false);
+  } catch(e) {
+    uploadResult.innerHTML = `<div class="alert alert-error">保存失败：${KB.escape(e.message)}</div>`;
+  }
+}
+
+savePasteBtn.onclick = ()=>saveText(false);
+savePasteAndIndexBtn.onclick = ()=>saveText(true);
+
+window.doIndexNow = async function(force){
+  const tid = topicSel.value;
+  if (!tid){ alert('请先选主题'); return; }
+  uploadResult.innerHTML = `<div class="alert alert-warn">🔄 正在索引 ${tid} ...</div>`;
+  try {
+    const r = await KB.json(`/api/kb/${tid}/index`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({force:!!force}) });
+    if (!r.ok){ uploadResult.innerHTML = `<div class="alert alert-error">索引失败：${KB.escape(r.error||'')}</div>`; return; }
+    uploadResult.innerHTML = `<div class="alert alert-success">✅ 索引完成：files=${r.files} new=${r.new_files} skipped=${r.skipped_files} chunks=${r.chunks}</div>`;
+    refreshTopicList();
+  } catch(e){ uploadResult.innerHTML = `<div class="alert alert-error">${KB.escape(e.message)}</div>`; }
+};
+
+// ============== 文档列表页 ==============
+const chkDel = document.getElementById('chk_del');
+const btnRefreshDocs = document.getElementById('btn_refresh_docs');
+const docsTable = document.getElementById('docs_table');
+const docsStats = document.getElementById('docs_stats');
+const docsBadge = document.getElementById('docs_total_badge');
+
+async function refreshDocs(){
+  const tid = topicSel.value;
+  if (!tid) return;
+  try {
+    const [docs, stats] = await Promise.all([
+      KB.json(`/api/kb/${tid}/documents?limit=500&offset=0&include_deleted=${chkDel.checked}`),
+      KB.json(`/api/kb/${tid}/stats`),
+    ]);
+    docsBadge.textContent = docs.total;
+    const by = Object.entries(stats.by_source_type||{}).map(([k,v])=>`<span class="tag">${k}: ${v}</span>`).join(' ');
+    docsStats.innerHTML = `<div class="alert alert-info">
+      🎯 <b>${stats.topic_id}</b> · docs <b>${stats.documents||0}</b> · chunks meta/vector <b>${stats.chunks_in_meta||0}</b>/<b>${stats.total_chunks||0}</b>
+      ${by? ' · '+by:''}
+    </div>`;
+    renderDocsTable(docs.documents);
+  } catch(e) {
+    docsTable.innerHTML = `<div class="alert alert-error">加载失败：${KB.escape(e.message)}</div>`;
+  }
+}
+
+function renderDocsTable(rows){
+  if (!rows.length){ docsTable.innerHTML = `<div class="empty">暂无文档。先去 <a href="#" onclick="document.querySelector('nav a[data-page=upload]').click(); return false;">⬆️ 上传页面</a> 添加，或点 🔄 重建索引。</div>`; return; }
+  docsTable.innerHTML = `
+  <table class="table">
+    <thead><tr>
+      <th>Title</th><th>source</th><th>file</th><th>size</th><th>chunks</th>
+      <th>status</th><th>version</th><th>updated_at</th><th>操作</th>
+    </tr></thead>
+    <tbody>
+    ${rows.map(d=>`<tr data-id="${KB.escape(d.id)}">
+      <td>
+        <div style="display:flex; gap:.35rem; flex-wrap:wrap; align-items:center;">
+          <b>${KB.escape(d.title)}</b>
+          ${(d.tags||[]).map(t=>`<span class="tag">#${KB.escape(t)}</span>`).join('')}
+        </div>
+      </td>
+      <td class="nowrap">${KB.sourceTag(d.source_type)}</td>
+      <td class="nowrap">${KB.escape(d.file_name)}</td>
+      <td class="nowrap text-muted small">${KB.fmtSize(d.file_size)}</td>
+      <td class="nowrap">${d.chunk_count}</td>
+      <td class="nowrap">${KB.statusTag(d.status)}</td>
+      <td class="nowrap">v${d.version}</td>
+      <td class="nowrap text-muted small">${KB.fmtTs(d.updated_at)}</td>
+      <td class="nowrap">
+        ${d.status!=='deleted'
+          ? `<button class="btn btn-danger btn-sm" onclick="softDelDoc('${KB.escape(d.id)}', this)">🗑️ 软删</button>`
+          : `<span class="text-muted small">已删</span>`}
+      </td>
+    </tr>`).join('')}
+    </tbody>
+  </table>`;
+}
+
+window.softDelDoc = async function(docId, btn){
+  if (!confirm('软删此文档？(SQLite 级联清理 kb_chunk + 同时删除 Chroma 中相关 chunk)')) return;
+  btn.disabled = true;
+  const tid = topicSel.value;
+  try {
+    const r = await KB.json(`/api/kb/${tid}/documents/${docId}`, { method:'DELETE' });
+    alert(`已软删 ${r.soft_deleted} 条文档，同步删了 Chroma ${r.deleted_chunk_ids_count} 个 chunk`);
+    refreshDocs();
+    refreshTopicList();
+  } catch(e){ alert('删除失败: '+e.message); btn.disabled = false; }
+};
+
+btnRefreshDocs.onclick = refreshDocs;
+chkDel.onchange = refreshDocs;
+
+// ============== 任务/审计页 ==============
+const jobsArea = document.getElementById('jobs_area');
+const auditArea = document.getElementById('audit_area');
+const jobsBadge = document.getElementById('jobs_total_badge');
+const btnRefreshJobs = document.getElementById('btn_refresh_jobs');
+
+async function refreshJobs(){
+  const tid = topicSel.value;
+  if (!tid) return;
+  try {
+    const [jobs, audit] = await Promise.all([
+      KB.json(`/api/kb/${tid}/jobs?limit=50`),
+      KB.json(`/api/kb/${tid}/audit?limit=100`),
+    ]);
+    jobsBadge.textContent = `jobs ${jobs.jobs.length} · audit ${audit.audit.length}`;
+    renderJobs(jobs.jobs);
+    renderAudit(audit.audit);
+  } catch(e) {
+    jobsArea.innerHTML = `<div class="alert alert-error">加载失败：${KB.escape(e.message)}</div>`;
+  }
+}
+
+function renderJobs(rows){
+  if (!rows.length){ jobsArea.innerHTML = `<div class="empty">暂无任务记录</div>`; return; }
+  jobsArea.innerHTML = `<table class="table">
+    <thead><tr><th>ID</th><th>mode</th><th>status</th><th>progress</th><th>files (total/done)</th><th>chunks</th>
+      <th>created_at</th><th>duration</th><th>error</th></tr></thead>
+    <tbody>
+    ${rows.map(j=>{
+      const pct = j.progress||0;
+      const dur = j.started_at && j.finished_at ? `${((j.finished_at-j.started_at)/1000).toFixed(1)}s` : '-';
+      return `<tr>
+        <td class="nowrap"><code>${KB.escape(String(j.id).slice(0,12))}…</code></td>
+        <td class="nowrap"><span class="tag">${KB.escape(j.mode||'')}</span></td>
+        <td class="nowrap">${KB.statusTag(j.status)}</td>
+        <td style="min-width:160px;"><div class="progress"><span style="width:${pct}%;"></span></div>
+          <div class="small text-muted">${pct}%</div></td>
+        <td class="nowrap">${j.file_total||0} / ${j.file_done||0}</td>
+        <td class="nowrap"><b>${j.chunk_total||0}</b></td>
+        <td class="nowrap text-muted small">${KB.fmtTs(j.created_at)}</td>
+        <td class="nowrap text-muted small">${dur}</td>
+        <td class="nowrap">${j.error_msg? `<span class="tag tag-status-deleted" title="${KB.escape(j.error_msg)}">${KB.escape(j.error_msg.slice(0,40))}</span>`: '-'}</td>
+      </tr>`;
+    }).join('')}
+    </tbody>
+  </table>`;
+}
+
+function renderAudit(rows){
+  if (!rows.length){ auditArea.innerHTML = `<div class="empty">暂无审计记录</div>`; return; }
+  auditArea.innerHTML = `<table class="table">
+    <thead><tr><th>created_at</th><th>op</th><th>actor</th><th>job_id</th><th>query / details</th></tr></thead>
+    <tbody>
+    ${rows.map(a=>{
+      const extra = [];
+      if (a.query_text) extra.push(`<span>q: <code>${KB.escape(a.query_text.slice(0,80))}</code></span>`);
+      if (a.filters_json) extra.push(`<span>filters: <code>${KB.escape(a.filters_json.slice(0,60))}</code></span>`);
+      if (a.result_json) extra.push(`<span class="text-muted small">res: ${KB.escape(a.result_json.slice(0,80))}</span>`);
+      return `<tr>
+        <td class="nowrap text-muted small">${KB.fmtTs(a.created_at)}</td>
+        <td class="nowrap"><span class="tag">${KB.escape(a.op||'')}</span></td>
+        <td class="nowrap"><b>${KB.escape(a.actor||'')}</b></td>
+        <td class="nowrap">${a.job_id?`<code>${KB.escape(String(a.job_id).slice(0,10))}…</code>`:'-'}</td>
+        <td>${extra.join(' · ')||(a.error_msg? `<span class="tag tag-status-deleted">${KB.escape(a.error_msg.slice(0,60))}</span>`:'')}</td>
+      </tr>`;
+    }).join('')}
+    </tbody>
+  </table>`;
+}
+
+btnRefreshJobs.onclick = refreshJobs;
+
+// ============== 初始化 ==============
+(async function init(){
+  // 1) 切换到服务端指示的初始页面（/kb/upload /kb/docs /kb/jobs 传过来的）
+  const initial = (window.__KB_INITIAL_TAB__ || 'search').toString();
+  const valid = new Set(['search','upload','docs','jobs']);
+  if (valid.has(initial)){
+    const a = document.querySelector(`nav a[data-page="${initial}"]`);
+    if (a) a.click();
+  }
+  // 2) 拉主题 + stats
+  await refreshTopicList();
+  refreshStats();
+})();
+</script>
+</body>
+</html>

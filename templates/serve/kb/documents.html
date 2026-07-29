@@ -1,0 +1,89 @@
+{% extends "kb/base.html" %}
+{% block title %}文档 · 知识库{% endblock %}
+{% block body %}
+
+<div class="section-title flex-between">
+  <span>📄 所有文档 <span class="badge" id="total_badge">-</span></span>
+  <span class="text-right inline-flex">
+    <select id="world_id" style="margin-right:.5rem;"></select>
+    <label><input type="checkbox" id="chk_del"> 含已软删</label>
+    <button class="btn btn-ghost btn-sm" id="btn_refresh" style="margin-left:.5rem;">🔄 刷新</button>
+  </span>
+</div>
+
+<div id="stats_area" style="margin-bottom:1rem;"></div>
+<div id="table_area"></div>
+
+<script>
+const worldSel = document.getElementById('world_id');
+const chkDel = document.getElementById('chk_del');
+const btnRefresh = document.getElementById('btn_refresh');
+const tblArea = document.getElementById('table_area');
+const statsArea = document.getElementById('stats_area');
+const badge = document.getElementById('total_badge');
+
+async function refresh(){
+  if (!worldSel.value) return;
+  const worldId = worldSel.value;
+  const [docs, stats] = await Promise.all([
+    KB.json(`/api/kb/${worldId}/documents?limit=500&offset=0&include_deleted=${chkDel.checked}`),
+    KB.json(`/api/kb/${worldId}/stats`),
+  ]);
+  badge.textContent = docs.total;
+  const by = Object.entries(stats.by_source_type||{}).map(([k,v])=>`<span class="tag">${k}: ${v}</span>`).join(' ');
+  statsArea.innerHTML = `<div class="alert alert-info">
+    📦 <b>${stats.world_id}</b> · docs <b>${stats.documents||0}</b> · chunks meta/vector <b>${stats.chunks_in_meta||0}</b>/<b>${stats.total_chunks||0}</b>
+    ${by? '· '+by:''}
+  </div>`;
+  renderTable(docs.documents);
+}
+
+function renderTable(rows){
+  if (!rows.length){ tblArea.innerHTML = `<div class="empty">暂无文档。先去 <a href="/kb/upload">⬆️ 上传页面</a> 添加，或点 🔄 重建索引。</div>`; return; }
+  tblArea.innerHTML = `
+  <table class="table">
+    <thead><tr>
+      <th>Title</th><th>source</th><th>file</th><th>size</th><th>chunks</th>
+      <th>status</th><th>version</th><th>updated_at</th><th>操作</th>
+    </tr></thead>
+    <tbody>
+    ${rows.map(d=>`<tr data-id="${KB.escape(d.id)}">
+      <td>
+        <div style="display:flex; gap:.35rem; flex-wrap:wrap; align-items:center;">
+          <b>${KB.escape(d.title)}</b>
+          ${(d.tags||[]).map(t=>`<span class="tag">#${KB.escape(t)}</span>`).join('')}
+        </div>
+      </td>
+      <td class="nowrap">${KB.sourceTag(d.source_type)}</td>
+      <td class="nowrap">${KB.escape(d.file_name)}</td>
+      <td class="nowrap text-muted small">${KB.fmtSize(d.file_size)}</td>
+      <td class="nowrap">${d.chunk_count}</td>
+      <td class="nowrap">${KB.statusTag(d.status)}</td>
+      <td class="nowrap">v${d.version}</td>
+      <td class="nowrap text-muted small">${KB.fmtTs(d.updated_at)}</td>
+      <td class="nowrap">
+        ${d.status!=='deleted'
+          ? `<button class="btn btn-danger btn-sm" onclick="softDel('${KB.escape(d.id)}', this)">🗑️ 软删</button>`
+          : `<span class="text-muted small">已删</span>`}
+      </td>
+    </tr>`).join('')}
+    </tbody>
+  </table>`;
+}
+
+window.softDel = async function(docId, btn){
+  if (!confirm('软删此文档？(SQLite 级联清理 kb_chunk + 同时删除 Chroma 中相关 chunk)')) return;
+  btn.disabled = true;
+  const worldId = worldSel.value;
+  try {
+    const r = await KB.json(`/api/kb/${worldId}/documents/${docId}`, { method:'DELETE' });
+    alert(`已软删 ${r.soft_deleted} 条文档，同步删了 Chroma ${r.deleted_chunk_ids_count} 个 chunk`);
+    refresh();
+  } catch(e) { alert('删除失败: ' + e.message); btn.disabled = false; }
+};
+
+KB.setupWorldPicker(worldSel, ()=>refresh());
+btnRefresh.onclick = refresh;
+chkDel.onchange = refresh;
+</script>
+{% endblock %}

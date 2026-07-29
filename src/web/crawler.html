@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🕷️ 爬虫 · AIGameWorld Studio</title>
+<style>
+  :root{
+    --bg:#0f172a; --panel:#1e293b; --border:#334155; --text:#e2e8f0; --muted:#94a3b8;
+    --accent:#38bdf8; --accent2:#a855f7; --danger:#f43f5e; --ok:#22c55e; --warn:#f59e0b;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,-apple-system,sans-serif;font-size:14px;line-height:1.5}
+  a{color:var(--accent);text-decoration:none}
+  a:hover{text-decoration:underline}
+
+  header{background:linear-gradient(135deg,#1e293b,#0f172a);padding:1rem 1.5rem;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem}
+  header h1{font-size:1.1rem;font-weight:600}
+  header .sub{color:var(--muted);font-size:.8rem;margin-top:.2rem}
+  .header-links a{margin-left:.75rem;font-size:.8rem}
+
+  nav{display:flex;gap:0;padding:0 1.5rem;background:var(--panel);border-bottom:1px solid var(--border)}
+  nav a{padding:.75rem 1.25rem;color:var(--muted);text-decoration:none;font-size:.9rem;border-bottom:2px solid transparent;cursor:pointer}
+  nav a:hover,nav a.active{color:var(--accent);border-bottom-color:var(--accent)}
+
+  .banner{background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.4);color:#fcd34d;padding:.6rem 1.5rem;font-size:.8rem;display:flex;align-items:center;gap:.5rem}
+  .banner code{background:rgba(0,0,0,.3);padding:.1rem .4rem;border-radius:3px;font-size:.75rem}
+
+  .toolbar{padding:.75rem 1.5rem;background:var(--panel);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:.75rem;flex-wrap:wrap}
+  .toolbar label{font-size:.8rem;color:var(--muted)}
+  select,input[type=text],input[type=number],textarea{
+    background:#0f172a;color:var(--text);border:1px solid var(--border);border-radius:4px;
+    padding:.4rem .6rem;font-size:.85rem;font-family:inherit
+  }
+  textarea{width:100%;min-height:120px;resize:vertical;font-family:'Consolas',monospace}
+  input[type=text]{width:320px}
+  .btn{background:var(--accent);color:#0f172a;border:none;padding:.45rem .9rem;border-radius:4px;cursor:pointer;font-size:.85rem;font-weight:500}
+  .btn:hover{filter:brightness(1.1)}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--border)}
+  .btn-ghost:hover{color:var(--text);border-color:var(--muted)}
+  .btn-danger{background:var(--danger);color:#fff}
+  .btn-ok{background:var(--ok);color:#0f172a}
+  .btn-sm{padding:.3rem .6rem;font-size:.78rem}
+
+  main{padding:1.5rem;max-width:1400px;margin:0 auto}
+
+  .tabs{display:flex;border-bottom:1px solid var(--border);margin-bottom:1rem}
+  .tab{padding:.6rem 1rem;font-size:.85rem;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent}
+  .tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+  .tab-pane{display:none}
+  .tab-pane.active{display:block}
+
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:1rem;margin-bottom:.75rem}
+  .card h3{font-size:.9rem;margin-bottom:.5rem;color:var(--text)}
+  .card .meta{font-size:.75rem;color:var(--muted);margin-bottom:.5rem}
+  .card .snippet{font-size:.8rem;color:var(--muted);line-height:1.4}
+  .card input[type=checkbox]{margin-right:.5rem;transform:scale(1.2);accent-color:var(--accent)}
+
+  .results{margin-top:.75rem}
+  .empty{color:var(--muted);font-size:.85rem;padding:2rem;text-align:center}
+
+  table{width:100%;border-collapse:collapse;font-size:.82rem}
+  th,td{padding:.5rem .6rem;border-bottom:1px solid var(--border);text-align:left;vertical-align:top}
+  th{color:var(--muted);font-weight:500;background:var(--panel)}
+  tr:hover td{background:rgba(30,41,59,.5)}
+  .status{display:inline-block;padding:.1rem .5rem;border-radius:10px;font-size:.72rem;font-weight:500}
+  .status-done{background:rgba(34,197,94,.15);color:var(--ok)}
+  .status-running{background:rgba(56,189,248,.15);color:var(--accent)}
+  .status-failed{background:rgba(244,63,94,.15);color:var(--danger)}
+  .status-discarded{background:rgba(148,163,184,.15);color:var(--muted)}
+  .status-promoted{background:rgba(168,85,247,.15);color:var(--accent2)}
+  .status-fetched{background:rgba(34,197,94,.15);color:var(--ok)}
+
+  .item-row{background:#0f172a;border-radius:4px;padding:.6rem;margin:.4rem 0;font-size:.8rem}
+  .item-row .url{color:var(--accent);word-break:break-all}
+  .item-row .preview{color:var(--muted);margin-top:.4rem;font-size:.75rem;max-height:100px;overflow:auto;background:#000;padding:.4rem;border-radius:3px;white-space:pre-wrap}
+
+  .msg{padding:.6rem 1rem;border-radius:4px;margin:.5rem 0;font-size:.85rem}
+  .msg-ok{background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);color:var(--ok)}
+  .msg-err{background:rgba(244,63,94,.1);border:1px solid rgba(244,63,94,.3);color:var(--danger)}
+  .msg-info{background:rgba(56,189,248,.1);border:1px solid rgba(56,189,248,.3);color:var(--accent)}
+
+  .expand-btn{cursor:pointer;color:var(--accent);font-size:.78rem}
+  .hidden{display:none}
+
+  .spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--muted);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;vertical-align:middle;margin-right:.4rem}
+  @keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>🕷️ 爬虫 / Crawler · 知识库采集</h1>
+    <div class="sub">搜 · 抓 · 暂存 · 审核 → 独立于向量入库</div>
+  </div>
+  <div class="header-links">
+    <a href="/kb">📚 知识库</a>
+    <a href="/docs">📖 API</a>
+    <a href="/health">❤️ Health</a>
+  </div>
+</header>
+
+<div class="banner">
+  ⚠️ 爬虫下载内容的使用者需自行确保版权合规。所有抓取动作（URL + 时间戳）记入 SQLite 审计表 <code>crawler_job</code> / <code>crawler_item</code>。HTML 抓取尊重目标站 robots.txt。
+</div>
+
+<div class="toolbar">
+  <label>主题:</label>
+  <select id="topic_select"></select>
+  <button class="btn btn-ghost btn-sm" id="btn_refresh_topics">🔄</button>
+  <span style="flex:1"></span>
+  <label style="font-size:.75rem;color:var(--muted)">暂存区: <code id="staging_hint">.staging/crawler/</code></label>
+</div>
+
+<div class="tabs">
+  <div class="tab active" data-tab="search">🔍 全网搜索</div>
+  <div class="tab" data-tab="urls">📎 贴 URL 抓取</div>
+  <div class="tab" data-tab="jobs">📋 任务列表</div>
+</div>
+
+<main>
+  <!-- ============== Tab 1: 全网搜索 ============== -->
+  <div class="tab-pane active" id="tab_search">
+    <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:.75rem;flex-wrap:wrap">
+      <input type="text" id="search_query" placeholder="搜索关键词，如：魔兽世界 编年史" style="flex:1;min-width:300px">
+      <label>结果数:</label>
+      <select id="search_max">
+        <option value="5">5</option>
+        <option value="10" selected>10</option>
+        <option value="15">15</option>
+        <option value="20">20</option>
+      </select>
+      <label>source_type:</label>
+      <select id="search_source">
+        <option value="documents">documents</option>
+        <option value="lore">lore</option>
+      </select>
+      <button class="btn" id="btn_search">🔍 搜索</button>
+      <button class="btn btn-ok" id="btn_crawl_search" disabled>🕷️ 搜索+抓取</button>
+    </div>
+    <div id="search_results" class="results"></div>
+    <div id="search_msg"></div>
+  </div>
+
+  <!-- ============== Tab 2: 贴 URL ============== -->
+  <div class="tab-pane" id="tab_urls">
+    <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:.5rem;flex-wrap:wrap">
+      <label>source_type:</label>
+      <select id="urls_source">
+        <option value="documents">documents</option>
+        <option value="lore">lore</option>
+      </select>
+      <span style="flex:1"></span>
+      <span style="font-size:.75rem;color:var(--muted)">一行一个 URL，支持 HTML / PDF</span>
+    </div>
+    <textarea id="urls_input" placeholder="https://wowpedia.fandom.com/wiki/Lich_King&#10;https://example.com/doc.pdf&#10;..."></textarea>
+    <div style="margin-top:.5rem;display:flex;gap:.5rem">
+      <button class="btn" id="btn_crawl_urls">🚀 开始抓取</button>
+      <button class="btn btn-ghost" id="btn_clear_urls">清空</button>
+    </div>
+    <div id="urls_msg" style="margin-top:.75rem"></div>
+  </div>
+
+  <!-- ============== Tab 3: 任务列表 ============== -->
+  <div class="tab-pane" id="tab_jobs">
+    <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:.75rem">
+      <button class="btn btn-ghost btn-sm" id="btn_refresh_jobs">🔄 刷新</button>
+      <label><input type="checkbox" id="filter_topic" checked> 仅当前主题</label>
+      <span id="jobs_count" style="font-size:.8rem;color:var(--muted)"></span>
+    </div>
+    <div id="jobs_list"></div>
+  </div>
+</main>
+
+<script>
+// ============== 通用工具 ==============
+const C = {
+  KEY_TOPIC: 'aw_kb_topic_id',  // 与 kb.html 共享 localStorage key
+  getTopic(){ return localStorage.getItem(this.KEY_TOPIC) || ''; },
+  setTopic(t){ localStorage.setItem(this.KEY_TOPIC, t); },
+  getParam(name){ return new URLSearchParams(location.search).get(name); },
+  async json(url, opts={}){
+    const res = await fetch(url, Object.assign({headers:{'Accept':'application/json'}}, opts));
+    if(!res.ok){
+      const t = await res.text();
+      throw new Error(`HTTP ${res.status}: ${t.slice(0,300)}`);
+    }
+    return res.json();
+  },
+  fmtTime(ms){
+    if(!ms) return '-';
+    const d = new Date(ms);
+    return d.toLocaleString('zh-CN', {hour12:false});
+  },
+  fmtSize(n){
+    if(!n) return '0 B';
+    if(n<1024) return n+' B';
+    if(n<1048576) return (n/1024).toFixed(1)+' KB';
+    return (n/1048576).toFixed(2)+' MB';
+  },
+  esc(s){ return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+};
+
+let currentSearchResults = [];
+let selectedUrls = new Set();
+
+// ============== 初始化 ==============
+document.querySelectorAll('.tab').forEach(t=>{
+  t.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.tab-pane').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    document.getElementById('tab_'+t.dataset.tab).classList.add('active');
+    if(t.dataset.tab==='jobs') refreshJobs();
+  });
+});
+
+// ============== 主题选择 ==============
+async function refreshTopics(){
+  try{
+    const data = await C.json('/api/kb/topics');
+    const sel = document.getElementById('topic_select');
+    sel.innerHTML = '';
+    (data.topics||[]).forEach(t=>{
+      const opt = document.createElement('option');
+      opt.value = t.topic_id;
+      opt.textContent = `${t.topic_id} (${t.name}) — ${t.chunks_in_collection||0} chunks`;
+      sel.appendChild(opt);
+    });
+    // 优先用 URL ?topic= 参数，其次 localStorage
+    const paramTopic = C.getParam('topic');
+    const saved = paramTopic || C.getTopic();
+    if(saved && [...sel.options].some(o=>o.value===saved)){
+      sel.value = saved;
+    }
+    currentTopicChanged();
+  }catch(e){
+    showMsg('search_msg', 'err', '加载主题失败: '+e.message);
+  }
+}
+document.getElementById('topic_select').addEventListener('change', ()=>{
+  C.setTopic(document.getElementById('topic_select').value);
+  refreshJobs();
+});
+document.getElementById('btn_refresh_topics').addEventListener('click', refreshTopics);
+
+function currentTopic(){
+  return document.getElementById('topic_select').value || '';
+}
+
+function currentTopicChanged(){
+  const t = currentTopic();
+  if(t) C.setTopic(t);
+  document.getElementById('staging_hint').textContent = `knowledge-bases/${t}/.staging/crawler/`;
+}
+
+// ============== Tab 1: 搜索 ==============
+async function doSearch(){
+  const q = document.getElementById('search_query').value.trim();
+  if(!q){ showMsg('search_msg','err','请输入关键词'); return; }
+  const max = parseInt(document.getElementById('search_max').value);
+  const box = document.getElementById('search_results');
+  box.innerHTML = '<div class="empty"><span class="spinner"></span>搜索中...</div>';
+  document.getElementById('btn_crawl_search').disabled = true;
+  selectedUrls.clear();
+  try{
+    const data = await C.json('/api/crawler/search', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({query:q, max_results:max})
+    });
+    currentSearchResults = data.results||[];
+    renderSearchResults();
+    document.getElementById('btn_crawl_search').disabled = currentSearchResults.length===0;
+    showMsg('search_msg', 'ok', `找到 ${data.total} 条结果，勾选后可「搜索+抓取」`);
+  }catch(e){
+    box.innerHTML = '<div class="empty">搜索失败</div>';
+    showMsg('search_msg','err','搜索失败: '+e.message);
+  }
+}
+
+function renderSearchResults(){
+  const box = document.getElementById('search_results');
+  if(currentSearchResults.length===0){
+    box.innerHTML = '<div class="empty">无结果</div>';
+    return;
+  }
+  box.innerHTML = currentSearchResults.map((r,i)=>`
+    <div class="card">
+      <label>
+        <input type="checkbox" data-idx="${i}" data-url="${C.esc(r.url)}" ${selectedUrls.has(r.url)?'checked':''}>
+        <strong>${C.esc(r.title)}</strong>
+      </label>
+      <div class="meta"><a href="${C.esc(r.url)}" target="_blank">${C.esc(r.url)}</a></div>
+      <div class="snippet">${C.esc(r.snippet)}</div>
+    </div>
+  `).join('');
+  box.querySelectorAll('input[type=checkbox]').forEach(cb=>{
+    cb.addEventListener('change', e=>{
+      const url = e.target.dataset.url;
+      if(e.target.checked) selectedUrls.add(url); else selectedUrls.delete(url);
+    });
+  });
+}
+
+async function crawlSearch(){
+  const t = currentTopic();
+  if(!t){ showMsg('search_msg','err','请先选择主题'); return; }
+  const q = document.getElementById('search_query').value.trim();
+  const max = parseInt(document.getElementById('search_max').value);
+  const st = document.getElementById('search_source').value;
+  showMsg('search_msg','info','<span class="spinner"></span>搜索 + 抓取中（每 URL 间隔 ~1s，请稍候）...');
+  document.getElementById('btn_crawl_search').disabled = true;
+  try{
+    const data = await C.json('/api/crawler/jobs/search', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({topic_id:t, query:q, max_results:max, source_type:st})
+    });
+    showMsg('search_msg','ok', `✅ 任务已创建：${data.job_id.slice(0,8)}... 共 ${data.total_items} 个 URL，已抓到暂存区。去「任务列表」查看 / 批准入库。`);
+    // 跳到任务列表
+    document.querySelector('.tab[data-tab="jobs"]').click();
+  }catch(e){
+    showMsg('search_msg','err','抓取失败: '+e.message);
+    document.getElementById('btn_crawl_search').disabled = false;
+  }
+}
+
+document.getElementById('btn_search').addEventListener('click', doSearch);
+document.getElementById('search_query').addEventListener('keydown', e=>{ if(e.key==='Enter') doSearch(); });
+document.getElementById('btn_crawl_search').addEventListener('click', crawlSearch);
+
+// ============== Tab 2: 贴 URL ==============
+async function crawlUrls(){
+  const t = currentTopic();
+  if(!t){ showMsg('urls_msg','err','请先选择主题'); return; }
+  const raw = document.getElementById('urls_input').value;
+  const urls = raw.split('\n').map(s=>s.trim()).filter(s=>s && /^https?:\/\//i.test(s));
+  if(urls.length===0){ showMsg('urls_msg','err','请输入至少一个有效 URL（http/https）'); return; }
+  const st = document.getElementById('urls_source').value;
+  showMsg('urls_msg','info', `<span class="spinner"></span>抓取 ${urls.length} 个 URL 中（每域名间隔 ~1s）...`);
+  document.getElementById('btn_crawl_urls').disabled = true;
+  try{
+    const data = await C.json('/api/crawler/jobs/urls', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({topic_id:t, urls:urls, source_type:st})
+    });
+    showMsg('urls_msg','ok', `✅ 任务 ${data.job_id.slice(0,8)}... 已抓取 ${data.total_items} 个 URL。去「任务列表」批准入库。`);
+    document.getElementById('urls_input').value = '';
+    document.querySelector('.tab[data-tab="jobs"]').click();
+  }catch(e){
+    showMsg('urls_msg','err','抓取失败: '+e.message);
+  }finally{
+    document.getElementById('btn_crawl_urls').disabled = false;
+  }
+}
+document.getElementById('btn_crawl_urls').addEventListener('click', crawlUrls);
+document.getElementById('btn_clear_urls').addEventListener('click', ()=>{ document.getElementById('urls_input').value=''; });
+
+// ============== Tab 3: 任务列表 ==============
+async function refreshJobs(){
+  const filterTopic = document.getElementById('filter_topic').checked ? currentTopic() : null;
+  const box = document.getElementById('jobs_list');
+  box.innerHTML = '<div class="empty"><span class="spinner"></span>加载任务...</div>';
+  try{
+    const url = filterTopic ? `/api/crawler/jobs?topic_id=${encodeURIComponent(filterTopic)}` : '/api/crawler/jobs';
+    const data = await C.json(url);
+    document.getElementById('jobs_count').textContent = `共 ${data.total} 个任务`;
+    if(data.jobs.length===0){
+      box.innerHTML = '<div class="empty">暂无爬虫任务</div>';
+      return;
+    }
+    box.innerHTML = data.jobs.map(j=>renderJobRow(j)).join('');
+    box.querySelectorAll('.expand-btn').forEach(btn=>{
+      btn.addEventListener('click', ()=>toggleJobItems(btn.dataset.jobId));
+    });
+    box.querySelectorAll('[data-action]').forEach(btn=>{
+      btn.addEventListener('click', ()=>handleJobAction(btn.dataset.action, btn.dataset.jobId));
+    });
+  }catch(e){
+    box.innerHTML = `<div class="empty">加载失败: ${C.esc(e.message)}</div>`;
+  }
+}
+
+function renderJobRow(j){
+  const statusCls = 'status-'+j.status;
+  const modeLabel = j.mode==='search' ? '🔍搜索' : '📎URL';
+  const queryLabel = j.query ? C.esc(j.query.slice(0,40)) : '';
+  return `
+    <div class="card" style="padding:.6rem 1rem">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem">
+        <div>
+          <strong>${j.id.slice(0,8)}</strong>
+          <span class="status ${statusCls}">${j.status}</span>
+          <span style="color:var(--muted);font-size:.78rem;margin-left:.5rem">${modeLabel} · ${j.topic_id} · ${j.done_items}/${j.total_items} 个</span>
+          ${queryLabel ? `<div style="font-size:.75rem;color:var(--muted);margin-top:.2rem">query: ${queryLabel}</div>` : ''}
+          <div style="font-size:.72rem;color:var(--muted);margin-top:.2rem">${C.fmtTime(j.created_at)} · source_type=${j.source_type}</div>
+          ${j.error_msg ? `<div style="font-size:.72rem;color:var(--danger);margin-top:.2rem">${C.esc(j.error_msg)}</div>` : ''}
+        </div>
+        <div style="display:flex;gap:.4rem">
+          <span class="expand-btn" data-job-id="${j.id}">📂 查看</span>
+          <button class="btn btn-ok btn-sm" data-action="promote" data-job-id="${j.id}" ${j.status==='discarded'?'disabled':''}>✅ 批准入库</button>
+          <button class="btn btn-danger btn-sm" data-action="discard" data-job-id="${j.id}" ${j.status==='discarded'?'disabled':''}>🗑️ 丢弃</button>
+        </div>
+      </div>
+      <div id="items_${j.id}" class="hidden" style="margin-top:.6rem"></div>
+    </div>
+  `;
+}
+
+async function toggleJobItems(jobId){
+  const box = document.getElementById('items_'+jobId);
+  if(!box.classList.contains('hidden')){
+    box.classList.add('hidden');
+    return;
+  }
+  box.classList.remove('hidden');
+  box.innerHTML = '<div class="empty"><span class="spinner"></span>加载文件...</div>';
+  try{
+    const data = await C.json(`/api/crawler/jobs/${jobId}/items`);
+    if(data.length===0){
+      box.innerHTML = '<div class="empty">无文件</div>';
+      return;
+    }
+    box.innerHTML = data.map(it=>`
+      <div class="item-row">
+        <div style="display:flex;justify-content:space-between;gap:.5rem;align-items:start">
+          <div style="flex:1">
+            <span class="status status-${it.status}">${it.status}</span>
+            <span style="margin-left:.4rem"><a href="${C.esc(it.url)}" target="_blank">${C.esc(it.title||it.url)}</a></span>
+            <div class="url" style="font-size:.72rem;margin-top:.2rem">${C.esc(it.url)}</div>
+            ${it.file_path ? `<div style="font-size:.72rem;color:var(--muted);margin-top:.2rem">📄 ${C.esc(it.file_path.split(/[\\/]/).pop())} · ${C.fmtSize(it.file_size)} · ${it.content_type}</div>` : ''}
+            ${it.error_msg ? `<div style="font-size:.72rem;color:var(--danger);margin-top:.2rem">⚠️ ${C.esc(it.error_msg)}</div>` : ''}
+          </div>
+        </div>
+        ${it.preview ? `<div class="preview">${C.esc(it.preview)}</div>` : ''}
+      </div>
+    `).join('');
+  }catch(e){
+    box.innerHTML = `<div class="empty">加载失败: ${C.esc(e.message)}</div>`;
+  }
+}
+
+async function handleJobAction(action, jobId){
+  if(action==='promote'){
+    if(!confirm('确认把这些文件移到 knowledge/documents/ ？\n（不会自动索引，需到 /kb 手动点重建索引）')) return;
+    try{
+      const data = await C.json(`/api/crawler/jobs/${jobId}/promote`, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({})
+      });
+      alert(`✅ 已批准 ${data.promoted_count} 个文件到 knowledge/${data.topic_id}/\n跳过 ${data.skipped_count} 个\n\n现在去 /kb 点「重建索引」即可让新内容生效。`);
+      refreshJobs();
+    }catch(e){ alert('批准失败: '+e.message); }
+  }else if(action==='discard'){
+    if(!confirm('确认丢弃此任务？暂存区文件会被删除。')) return;
+    try{
+      await C.json(`/api/crawler/jobs/${jobId}`, {method:'DELETE'});
+      refreshJobs();
+    }catch(e){ alert('丢弃失败: '+e.message); }
+  }
+}
+
+document.getElementById('btn_refresh_jobs').addEventListener('click', refreshJobs);
+
+// ============== 消息工具 ==============
+function showMsg(boxId, kind, html){
+  const box = document.getElementById(boxId);
+  if(!box) return;
+  box.innerHTML = `<div class="msg msg-${kind==='err'?'err':kind==='ok'?'ok':'info'}">${html}</div>`;
+}
+
+// ============== 启动 ==============
+(async function init(){
+  await refreshTopics();
+  // 如果 URL 带 ?topic=，自动切到对应主题
+  const t = C.getParam('topic');
+  if(t){
+    const sel = document.getElementById('topic_select');
+    if([...sel.options].some(o=>o.value===t)) sel.value = t;
+  }
+})();
+</script>
+
+</body>
+</html>

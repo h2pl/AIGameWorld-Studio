@@ -25,7 +25,7 @@ class KnowledgePipeline:
         self._sqlite = sqlite
         self._reader = KnowledgeReader()
 
-        self._collection = chroma_client.get_collection(self.collection_name)
+        self._collection = chroma_client.get_or_create_collection(self.collection_name)
 
         # BGE-M3 本地路径（ModelScope 下载）
         import os
@@ -51,7 +51,7 @@ class KnowledgePipeline:
     def clear(self):
         """清空知识库索引."""
         self._chroma.delete_collection(self.collection_name)
-        self._collection = self._chroma.get_collection(self.collection_name)
+        self._collection = self._chroma.get_or_create_collection(self.collection_name)
 
     async def index_directory(self, knowledge_dir: Path) -> dict:
         """索引整个目录，返回统计信息."""

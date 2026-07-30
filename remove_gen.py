@@ -1,4 +1,5 @@
 """Remove interpret_tilemap, generate_actors, generate_scene_objects from all backend files."""
+
 import re
 
 ROOT = "E:/Projects/AIGameWorld/backend"
@@ -50,7 +51,10 @@ c = c.replace(
     "from ..utils.helpers import build_occupied_set, find_vacant_adjacent, get_repo\n\n",
     "from ..utils.helpers import build_occupied_set, find_vacant_adjacent, get_repo\n",
 )
-c = c.replace("_PROMPTS_ROOT = Path(__file__).parent.parent / \"prompts\"\n_PROMPTS = Environment(loader=FileSystemLoader(str(_PROMPTS_ROOT)))\n\n\n", "")
+c = c.replace(
+    '_PROMPTS_ROOT = Path(__file__).parent.parent / "prompts"\n_PROMPTS = Environment(loader=FileSystemLoader(str(_PROMPTS_ROOT)))\n\n\n',
+    "",
+)
 c = re.sub(r"\n{4,}", "\n\n\n", c)
 
 with open(path, "w", encoding="utf-8") as f:
@@ -63,15 +67,15 @@ with open(path, encoding="utf-8") as f:
 
 c = c.replace(
     '    graph.add_node("scene_service.interpret_tilemap", scene_service.interpret_tilemap)\n',
-    '',
+    "",
 )
 c = c.replace(
     '    graph.add_node("scene_service.generate_actors", scene_service.generate_actors)\n',
-    '',
+    "",
 )
 c = c.replace(
     '    graph.add_node("scene_service.generate_scene_objects", scene_service.generate_scene_objects)\n',
-    '',
+    "",
 )
 c = c.replace(
     'graph.add_edge("scene_service.build_scene_info", "scene_service.interpret_tilemap")\n'

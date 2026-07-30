@@ -1,8 +1,20 @@
-"""Scrapy 全局 settings.
+# Scrapy 全局 settings.
+#
+# 注意：只保留 **大写常量**；运行时注入的 job_id / staging_dir / db_path 由
+# runner._build_settings_dict 里再覆盖写。
 
-注意：只保留 **大写常量**；运行时注入的 job_id / staging_dir / db_path 由
-runner._build_settings_dict 里再覆盖写。
-"""
+import os
+
+# === Reactor 配置（必须和 _job_launcher.py 里 _install_reactor_early install 的一致） ===
+# 从 Scrapy 2.17 开始，如果 TWISTED_REACTOR 和已 install 的 reactor 不一致，会直接
+# RuntimeError: The installed reactor X does not match the requested one Y。
+# 这里和 _job_launcher.py 保持相同的选择逻辑，避免不一致。
+if os.name == "nt":
+    # Windows 子进程：win32eventreactor（不依赖 asyncio，消息循环更稳）
+    TWISTED_REACTOR = "twisted.internet.win32eventreactor.Win32Reactor"
+else:
+    # POSIX：pollreactor（传统、高并发稳）
+    TWISTED_REACTOR = "twisted.internet.pollreactor.PollReactor"
 
 # === 项目基础 ===
 # Scrapy 查找模块的基包名
@@ -12,7 +24,7 @@ SPIDER_MODULES = ["src.services.crawler.scrapy_app.spiders"]
 # runspider 命令创建的新 Spider 会放在这个模块
 NEWSPIDER_MODULE = "src.services.crawler.scrapy_app.spiders"
 # robots.txt 是否遵守（Spider 自己还会走 fetcher._can_fetch 二次防御，这里也开着更合规）
-ROBOTSTXT_OBEY = True
+ROBOTSTXT_OBEY = False  # DEBUG 暂时关闭，避免部分站点 robots.txt 下载超时导致整个 job 卡住
 
 # === 并发限速 ===
 # 全局最大并发请求数（runner 可按 job 覆盖，默认 8）
@@ -22,7 +34,8 @@ CONCURRENT_REQUESTS_PER_DOMAIN = 2
 # 同一 IP 最大并发（0 = 不按 IP 限制，只按域名）
 CONCURRENT_REQUESTS_PER_IP = 0
 # 对同一个域名两次请求之间的最小延迟秒数（配合 AutoThrottle）
-DOWNLOAD_DELAY = 1.0
+# 注意：百度百科反爬比较严，之前 0.2~1.0s 触发了大量 403；临时调到 3s 更稳。
+DOWNLOAD_DELAY = 3.0
 # 禁用 cookies middleware（不需要登录，减少被 fingerprint 概率）
 COOKIES_ENABLED = False
 # Telnet console 默认关掉（避免端口占用，且子进程里根本不需要）
@@ -36,12 +49,22 @@ RETRY_TIMES = 2
 # 触发重试的 HTTP 状态码（5xx 为主，408/429 也算典型可重试）
 RETRY_HTTP_CODES = [408, 429, 500, 502, 503, 504, 522, 524]
 
+# === HttpErrorMiddleware 行为 ===
+# 默认 Scrapy 把非 2xx 响应直接丢进 errback（errmsg='Ignoring non-200 response'）。
+# 但百度百科 404 页面、重定向到的 error 页面等，body 里有时还有正文信息（或至少可用来做失败分析）。
+# 这里允许所有 HTTP 状态码进入 Spider.parse，由我们自己按 response.status 判定成败。
+HTTPERROR_ALLOW_ALL = True
+# 或者更保守：HTTPERROR_ALLOWED_CODES = [403, 404]
+# （注：2xx/3xx 默认允许，不用特意写在这里。）
+
 # === 中间件（Downloader / Spider） ===
-# Downloader middleware：Scrapy 默认顺序基础上注入 AutoThrottle + 自定义 UA
-DOWNLOADER_MIDDLEWARES = {
-    # Scrapy 自带的自动限速（根据响应延迟动态调）
-    "scrapy.downloadermiddlewares.autothrottle.AutoThrottleMiddleware": 800,
-}
+# 用 Scrapy 2.17 默认中间件（AutoThrottle 已默认集成，路径是
+# scrapy.downloadermiddlewares.auto_throttle.AutoThrottleMiddleware，与旧版不同；
+# 因此不再手动覆盖 DOWNLOADER_MIDDLEWARES，避免路径变更导致导入失败）
+#
+# DOWNLOADER_MIDDLEWARES = {}  # 留空 = 全用默认
+#
+# AutoThrottle 参数仍然生效（Scrapy 会读取这些 settings）：
 # AutoThrottle 起始并发（每个 domain）
 AUTOTHROTTLE_START_DELAY = 0.5
 # AutoThrottle 最大并发延迟（遇到 429/5xx 会升到这里）
@@ -52,14 +75,24 @@ AUTOTHROTTLE_TARGET_CONCURRENCY = 1.0
 AUTOTHROTTLE_DEBUG = False
 # 默认 User-Agent（浏览器 UA 伪装，避免被当成爬虫默认 UA 直接 ban）
 USER_AGENT = (
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-    "AppleWebKit/537.36 (KHTML, like Gecko) "
-    "Chrome/131.0.0.0 Safari/537.36"
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 )
-# 请求头默认值（Accept 等，更像正常浏览器）
+# 请求头默认值（更像真实 Chrome 浏览器，减少被百度百科/站点 WAF 拦截为 403 的概率）
 DEFAULT_REQUEST_HEADERS = {
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-    "Accept-Language": "zh-CN,zh;q=0.8,en-US;q=0.5,en;q=0.3",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+    "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+    "Accept-Encoding": "gzip, deflate, br",  # 注意：Scrapy 会自动处理编码，这个头用于假装浏览器
+    "Cache-Control": "max-age=0",
+    "Sec-Ch-Ua": '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+    "Sec-Ch-Ua-Mobile": "?0",
+    "Sec-Ch-Ua-Platform": '"Windows"',
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "same-origin",
+    "Sec-Fetch-User": "?1",
+    "Upgrade-Insecure-Requests": "1",
+    # Referer 从百度搜索页过来（常见的自然流量来源）
+    "Referer": "https://www.baidu.com/",
 }
 
 # === Pipeline ===
@@ -103,7 +136,7 @@ LOG_ENABLED = True
 
 # === HTTP 缓存（可选，避免重跑重复抓同一个 URL） ===
 # 开启 HTTPCACHE（临时缓存，断点续跑 / 同 URL 重复爬时很有用）
-HTTPCACHE_ENABLED = True
+HTTPCACHE_ENABLED = False  # DEBUG 暂时关闭，避免缓存了 403 的坏响应
 # 缓存过期秒数（默认 7 天 = 604800 秒）
 HTTPCACHE_EXPIRATION_SECS = 604800
 # 缓存目录（runner 会覆盖成 staging/_httpcache，这里给一个默认值仅作占位）

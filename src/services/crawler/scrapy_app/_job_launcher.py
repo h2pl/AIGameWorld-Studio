@@ -14,12 +14,18 @@ from __future__ import annotations
 
 import argparse
 import json
-import logging
 import os
 import sys
 import traceback
 from pathlib import Path
 from typing import Any
+
+# 作为顶层脚本启动（python path/to/_job_launcher.py）时，__package__ 是 None，
+# 相对 import 会失败："attempted relative import with no known parent package"。
+# 这里提前把项目根目录（src 的父目录）加到 sys.path，改用绝对 import。
+_PROJECT_ROOT = Path(__file__).resolve().parents[4]  # _job_launcher → scrapy_app → crawler → services → src → 项目根
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
 
 
 # 解析命令行：只接受 --args-file 参数
@@ -70,13 +76,14 @@ def _load_payload(path: str | Path) -> dict[str, Any]:
 # 参数 finished：是否标记 finished_at 时间戳
 # 参数 error_msg：可选的错误消息
 # 返回 None
-def _mark_job_safe(db_path: str | Path, job_id: str, status: str, *, finished: bool, error_msg: str | None = None) -> None:
+def _mark_job_safe(
+    db_path: str | Path, job_id: str, status: str, *, finished: bool, error_msg: str | None = None
+) -> None:
     # 延迟导入（失败了也不会让 launcher import 阶段崩）
     try:
-        # 导入 store 层函数
-        from ..store import update_job_status  # type: ignore
-        # 导入 SQLiteStore
-        from ....utils.sqlite_store import SQLiteStore as _S  # type: ignore
+        # 用绝对 import：项目根已加到 sys.path
+        from src.services.crawler.store import update_job_status
+        from src.utils.sqlite_store import SQLiteStore as _S
     except Exception as e:
         # 导入失败（import 路径不对之类）
         # 打印但不抛
@@ -123,6 +130,7 @@ def _install_reactor_early() -> None:
     # 不和 asyncio 有任何瓜葛"的 reactor 更稳定。
     # 用 importlib 绕过 early import 检查（Twisted 推荐的官方写法）
     import importlib
+
     # 根据平台挑 reactor 模块名
     if os.name == "nt":
         # Windows 子进程选 win32eventreactor（不依赖 asyncio、消息循环更稳）
@@ -160,9 +168,9 @@ def _main(payload: dict[str, Any]) -> int:
     # 延迟到这里 import；保证 reactor 已 install、且 runner.py（主进程）不需要 scrapy
     try:
         # Scrapy 设置对象
-        from scrapy.settings import Settings
         # CrawlerProcess（跨 spider 单进程跑）
         from scrapy.crawler import CrawlerProcess
+        from scrapy.settings import Settings
     except Exception as e:
         # Scrapy 未安装（没装 crawler 可选依赖）
         # 失败消息
@@ -202,15 +210,110 @@ def _main(payload: dict[str, Any]) -> int:
         # 返回失败退出码
         return 1
 
+    # --- 【关键】显式 import Spider 类，手动映射，避免 Scrapy SpiderLoader 的字符串查找问题 ---
+    # 这样做的好处：
+    #   1. 避开 Scrapy SpiderLoader 遍历 SPIDER_MODULES 子包 import 时可能吞掉异常的问题；
+    #   2. 显式 import 失败会直接 stderr 打印 traceback，方便排查；
+    #   3. 直接传 Spider 类给 CrawlerProcess.crawl()，行为更可预测。
+    print(f"[launcher] resolving spider class for name={spider_name!r}", file=sys.stderr, flush=True)
+    try:
+        if spider_name == "topic_search":
+            from src.services.crawler.scrapy_app.spiders.topic_search import TopicSearchSpider as _SpiderCls
+        elif spider_name == "generic_crawl":
+            from src.services.crawler.scrapy_app.spiders.generic import GenericCrawlSpider as _SpiderCls
+        else:
+            err = f"unknown spider_name: {spider_name!r} (expected 'topic_search' or 'generic_crawl')"
+            print(f"[launcher] {err}", file=sys.stderr)
+            _mark_job_safe(db_path, job_id, "failed", finished=True, error_msg=err)
+            return 1
+        print(
+            f"[launcher] resolved spider class: {_SpiderCls.__module__}.{_SpiderCls.__name__}",
+            file=sys.stderr,
+            flush=True,
+        )
+    except Exception as _e:
+        # import Spider 失败（比如模块内部有语法错误或依赖缺失）
+        print(f"[launcher] import spider class FAILED: {type(_e).__name__}: {_e}", file=sys.stderr)
+        traceback.print_exc(file=sys.stderr)
+        _mark_job_safe(db_path, job_id, "failed", finished=True, error_msg=f"ImportSpider: {type(_e).__name__}: {_e}")
+        return 1
+
+    # --- 【关键 2】构造 Crawler 对象 + 监听 spider_opened 信号，解决 Scrapy 2.17 不自动调 start_requests() 的问题 ---
+    #
+    # 问题背景（已在 _debug_launcher_env.py 中最小复现并验证修复方案有效）：
+    #   在 Windows + Python 3.14 + Scrapy 2.17 环境下，若调用 CrawlerProcess.crawl(SpiderClass, **kwargs)
+    #   传入 Spider 类，Engine 在 Spider opened 后不会自动调用 spider.start_requests()，导致整个
+    #   spider 在 0.001s 内 finish，没有任何请求发出。
+    # 修复方案：
+    #   1. 先显式构造 Crawler(SpiderClass, scrapy_settings) 对象；
+    #   2. 监听 crawler.signals 的 spider_opened；
+    #   3. 在回调中：拿到 spider 实例 → 手动调用 spider.start_requests() → 遍历产生的 Request，
+    #      用 crawler.engine.crawl(req) 逐个塞进 Scheduler（Engine.crawl 在 Scrapy 2.17 中只接受
+    #      一个 positional argument，spider 关联由 Engine 当前打开的 slot 自动完成）；
+    #   4. 最后调用 process.crawl(crawler, **spider_kwargs) 把 Crawler 对象交给 Process 调度。
+    #   这样完全绕开 Scrapy 自身 "自动调 start_requests" 这条有 bug 的代码路径。
+    #
+    from scrapy import signals as _scrapy_signals
+    from scrapy.crawler import Crawler as _ScrapyCrawler
+
+    crawler = _ScrapyCrawler(_SpiderCls, scrapy_settings)
+    _sr_flag_done = False  # 防止 signal 被多次触发时重复调 start_requests
+
+    def _on_spider_opened(*_args, **_kwargs):
+        nonlocal _sr_flag_done
+        _spider_ref = _kwargs.get("spider") or (_args[0] if _args else None)
+        if not _spider_ref or _sr_flag_done:
+            return
+        _sr_flag_done = True
+
+        # 【关键】reactor.callLater(0, ...)：把"调 start_requests + 塞 Request"推迟到下一个 reactor tick。
+        # 原因：spider_opened 信号会触发多个中间件（尤其是 OffsiteMiddleware）的初始化，
+        #   OffsiteMiddleware.spider_opened 会初始化 self.host_regex；
+        #   而一旦我们把 Request 塞给 Engine，它立即会发 request_scheduled 信号，
+        #   OffsiteMiddleware.request_scheduled 又需要 host_regex。
+        #   如果 spider_opened 信号回调的连接顺序是：
+        #     我们的回调 → OffsiteMiddleware.request_scheduled → OffsiteMiddleware.spider_opened
+        #   就会在塞 Request 时遇到 AttributeError: host_regex。
+        #   推迟到下一个 reactor tick，可以确保 spider_opened 的**所有**回调都先跑完。
+        def _enqueue_later():
+            try:
+                _req_iter = _spider_ref.start_requests()
+                _req_list = list(_req_iter or [])
+                print(
+                    f"[launcher.signal/spider_opened(callLater)] start_requests() => "
+                    f"{len(_req_list)} requests, enqueueing via engine.crawl(req) ...",
+                    file=sys.stderr,
+                    flush=True,
+                )
+                for _r in _req_list:
+                    crawler.engine.crawl(_r)
+            except Exception as _e:
+                print(
+                    f"[launcher.signal/spider_opened(callLater)] ERROR while enqueueing "
+                    f"start_requests: {type(_e).__name__}: {_e}",
+                    file=sys.stderr,
+                    flush=True,
+                )
+                traceback.print_exc(file=sys.stderr)
+
+        try:
+            from twisted.internet import reactor as _tw_reactor
+
+            _tw_reactor.callLater(0, _enqueue_later)
+        except Exception:
+            # 万一 reactor 还没好（罕见），直接立即塞，总比啥都不做强
+            _enqueue_later()
+
+    crawler.signals.connect(_on_spider_opened, signal=_scrapy_signals.spider_opened)
+
     # 启动爬虫（blocking 直到爬完或崩溃）
     # 外层 try 捕获 reactor 跑起来之后任何未被 Scrapy 自身处理的异常
     # Scrapy 设计上 crawl 过程里 spider 级别的错误会自己记在 stats 里，不会抛到 process.start 外层
     # 但我们还是加一层兜底，极端情况下保证把 DB 标为 failed
     fatal_err: str | None = None
     try:
-        # 注册 spider 到 CrawlerProcess
-        # CrawlerProcess.crawl 返回 Deferred；我们用 start() 阻塞直到 reactor 退出
-        process.crawl(spider_name, **spider_kwargs)
+        # 【关键】把 Crawler 对象（不是 Spider 类）交给 Process，并附带 spider 构造 kwargs
+        process.crawl(crawler, **spider_kwargs)
         # 阻塞运行 reactor 直到爬取结束
         process.start(install_signal_handlers=True)
     except Exception as e:

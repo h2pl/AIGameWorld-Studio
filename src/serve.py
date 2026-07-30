@@ -29,8 +29,9 @@ import argparse
 import contextlib
 import json
 import time
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
 # 第三方库导入（uvicorn / yaml / FastAPI 生态）
 import uvicorn
@@ -69,6 +70,7 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 # ---------------------------------------------------------------------------
 # Helpers (对应原来 _load_yaml / _load_yaml_all)
 # ---------------------------------------------------------------------------
+
 
 # 单个 YAML 文件安全读取：不存在或解析失败返回 None
 def _load_yaml(path: Path) -> dict | None:
@@ -109,9 +111,7 @@ def create_app(
     """构建 FastAPI 实例（所有路由 + 全局状态注入）."""
     global SOURCE_DIR_GLOBAL
     SOURCE_DIR_GLOBAL = (
-        Path(pack_dir).expanduser().resolve()
-        if Path(pack_dir).is_absolute()
-        else (PROJECT_ROOT / pack_dir).resolve()
+        Path(pack_dir).expanduser().resolve() if Path(pack_dir).is_absolute() else (PROJECT_ROOT / pack_dir).resolve()
     )
     chroma_path = Path(chroma_path).expanduser().resolve()
     data_dir = Path(data_dir).expanduser().resolve()
@@ -152,14 +152,16 @@ def create_app(
                 if not d.is_dir() or not (d / "meta.yaml").exists():
                     continue
                 meta = _load_yaml(d / "meta.yaml") or {}
-                packs.append({
-                    "id": d.name,
-                    "name": meta.get("name", d.name),
-                    "description": meta.get("description", ""),
-                    "version": meta.get("version", ""),
-                    "author": meta.get("author", ""),
-                    "entities_count": max(0, sum(1 for _ in d.rglob("*.yaml")) - 1),
-                })
+                packs.append(
+                    {
+                        "id": d.name,
+                        "name": meta.get("name", d.name),
+                        "description": meta.get("description", ""),
+                        "version": meta.get("version", ""),
+                        "author": meta.get("author", ""),
+                        "entities_count": max(0, sum(1 for _ in d.rglob("*.yaml")) - 1),
+                    }
+                )
         return packs
 
     # --- Web UI: 静态资源（可选） ---
@@ -185,12 +187,14 @@ def create_app(
                 if not meta_path.exists():
                     continue
                 meta = _load_yaml(meta_path) or {}
-                packs.append({
-                    "id": d.name,
-                    "name": meta.get("name", d.name),
-                    "desc": meta.get("description", ""),
-                    "total": max(0, sum(1 for _ in d.rglob("*.yaml")) - 1),
-                })
+                packs.append(
+                    {
+                        "id": d.name,
+                        "name": meta.get("name", d.name),
+                        "desc": meta.get("description", ""),
+                        "total": max(0, sum(1 for _ in d.rglob("*.yaml")) - 1),
+                    }
+                )
         return templates.TemplateResponse(
             request=request,
             name="index_yaml.html",
@@ -311,6 +315,7 @@ def create_app(
 # Lifespan / 入口
 # ---------------------------------------------------------------------------
 
+
 # FastAPI lifespan 上下文管理器：目前占位，后续可放异步 worker 初始化
 @contextlib.contextmanager
 def _serve_lifespan(app: FastAPI) -> Iterator[None]:
@@ -334,7 +339,9 @@ def run(
     与旧版 ``aw-studio serve`` CLI 完全兼容：参数顺序、默认值都不变。
     """
     root = str(pack_dir)
-    print(f"YAML Packs 目录: {(Path(pack_dir) if Path(pack_dir).is_absolute() else (PROJECT_ROOT / pack_dir)).resolve()}")
+    print(
+        f"YAML Packs 目录: {(Path(pack_dir) if Path(pack_dir).is_absolute() else (PROJECT_ROOT / pack_dir)).resolve()}"
+    )
     print(f"Studio Web UI : http://{host}:{port}")
     print(f"  · Pack 列表 : http://{host}:{port}/")
     print(f"  · 知识库 UI : http://{host}:{port}/kb (upload/docs/search/jobs)")
@@ -391,7 +398,8 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     )
     # === 日志参数 ===
     p.add_argument(
-        "-v", "--verbose",
+        "-v",
+        "--verbose",
         action="store_true",
         help="打印 uvicorn access log + info log",
     )
@@ -415,4 +423,3 @@ if __name__ == "__main__":
         log_level="info" if args.verbose else "warning",
         access_log=bool(args.verbose),
     )
-

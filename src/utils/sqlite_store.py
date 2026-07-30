@@ -11,25 +11,35 @@ from __future__ import annotations
 import logging
 import sqlite3
 import threading
+from collections.abc import Iterable, Sequence
 from pathlib import Path
-from typing import Any, Iterable, Optional, Sequence
+from typing import Any
 
 # 模块级 logger
 _log = logging.getLogger(__name__)
+
+
+# 全局唯一 ID：UUID4 hex（32 位十六进制，不带短横，DB/文件名友好）
+import uuid as _uuid
 
 
 # 轻量 SQLite 封装类
 class SQLiteStore:
     # 构造：打开或创建 DB
     # 参数 path：SQLite 文件路径
-    # 参数 auto_init_crawler：是否自动初始化 crawler 相关表
+    # 参数 auto_init_crawler：是否自动初始化 crawler 相关表（默认 False，新架构统一走 migrations 目录）
     # 参数 pragmas：可选的 PRAGMA 列表（默认 WAL / 外键 / 同步级别）
+    @staticmethod
+    def new_id() -> str:
+        """生成全局唯一 ID（UUID4 hex，32 位十六进制，不带短横，DB/URL/文件名友好）."""
+        return _uuid.uuid4().hex
+
     def __init__(
         self,
         path: str | Path,
         *,
-        auto_init_crawler: bool = True,
-        pragmas: Optional[Iterable[str]] = None,
+        auto_init_crawler: bool = False,  # 默认关：新架构用 migrations/ 统一建表，避免两套 schema 冲突
+        pragmas: Iterable[str] | None = None,
     ):
         # 路径转 Path
         self._path = Path(path)
@@ -77,6 +87,16 @@ class SQLiteStore:
         if auto_init_crawler:
             # 执行建表 SQL（幂等）
             self._init_crawler_schema()
+
+    # ------------------------------------------------------------------
+    # 公共属性 / helpers
+    # ------------------------------------------------------------------
+
+    # DB 文件绝对路径（CrawlerService 启动 Scrapy 子进程时需要知道 DB 路径给子进程用）
+    @property
+    def db_path(self) -> Path:
+        """返回 SQLite 文件的绝对路径."""
+        return self._path.resolve()
 
     # 初始化 crawler 三张表（IF NOT EXISTS）
     # 返回 None
@@ -228,7 +248,7 @@ class SQLiteStore:
     # 参数 sql：SELECT 语句
     # 参数 params：参数元组
     # 返回 Optional[dict]：Row 转 dict，没结果 None
-    def fetchone(self, sql: str, params: Sequence[Any] = ()) -> Optional[dict[str, Any]]:
+    def fetchone(self, sql: str, params: Sequence[Any] = ()) -> dict[str, Any] | None:
         # 加锁
         with self._lock:
             try:
@@ -244,6 +264,9 @@ class SQLiteStore:
             return None
         # 转 dict（sqlite3.Row 本身是映射，但上层 isinstance(dict) 判断可能 False，所以明确转 dict）
         return {k: row[k] for k in row.keys()}
+
+    # 兼容 store.py 的 fetch_one（带下划线）调用方式
+    fetch_one = fetchone
 
     # 执行查询 SQL，拿所有行（空结果返回 []）
     # 参数 sql：SELECT 语句
@@ -269,6 +292,9 @@ class SQLiteStore:
         # 返回列表
         return out
 
+    # 兼容 store.py 的 fetch_all（带下划线）调用方式
+    fetch_all = fetchall
+
     # 关闭 SQLite 连接（幂等）
     # 返回 None
     def close(self) -> None:
@@ -284,3 +310,54 @@ class SQLiteStore:
                     pass
                 # 置 None，防重复关
                 self._conn = None
+
+    # ------------------------------------------------------------------
+    # Migrations
+    # ------------------------------------------------------------------
+
+    # 按文件名前缀数字排序执行 migrations 目录下的 *.sql，幂等（用 _migrations 表记录已执行）
+    # 参数 migrations_dir：包含 0001_xxx.sql / 0002_xxx.sql 的目录
+    # 返回 list[str]：本次新执行过的文件名（空列表 = 全部已执行过）
+    def run_migrations(self, migrations_dir: str | Path) -> list[str]:
+        """幂等执行 migrations_dir 下的 .sql 文件，按编号升序."""
+        md = Path(migrations_dir).resolve()
+        if not md.is_dir():
+            _log.warning("run_migrations: migrations dir not found: %s", md)
+            return []
+
+        with self._lock:
+            # 建元表：记录已执行过的文件名
+            self._conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS _migrations (
+                    filename   TEXT PRIMARY KEY,
+                    applied_at INTEGER NOT NULL DEFAULT (unixepoch('subsec') * 1000)
+                )
+                """
+            )
+            self._conn.commit()
+
+            # 列出目录下全部 .sql，按文件名排序
+            sql_files = sorted([p for p in md.iterdir() if p.is_file() and p.suffix.lower() == ".sql"])
+
+            applied: list[str] = []
+            for fp in sql_files:
+                name = fp.name
+                # 查是否已执行
+                row = self._conn.execute("SELECT 1 FROM _migrations WHERE filename = ?", (name,)).fetchone()
+                if row is not None:
+                    continue  # 已跑过，跳过
+
+                # 读文件内容，executescript 批量执行（多个 SQL 语句）
+                sql = fp.read_text(encoding="utf-8")
+                try:
+                    self._conn.executescript(sql)
+                    self._conn.execute("INSERT INTO _migrations (filename) VALUES (?)", (name,))
+                    self._conn.commit()
+                    applied.append(name)
+                    _log.info("run_migrations: applied %s", name)
+                except Exception:
+                    self._conn.rollback()
+                    _log.exception("run_migrations FAILED at file: %s", name)
+                    raise
+            return applied

@@ -1,4 +1,4 @@
-"""一键索引魔兽世界编年史到 kb_wow_worldview collection（BGE-M3 embedding + Qdrant）.
+r"""一键索引魔兽世界编年史到 kb_wow_worldview collection（BGE-M3 embedding + Qdrant）.
 
 做的事情：
   1. 实例化 KnowledgeManager（自动跑 migrations、初始化 Qdrant Factory）
@@ -13,6 +13,7 @@
   cd E:\Projects\AIGameWorld-Studio
   uv run python scripts/ingest_wow_chronicles.py
 """
+
 from __future__ import annotations
 
 import json
@@ -46,7 +47,7 @@ def main() -> int:
         mds = sorted(kb_dir.glob("*.md"))
         print(f"      找到 {len(mds)} 个 Markdown 文件:")
         for m in mds:
-            print(f"        - {m.name}  ({m.stat().st_size//1024} KB)")
+            print(f"        - {m.name}  ({m.stat().st_size // 1024} KB)")
     else:
         print(f"      ❌ 目录不存在: {kb_dir}")
         return 2
@@ -60,7 +61,7 @@ def main() -> int:
     print()
     print(f"[2/3] 开始索引 topic={topic} mode=incremental（SHA256 去重）")
     result = mgr.index(topic)
-    print(f"      index() 返回:")
+    print("      index() 返回:")
     print(json.dumps(result, ensure_ascii=False, indent=2, default=str))
 
     print()
@@ -93,9 +94,11 @@ def main() -> int:
             chunk_idx = meta.get("chunk_index")
             text = (h.get("text") or "").replace("\n", " ").strip()
             short_text = text[:120] + ("…" if len(text) > 120 else "")
-            print(f"      #{rank}  score={score:.4f}  doc={doc_id}"
-                  + (f" chunk={chunk_idx}" if chunk_idx is not None else "")
-                  + f"\n        {short_text}")
+            print(
+                f"      #{rank}  score={score:.4f}  doc={doc_id}"
+                + (f" chunk={chunk_idx}" if chunk_idx is not None else "")
+                + f"\n        {short_text}"
+            )
 
     print("\n✅ 索引完成！")
     print("   UI 管理: http://127.0.0.1:5173/kb")

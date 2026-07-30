@@ -2,16 +2,18 @@
 
 # ---- 导入依赖 ----
 from __future__ import annotations
+
 # 启用类型注解的前向引用支持
-
 from typing import Any
-# 导入任意类型注解
 
+# 导入任意类型注解
 from pydantic import BaseModel, Field
+
 # 导入 Pydantic 基础模型和字段定义
 
 
 # === 请求 / Request Models ===
+
 
 class SearchRequest(BaseModel):
     # 必填：搜索关键词，长度1-500
@@ -44,10 +46,12 @@ class PromoteRequest(BaseModel):
     # 指定要promote的条目ID，None=全部
     item_ids: list[str] | None = Field(None, description="指定提升的 item id 列表；None=全部")
 
+
 # === 请求模型分组结束 ===
 
 
 # === 响应 / Response Models ===
+
 
 class SearchResultItem(BaseModel):
     # 搜索结果标题
@@ -175,5 +179,6 @@ class DiscardResponse(BaseModel):
     job_id: str
     # 暂存区目录是否已成功删除
     staging_removed: bool
+
 
 # === 响应模型分组结束 ===

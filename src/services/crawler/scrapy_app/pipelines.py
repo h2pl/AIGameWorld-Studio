@@ -7,6 +7,19 @@
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path as _Path
+
+# Scrapy 加载本模块时相对 import 点数容易数错（pipelines 在 scrapy_app 下，store 在 crawler 下是 3 个点），
+# 用绝对 import 更稳：把项目根加到 sys.path，再用 from src.services.crawler.xxx import。
+if not hasattr(sys, "_ag_project_root_injected"):
+    _pr = (
+        _Path(__file__).resolve().parents[3]
+    )  # pipelines → scrapy_app → crawler → services → src → 项目根（4 次 parents）
+    if str(_pr) not in sys.path:
+        sys.path.insert(0, str(_pr))
+    sys._ag_project_root_injected = True
+
 import json
 import logging
 import time
@@ -188,38 +201,86 @@ class SQLiteWritePipeline:
         # 延迟导入（import 失败不影响 Scrapy 跑起来，只是不回写 DB）
         try:
             # 导入 SQLiteStore 类
-            from ......utils.sqlite_store import SQLiteStore  # 延迟导入
-            # 导入 crawler store 函数
-            from ..store import (  # type: ignore
-                create_job,
-                get_job,
-                update_job_status,
-                create_item,
-                update_item_fetched,
-                mark_item_failed,
-            )
-            # SQLiteStore 类缓存
-            self._SQLiteStore = SQLiteStore
-            # store 层函数缓存
-            self._fn_create_job = create_job
-            self._fn_get_job = get_job
-            self._fn_update_job_status = update_job_status
-            self._fn_create_item = create_item
-            self._fn_update_item_fetched = update_item_fetched
-            self._fn_mark_item_failed = mark_item_failed
-            # 导入成功才打开连接
-            if self._db_path:
-                # 打开 SQLite 连接
-                self._store = SQLiteStore(Path(self._db_path))
+            from src.utils.sqlite_store import SQLiteStore  # 延迟导入（绝对 import，避免点数错）
         except Exception as e:
-            # store 不可用（比如服务没配置 crawler），那就整个 pipeline 退化成空操作
-            # 记 warning
-            self._log.warning("SQLiteWritePipeline disabled: import store failed: %s", e)
-            # 清空连接
+            self._log.warning("SQLiteWritePipeline disabled: import SQLiteStore failed: %s", e)
             self._store = None
-            # 函数清空
             self._SQLiteStore = None
-            self._fn_create_job = None
+        else:
+            self._SQLiteStore = SQLiteStore
+            # store 层函数：逐个 try/except，不存在的函数设 None，不影响其他功能
+            _import_failed = False
+            try:
+                from src.services.crawler.store import create_job as _cjob
+            except Exception as e:
+                self._log.warning("import create_job failed: %s", e)
+                _cjob = None
+                _import_failed = True
+            try:
+                from src.services.crawler.store import get_job as _gjob
+            except Exception as e:
+                self._log.warning("import get_job failed: %s", e)
+                _gjob = None
+                _import_failed = True
+            try:
+                from src.services.crawler.store import update_job_status as _ujstat
+            except Exception as e:
+                self._log.warning("import update_job_status failed: %s", e)
+                _ujstat = None
+                _import_failed = True
+            try:
+                from src.services.crawler.store import create_item as _citem
+            except Exception as e:
+                self._log.warning("import create_item failed: %s", e)
+                _citem = None
+                _import_failed = True
+            try:
+                from src.services.crawler.store import update_item_fetched as _uifetched
+            except Exception as e:
+                self._log.warning("import update_item_fetched failed: %s", e)
+                _uifetched = None
+                _import_failed = True
+            try:
+                from src.services.crawler.store import mark_item_failed as _mifailed
+            except Exception:
+                # mark_item_failed 在某些版本的 store.py 里可能不存在（不是核心功能），跳过即可
+                _mifailed = None
+
+            if _import_failed:
+                # 只有关键函数导入失败才禁用 pipeline（mark_item_failed 失败不影响）
+                if not (_cjob and _gjob and _ujstat and _citem and _uifetched):
+                    self._log.warning("SQLiteWritePipeline disabled: critical store functions missing")
+                    self._store = None
+                    self._SQLiteStore = None
+                else:
+                    # 只是 mark_item_failed 缺了，继续用
+                    self._fn_create_job = _cjob
+                    self._fn_get_job = _gjob
+                    self._fn_update_job_status = _ujstat
+                    self._fn_create_item = _citem
+                    self._fn_update_item_fetched = _uifetched
+                    self._fn_mark_item_failed = _mifailed
+                    if self._db_path:
+                        try:
+                            self._store = SQLiteStore(Path(self._db_path))
+                        except Exception as e:
+                            self._log.warning("SQLiteWritePipeline disabled: open DB failed: %s", e)
+                            self._store = None
+                            self._SQLiteStore = None
+            else:
+                self._fn_create_job = _cjob
+                self._fn_get_job = _gjob
+                self._fn_update_job_status = _ujstat
+                self._fn_create_item = _citem
+                self._fn_update_item_fetched = _uifetched
+                self._fn_mark_item_failed = _mifailed
+                if self._db_path:
+                    try:
+                        self._store = SQLiteStore(Path(self._db_path))
+                    except Exception as e:
+                        self._log.warning("SQLiteWritePipeline disabled: open DB failed: %s", e)
+                        self._store = None
+                        self._SQLiteStore = None
 
     # Scrapy from_crawler：构造实例 + 绑定信号
     # 参数 crawler：Scrapy Crawler 实例
@@ -289,50 +350,60 @@ class SQLiteWritePipeline:
         # item 属于哪个 job（可能和 self._job_id 不同；我们写回它自己的 job）
         item_job_id = item.get("job_id") or self._job_id
         # 抓取状态（ok/failed，None 视为 ok）
-        status = item.get("status") or "ok"
+        item_status = item.get("status") or "ok"
         # 错误消息（仅 failed 时用）
         error_msg = item.get("error") or None
 
-        # item 不存在（service 层同步回退没建 item）：先补建一条，再更新状态
-        # 有 mark_item_failed 才支持失败分支
-        if status == "failed" and self._fn_mark_item_failed:
-            # 该 item 失败
-            try:
-                # 失败落 DB：content/status/error_msg
-                self._fn_mark_item_failed(
-                    # SQLiteStore
-                    self._store,
-                    # item ID
-                    item_id,
-                    # 错误消息
-                    error_msg=str(error_msg)[:500] if error_msg else None,
-                )
-            except Exception:
-                # DB 写失败记日志
-                self._log.exception("mark_item_failed failed: item_id=%s", item_id)
-        else:
-            # 成功分支：标 fetched 并写正文
-            try:
-                # 更新 crawler_item：content + status=fetched + fetched_at
-                self._fn_update_item_fetched(
-                    # SQLiteStore
-                    self._store,
-                    # item ID
-                    item_id,
-                    # Markdown 正文
-                    content=item.get("content") or "",
-                    # 标题
-                    title=item.get("title") or "",
-                    # 作者
-                    author=item.get("author") or "",
-                    # 抓取时间戳 ms（默认当前时间）
-                    fetched_at=item.get("fetched_at") or int(time.time() * 1000),
-                    # 大小
-                    size_bytes=item.get("size") or 0,
-                )
-            except Exception:
-                # DB 写失败记日志
-                self._log.exception("update_item_fetched failed: item_id=%s", item_id)
+        # 统一用 update_item_fetched（store.py 里 mark_item_failed 不存在）
+        # 成功: status="fetched", 失败: status="failed" + error_msg
+        try:
+            # 目标内容类型
+            ct = item.get("content_type") or ""
+            # 文件路径 & 大小：PDF 类型用 attachments 下的真实 PDF 文件，其它用 {item_id}.md
+            if self._staging_dir:
+                if ct == "pdf":
+                    # PDF：主文件指向 attachments/{item_id}/source.pdf（由 StagingWritePipeline 写入）
+                    pdf_path = Path(self._staging_dir) / "attachments" / str(item_id) / "source.pdf"
+                    rel_or_abs = str(pdf_path)
+                    # PDF 文件大小：取 html_bytes 的长度（即原始响应字节数）
+                    html_bytes: bytes = item.get("html_bytes") or b""
+                    sz = len(html_bytes)
+                else:
+                    # HTML/其它：主文件是正文 Markdown
+                    rel_or_abs = str(Path(self._staging_dir) / f"{item_id}.md")
+                    sz = int(item.get("size") or 0)
+            else:
+                rel_or_abs = None
+                sz = int(item.get("size") or 0)
+            # sha256：staging 阶段暂时不计算（promote 时再算），留空
+            sha = None
+
+            db_status = "failed" if item_status == "failed" else "fetched"
+            db_error = str(error_msg)[:500] if error_msg else None
+
+            self._fn_update_item_fetched(
+                # SQLiteStore
+                self._store,
+                # item ID
+                item_id,
+                # 内容类型（必填）
+                content_type=ct,
+                # 文件路径（staging 下 {item_id}.md）
+                file_path=rel_or_abs,
+                # 字节大小
+                file_size=sz,
+                # sha256（staging 阶段暂空）
+                sha256=sha,
+                # 标题（非 None 才会更新）
+                title=item.get("title") or None,
+                # 错误消息（仅失败时有值）
+                error_msg=db_error,
+                # DB 状态 fetched/failed
+                status=db_status,
+            )
+        except Exception:
+            # DB 写失败记日志
+            self._log.exception("update_item_fetched failed: item_id=%s", item_id)
 
         # --- 自增 done_count + 随时把 job.done_items 同步到 DB ---
         # 成功抓取才计入 done_count（失败也计入 done_count 吗？失败的条也算"处理完"，便于 job 结束判断）

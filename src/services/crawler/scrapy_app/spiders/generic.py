@@ -12,14 +12,28 @@ Spider 内部会复用 :mod:`fetcher` 的 HTML→Markdown、robots 检查等逻�
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path as _Path
+
+# 本模块被 Scrapy 动态加载时相对 import 的点数容易数错（spiders/generic → crawler/fetcher 是 3 个点），
+# 这里用绝对 import：把项目根加到 sys.path，再用 from src.services.crawler.xxx import。
+if not hasattr(sys, "_ag_project_root_injected"):
+    _pr = (
+        _Path(__file__).resolve().parents[4]
+    )  # generic → spiders → scrapy_app → crawler → services → src → 项目根（5层往上，4 次 parents）
+    if str(_pr) not in sys.path:
+        sys.path.insert(0, str(_pr))
+    sys._ag_project_root_injected = True
+
 import logging
-from typing import Any, Iterable, Optional
+from collections.abc import Iterable
+from typing import Any
 from urllib.parse import urlparse
 
 import scrapy
 from itemloaders.processors import TakeFirst
-from scrapy.loader import ItemLoader
 from scrapy.item import Field, Item
+from scrapy.loader import ItemLoader
 
 # 本模块 logger
 _log = logging.getLogger(__name__)
@@ -58,7 +72,7 @@ class CrawlerItem(Item):
 
 
 # 按 URL 抓的通用 Spider
-class GenericSpider(scrapy.Spider):
+class GenericCrawlSpider(scrapy.Spider):
     # Spider 名（CrawlerProcess.crawl() 要对应上）
     name = "generic_crawl"
 
@@ -77,8 +91,8 @@ class GenericSpider(scrapy.Spider):
         job_id: str,
         seed_urls: list[str],
         url_item_ids: dict[str, str],
-        url_titles: Optional[dict[str, str]] = None,
-        allowed_domains: Optional[list[str]] = None,
+        url_titles: dict[str, str] | None = None,
+        allowed_domains: list[str] | None = None,
         follow_links: bool = False,
         follow_depth: int = 0,
         **kwargs,
@@ -123,15 +137,28 @@ class GenericSpider(scrapy.Spider):
         self.total_items = len(self._seed_urls)
         # Spider 自己的 logger（Scrapy 会注入，也可用 _log）
         self._spider_log = logging.getLogger(f"{__name__}.GenericSpider")
+        # 实例化日志（stderr 直接打，避免 Scrapy 的 logger 配置吞掉）
+        import sys as _sys_init_g
+
+        print(
+            f"[GenericSpider.__init__] instance created: "
+            f"job_id={self.job_id!r} seed_urls={len(self._seed_urls)} "
+            f"db_path={getattr(self, '_db_path_str', None)!r} allowed_domains={self.allowed_domains!r}",
+            file=_sys_init_g.stderr,
+            flush=True,
+        )
 
     # Scrapy 入口：yield 初始 Request
     # 返回 Iterable[scrapy.Request]：种子 URL 的 Request 列表
     def start_requests(self) -> Iterable[scrapy.Request]:
-        # 导入 fetcher 的 robots 检查（延迟导入：Spider 真正跑起来才 import）
-        from ..fetcher import _can_fetch, _rate_limit_init
-        # 初始化 httpx.Client（用于 robots 检查）
-        _rate_limit_init()
+        # Scrapy 自带：
+        #   - ROBOTSTXT_OBEY=True 的 RobotsTxtMiddleware
+        #   - DOWNLOAD_DELAY + AutoThrottle settings
+        # 所以这里不再依赖 fetcher 的 _rate_limit_init / _http_client 做额外控制。
+        import sys as _sys_g
 
+        reqs: list[scrapy.Request] = []
+        print(f"[generic.start_requests] ENTER: {len(self._seed_urls)} seed urls", file=_sys_g.stderr, flush=True)
         # 遍历种子 URL
         for url in self._seed_urls:
             # 对应 item_id（没有就按 URL hash 兜底生成一个，保证 pipeline 不崩）
@@ -168,12 +195,16 @@ class GenericSpider(scrapy.Spider):
                 priority=10,
             )
             # 产出 Request
-            yield req
+            reqs.append(req)
+        print(f"[generic.start_requests] returning list of {len(reqs)} requests", file=_sys_g.stderr, flush=True)
+        return reqs
 
     # 种子 URL 请求失败（超时、DNS、5xx 超过重试次数等）
     # 参数 failure：Scrapy Twisted Failure 对象
     # 返回 CrawlerItem：标记为 failed 的 item
     def _errback_seed(self, failure) -> CrawlerItem:
+        import sys as _sys_err
+
         # 从 request 里拿 meta
         request = getattr(failure, "request", None)
         # 原始 URL
@@ -189,6 +220,11 @@ class GenericSpider(scrapy.Spider):
         except Exception:
             # 兜底：转字符串
             msg = str(failure)
+        print(
+            f"[generic._errback_seed] ENTER: url={url!r} msg={msg[:100]!r}",
+            file=_sys_err.stderr,
+            flush=True,
+        )
         # 组装失败 Item（直接走 pipeline 写 DB，不走文件内容）
         loader = ItemLoader(item=CrawlerItem())
         # item_id
@@ -212,19 +248,23 @@ class GenericSpider(scrapy.Spider):
         # 错误信息（300 字符防溢出）
         loader.add_value("error", msg[:300])
         # 返回组装好的 Item
-        return loader.load_item()
+        item = loader.load_item()
+        print(
+            f"[generic._errback_seed] YIELD item: item_id={item.get('item_id')!r} "
+            f"status={item.get('status')!r} content_len={len(item.get('content') or '')}",
+            file=_sys_err.stderr,
+            flush=True,
+        )
+        return item
 
     # 解析响应：HTML→Markdown + 可选追链
     # 参数 response：Scrapy 响应对象（text/body 都有）
     # 返回 Iterable[CrawlerItem | scrapy.Request]：item 或继续 follow 的请求
     def parse(self, response: scrapy.http.Response) -> Iterable[Any]:
-        # 延迟导入 fetcher 的转换函数
-        from ..fetcher import (
-            _detect_content_type,
-            _can_fetch,
-            _rate_limit_wait,
-            _html_to_markdown,
-        )
+        import sys as _sys_parse
+
+        # 延迟导入 fetcher 的 HTML→Markdown 转换（其它函数要么不存在，要么由 Scrapy 自身机制替代）
+        from src.services.crawler.fetcher import _html_to_markdown
 
         # meta
         meta = response.meta
@@ -241,35 +281,140 @@ class GenericSpider(scrapy.Spider):
         # 预填标题
         pre_title = meta.get("pre_title") or ""
 
-        # --- HTTP 状态码判断（4xx 一律算失败） ---
-        # 4xx 状态码（不是 5xx，5xx 会被 Downloader 重试）
-        if 400 <= response.status < 500:
-            # 种子 URL：返回失败 item（保证 job 会计数）
-            item_id = seed_item_id or f"auto-{abs(hash(url)):x}"
-            # 组装失败 item
-            loader = ItemLoader(item=CrawlerItem())
-            loader.add_value("item_id", item_id)
-            loader.add_value("job_id", self.job_id)
-            loader.add_value("url", url)
-            loader.add_value("title", "")
-            loader.add_value("domain", domain)
-            loader.add_value("content_type", "")
-            loader.add_value("size", 0)
-            loader.add_value("content", "")
-            loader.add_value("status", "failed")
-            loader.add_value("error", f"HTTP {response.status}")
-            # 产出失败 item
-            yield loader.load_item()
-            # 结束解析
+        print(
+            f"[generic.parse] ENTER status={response.status} url={url!r} "
+            f"body_len={len(response.body or b'')} is_seed={is_seed}",
+            file=_sys_parse.stderr,
+            flush=True,
+        )
+
+        # --- 先拿原始响应字节（可能后面被 httpx 降级覆盖） ---
+        body_bytes: bytes = bytes(response.body or b"")
+        # HTTP 响应头（降级后可能也要更新，所以这里先记变量）
+        ct_header: str = response.headers.get("Content-Type", b"").decode("latin-1", errors="ignore")
+
+        # --- HTTP 状态码判断：403/429/451/5xx 等 Scrapy TLS 指纹常被挡的情况，一律降级 httpx 直连 ---
+        # 之前只针对 PDF 降级，但百度百科/灰机 Wiki/NGA 论坛等对 Scrapy TLS 指纹一律 403，
+        # 用 httpx + http2 + Chrome  UA headers 基本都能正常拿到 HTML。
+        url_lower = url.lower()
+        looks_like_pdf_url = (
+            url_lower.endswith(".pdf")
+            or "filetype=pdf" in url_lower
+            or "/pdf/" in url_lower
+            or "download_pdf" in url_lower
+        )
+        bad_status = response.status >= 400
+        # 值得降级的状态码：403(禁)/404(有时 Cloudflare 错挂)/429(限流)/451(法律) + 5xx
+        _should_fallback_status = response.status in {403, 404, 429, 451, 500, 502, 503, 504}
+        # 另外如果 response.body 极短（≤ 200 bytes 且是 HTML 但像 WAF challenge）也降级
+        _body_too_small = not bad_status and len(body_bytes) <= 2048 and ct_header.lower().startswith("text/")
+
+        if bad_status and _should_fallback_status:
+            print(
+                f"[generic.parse] URL got HTTP {response.status}, 尝试降级 httpx 直连抓取: {url[:100]}",
+                file=_sys_parse.stderr,
+                flush=True,
+            )
+            try:
+                import httpx as _httpx
+
+                from src.services.crawler.fetcher import _HEADERS, _TIMEOUT
+
+                with _httpx.Client(headers=_HEADERS, timeout=_TIMEOUT, follow_redirects=True, http2=True) as client2:
+                    resp2 = client2.get(url)
+                    try:
+                        resp2.raise_for_status()
+                    except Exception as _he:
+                        print(
+                            f"[generic.parse] 降级 httpx 也失败: {type(_he).__name__}: {_he}",
+                            file=_sys_parse.stderr,
+                            flush=True,
+                        )
+                        raise
+                    fallback_bytes = bytes(resp2.content or b"")
+                    fallback_ct = resp2.headers.get("Content-Type", "")
+                    # 只要是 HTML 或 PDF 任意一种就 OK（其他类型后面会统一处理）
+                    fallback_ct_lower = fallback_ct.lower()
+                    is_html = (
+                        "html" in fallback_ct_lower
+                        or "xml" in fallback_ct_lower
+                        or fallback_ct_lower.startswith("text/")
+                        or (
+                            len(fallback_bytes) >= 20
+                            and (
+                                fallback_bytes.lstrip()[:9].lower().startswith(b"<!doctype")
+                                or b"<html" in fallback_bytes[:2048].lower()
+                            )
+                        )
+                    )
+                    is_pdf = "pdf" in fallback_ct_lower or fallback_bytes[:4] == b"%PDF"
+                    if not (is_html or is_pdf):
+                        print(
+                            f"[generic.parse] 降级 httpx 拿到的不是 HTML/PDF "
+                            f"(ct={fallback_ct!r} head={fallback_bytes[:12]!r} len={len(fallback_bytes)})",
+                            file=_sys_parse.stderr,
+                            flush=True,
+                        )
+                        raise RuntimeError("fallback response is neither HTML nor PDF")
+                    print(
+                        f"[generic.parse] 降级 httpx 成功！拿到 {len(fallback_bytes)} bytes "
+                        f"type={'pdf' if is_pdf else 'html'}",
+                        file=_sys_parse.stderr,
+                        flush=True,
+                    )
+                    body_bytes = fallback_bytes
+                    ct_header = fallback_ct
+                    bad_status = False
+            except Exception as _fb:
+                print(
+                    f"[generic.parse] 降级 httpx 最终失败，记为 failed: {type(_fb).__name__}: {_fb}",
+                    file=_sys_parse.stderr,
+                    flush=True,
+                )
+                bad_status = True
+
+        if bad_status:
+            # 4xx/5xx：种子 URL 返回失败 item（保证 job 会计数）；非种子静默丢
+            if is_seed:
+                item_id = seed_item_id or f"auto-{abs(hash(url)):x}"
+                loader = ItemLoader(item=CrawlerItem())
+                loader.add_value("item_id", item_id)
+                loader.add_value("job_id", self.job_id)
+                loader.add_value("url", url)
+                loader.add_value("title", "")
+                loader.add_value("domain", domain)
+                loader.add_value("content_type", "")
+                loader.add_value("size", 0)
+                loader.add_value("content", "")
+                loader.add_value("status", "failed")
+                loader.add_value("error", f"HTTP {response.status}")
+                yield loader.load_item()
             return
 
-        # --- 先做类型识别 & 转换（HTML/PDF） ---
-        # 原始响应字节（二进制，避免 response.text 的编码异常）
-        body_bytes = bytes(response.body or b"")
-        # 响应头里的 Content-Type
-        ct_header = response.headers.get("Content-Type", b"").decode("latin-1", errors="ignore")
-        # 内容类型（html/pdf）
-        content_type = _detect_content_type(body_bytes, ct_header)
+        # --- 类型识别 & 转换（HTML/PDF） ---
+        # 注：body_bytes / ct_header 已在上方降级分支可能被覆盖
+        # --- 内容类型判断（_detect_content_type 在 fetcher 里不存在，用简单本地实现） ---
+        ct_lower = ct_header.lower()
+        if "pdf" in ct_lower or (body_bytes[:4] == b"%PDF"):
+            content_type = "pdf"
+        elif "html" in ct_lower or "xml" in ct_lower or ct_lower.startswith("text/"):
+            content_type = "html"
+        else:
+            # 最后兜底：按 body 内容猜
+            try:
+                head_snippet = body_bytes[:1024].decode("utf-8", errors="ignore").lstrip().lower()
+            except Exception:
+                head_snippet = ""
+            if head_snippet.startswith("<!doctype html") or "<html" in head_snippet:
+                content_type = "html"
+            else:
+                content_type = "other"
+        print(
+            f"[generic.parse] content_type detect: ct_header={ct_header!r} "
+            f"body_head={body_bytes[:16]!r} => content_type={content_type!r}",
+            file=_sys_parse.stderr,
+            flush=True,
+        )
         # 不是 HTML/PDF 直接丢掉（种子 URL 也要产一条 failed）
         if content_type not in ("html", "pdf"):
             # 是种子：失败 item；不是种子：静默丢
@@ -295,25 +440,54 @@ class GenericSpider(scrapy.Spider):
 
         # --- 正文转换：HTML/PDF → Markdown ---
         try:
-            # PDF 分支：用 fetcher.pdf_to_markdown
+            # PDF 分支：_pdf_to_markdown 在 fetcher 里不存在 → 这里先留空解析，
+            # 原始 PDF 字节保存在 html_bytes 字段，promote 后 KB pipeline 会用专业 PDFReader 解析。
             if content_type == "pdf":
-                # 延迟导入 PDF 转 Markdown
-                from ..fetcher import _pdf_to_markdown
-                # 转 PDF
-                title, author, markdown, attachments = _pdf_to_markdown(body_bytes)
-                # 转换 OK
                 ok = True
-                # 错误信息空
+                # PDF 标题从 URL 最后一段取（后续可人工改）
+                _parts = url.rstrip("/").rsplit("/", 1)
+                title = _parts[-1] if len(_parts) == 2 and _parts[-1] else url
+                author = ""
+                markdown = ""  # 正文不解析，留给 KB pipeline
+                attachments = [{"filename": "source.pdf", "bytes": body_bytes}]  # 原始 PDF 字节放 attachments
                 err_msg = None
             else:
                 # HTML 分支：HTML→Markdown
-                ok, title, author, markdown, attachments = _html_to_markdown(body_bytes, url)
-                # 错误信息初始 None
-                err_msg = None
-                # 转换失败：给出错误信息
-                if not ok:
-                    # 拼接错误
-                    err_msg = "html parse failed"
+                # fetcher._html_to_markdown 返回 2 元组 (title, markdown)
+                try:
+                    # _html_to_markdown 第一个参数是 str，body_bytes 是 bytes → 先 decode
+                    try:
+                        html_text = body_bytes.decode("utf-8", errors="replace")
+                    except Exception:
+                        html_text = body_bytes.decode("latin-1", errors="replace")
+                    print(
+                        f"[generic.parse] HTML decode ok, text_len={len(html_text)} calling _html_to_markdown...",
+                        file=_sys_parse.stderr,
+                        flush=True,
+                    )
+                    title, markdown = _html_to_markdown(html_text, url)
+                    ok = bool(markdown) or bool(title)
+                    print(
+                        f"[generic.parse] _html_to_markdown done: ok={ok} title={title[:40]!r} md_len={len(markdown)}",
+                        file=_sys_parse.stderr,
+                        flush=True,
+                    )
+                except Exception as _he:
+                    ok = False
+                    title = ""
+                    markdown = ""
+                    err_msg = f"html parse failed: {type(_he).__name__}: {_he}"
+                    print(
+                        f"[generic.parse] _html_to_markdown EXCEPTION: {err_msg}",
+                        file=_sys_parse.stderr,
+                        flush=True,
+                    )
+                else:
+                    author = ""
+                    attachments = []
+                    err_msg = None
+                    if not ok:
+                        err_msg = "html parse failed"
         except Exception as e:
             # 转换抛异常（parse 函数兜底失败）
             ok = False
@@ -375,7 +549,19 @@ class GenericSpider(scrapy.Spider):
             # 错误消息（截断 300 字符）
             loader.add_value("error", (err_msg or "parse failed")[:300])
         # 产出这个 item
-        yield loader.load_item()
+        item = loader.load_item()
+        # 调试：打印 item 的关键字段值（不是 loader 的输出，而是真正 item dict）
+        print(
+            f"[generic.parse] YIELD item: item_id={item.get('item_id')!r} "
+            f"status={item.get('status')!r} content_type={item.get('content_type')!r} "
+            f"title={str(item.get('title') or '')[:40]!r} "
+            f"size={item.get('size')!r} content_len={len(item.get('content') or '')} "
+            f"html_bytes_type={type(item.get('html_bytes')).__name__} "
+            f"html_bytes_len={len(item.get('html_bytes') or b'')}",
+            file=_sys_parse.stderr,
+            flush=True,
+        )
+        yield item
 
         # --- 追链：follow_links 开启且深度未超限、并且是 HTML（PDF 里的外链暂时不追） ---
         # 不开追链 / 已达最大深度 / PDF 不追链
@@ -388,8 +574,6 @@ class GenericSpider(scrapy.Spider):
         hrefs = response.css("a::attr(href)").getall()
         # 去重：同一页相同 href 不再重复 follow
         seen = set()
-        # 限速：按域名等待一下（保护目标站）
-        _rate_limit_wait(domain)
         # 遍历 href
         for href in hrefs:
             # 空 href 跳过
@@ -423,17 +607,7 @@ class GenericSpider(scrapy.Spider):
             # 有限制且域名不在白名单 → 跳过
             if self.allowed_domains and link_domain not in self._allowed:
                 continue
-            # robots.txt 二次防御（Spider 自己再问一遍，Scrapy offsite middleware 是额外保护）
-            try:
-                # 拿 httpx client（全局单例，fetcher._http_client）
-                from ..fetcher import _http_client
-                # client 非空才判 robots
-                if _http_client is not None and not _can_fetch(abs_url, _http_client):
-                    # robots 不允许，跳过
-                    continue
-            except Exception:
-                # robots 判断异常 → fail-open 允许抓
-                pass
+            # 注：robots.txt 由 Scrapy 自带的 RobotsTxtMiddleware 负责（ROBOTSTXT_OBEY=True）
             # 生成追链 Request：callback=parse（递归处理同一套逻辑）
             req = response.follow(
                 # 目标 URL（Scrapy 会帮做相对→绝对）

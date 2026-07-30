@@ -18,7 +18,7 @@ import shutil
 import threading
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable, Optional
+from typing import Any
 
 # 模块级 logger
 _log = logging.getLogger(__name__)
@@ -333,25 +333,28 @@ class KnowledgeManager:
                     # 按文件名（不含后缀）当 item_id
                     item_id = md.stem
                     # 构造最小 metadata 行
-                    staged_rows.append({
-                        # item_id
-                        "item_id": item_id,
-                        # URL 空
-                        "url": "",
-                        # 标题用文件名
-                        "title": item_id,
-                        # 作者空
-                        "author": "",
-                        # 域名空
-                        "domain": "",
-                        # 内容文件
-                        "content_file": md.name,
-                    })
+                    staged_rows.append(
+                        {
+                            # item_id
+                            "item_id": item_id,
+                            # URL 空
+                            "url": "",
+                            # 标题用文件名
+                            "title": item_id,
+                            # 作者空
+                            "author": "",
+                            # 域名空
+                            "domain": "",
+                            # 内容文件
+                            "content_file": md.name,
+                        }
+                    )
 
             # 本次 promote 成功的文档列表
             promoted: list[TopicDocument] = []
             # 当前时间戳（ms）
             import time
+
             # 取当前毫秒时间
             now_ms = int(time.time() * 1000)
 

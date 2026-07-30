@@ -10,6 +10,7 @@ AIGameWorld-Studio · 预置默认主题知识库（genshin / wow_worldview）
 用法（Studio 根目录执行）：
   uv run python scripts/bootstrap_default_topics.py
 """
+
 from __future__ import annotations
 
 import json
@@ -34,8 +35,7 @@ def main() -> int:
         created_by="bootstrap",
         bootstrap_default_topics=False,  # 先关，我们要手动调 + 打印过程
     ) as mgr:
-        print(f"[1/3] 向量库：type={mgr._factory.config.store_type}  "
-              f"health={mgr._factory.health()}")
+        print(f"[1/3] 向量库：type={mgr._factory.config.store_type}  health={mgr._factory.health()}")
         print()
 
         print("[2/3] 注册默认主题 + 建向量 collection + 知识目录骨架")
@@ -44,21 +44,28 @@ def main() -> int:
             t = mgr.get_topic(r["topic_id"])
             t_name = (t or {}).get("name") or r["topic_id"]
             t_chunks = mgr._factory.count(r["topic_id"])
-            print(f"  - [{r['topic_id']:<14}] {t_name:<12}  "
-                  f"registered={'Y' if r['registered'] else 'N'}  "
-                  f"vector={'OK' if r['vector_store_created'] else 'ERR'}  "
-                  f"chunks_now={t_chunks}")
+            print(
+                f"  - [{r['topic_id']:<14}] {t_name:<12}  "
+                f"registered={'Y' if r['registered'] else 'N'}  "
+                f"vector={'OK' if r['vector_store_created'] else 'ERR'}  "
+                f"chunks_now={t_chunks}"
+            )
 
         print()
         print("[3/3] 当前主题列表（含向量 collection 计数）：")
         for t in mgr.list_topics(include_archived=True):
-            print(json.dumps({
-                "topic_id": t["topic_id"],
-                "name": t["name"],
-                "status": t["status"],
-                "chunks": int(t.get("chunks_in_collection") or 0),
-                "tags": t.get("tags") or [],
-            }, ensure_ascii=False))
+            print(
+                json.dumps(
+                    {
+                        "topic_id": t["topic_id"],
+                        "name": t["name"],
+                        "status": t["status"],
+                        "chunks": int(t.get("chunks_in_collection") or 0),
+                        "tags": t.get("tags") or [],
+                    },
+                    ensure_ascii=False,
+                )
+            )
 
         print()
         cols = mgr._factory.list_collections()

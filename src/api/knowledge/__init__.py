@@ -11,14 +11,15 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
 
+from ...services.knowledge.manager import KnowledgeManager
+
 # ---- 子模块导入 ----
 from . import schemas
+from .deps import get_knowledge_manager, require_topic_id
 from .documents import router as _docs_router
 from .jobs import router as _jobs_router
 from .search import router as _search_router
 from .stats import router as _stats_router
-from .deps import get_knowledge_manager, require_topic_id
-from ...services.knowledge.manager import KnowledgeManager
 
 # ---- 顶层路由初始化 ----
 kb_router = APIRouter(prefix="/api/kb", tags=["knowledge"])
@@ -118,6 +119,7 @@ async def soft_delete_document(
 
 # ---- 路由分组: 主题注册表 API ----
 
+
 @kb_router.get(
     "/topics",
     response_model=schemas.TopicListResponse,
@@ -193,6 +195,7 @@ def delete_topic(
 
 
 # ---- 路由分组: World-Topic 绑定 API ----
+
 
 @kb_router.get(
     "/bindings",

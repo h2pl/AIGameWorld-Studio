@@ -330,8 +330,8 @@ def _interactive_prompt(parser, args):
 # generate 命令 handler：骨架模式直接输出，完整模式调 LLM 管线
 async def _generate(args) -> int:
     """LLM 管线生成 world-pack / LLM pipeline generate world-pack."""
-    from src.services.generator.filler import generate_world_pack
     from src.domain.params import GenerateParams
+    from src.services.generator.filler import generate_world_pack
     from src.services.generator.world_pack import generate_skeleton
 
     params = GenerateParams(
@@ -407,6 +407,7 @@ async def _validate(args) -> int:
 def _make_kb_manager(args):
     """构造 KnowledgeManager（统一 PersistentClient 初始化）."""
     import chromadb
+
     from src.services.knowledge import KnowledgeManager
 
     chroma_path = Path(args.chroma_path).expanduser().resolve()

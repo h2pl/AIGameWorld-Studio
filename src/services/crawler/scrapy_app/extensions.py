@@ -5,6 +5,19 @@
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path as _Path
+
+# Scrapy 加载本模块时相对 import 点数容易数错（extensions 在 scrapy_app 下，store 在 crawler 下是 3 个点），
+# 用绝对 import 更稳：把项目根加到 sys.path，再用 from src.services.crawler.xxx import。
+if not hasattr(sys, "_ag_project_root_injected"):
+    _pr = (
+        _Path(__file__).resolve().parents[3]
+    )  # extensions → scrapy_app → crawler → services → src → 项目根（4 层往上）
+    if str(_pr) not in sys.path:
+        sys.path.insert(0, str(_pr))
+    sys._ag_project_root_injected = True
+
 import logging
 from pathlib import Path
 from typing import Any
@@ -40,7 +53,7 @@ class JobStatusExtension:
     # -------- 内部 --------
     def _get_store(self):
         if self._store is None and self._db_path:
-            from ....utils.sqlite_store import SQLiteStore
+            from src.utils.sqlite_store import SQLiteStore
 
             self._store = SQLiteStore(Path(self._db_path))
         return self._store
@@ -54,7 +67,7 @@ class JobStatusExtension:
         if store is None:
             return
         try:
-            from .. import store as db
+            from src.services.crawler import store as db
 
             db.update_job_status(store, self._job_id, "running", started=True)
         except Exception as e:
@@ -68,7 +81,7 @@ class JobStatusExtension:
         if store is None:
             return
         try:
-            from .. import store as db
+            from src.services.crawler import store as db
 
             # 兼容新旧签名：旧版是 (spider, reason)，新版可能位置不同
             spider = args[0] if args else kwargs.get("spider")
@@ -80,15 +93,11 @@ class JobStatusExtension:
             # spider 可能设置了自定义 _error_count 等字段（可选）
             err = getattr(sp, "_close_error", None) if sp else None
             if err:
-                db.update_job_status(
-                    store, self._job_id, "failed", finished=True, error_msg=str(err)
-                )
+                db.update_job_status(store, self._job_id, "failed", finished=True, error_msg=str(err))
             elif reason in ok_reasons:
                 db.update_job_status(store, self._job_id, "done", finished=True)
             else:
-                db.update_job_status(
-                    store, self._job_id, "failed", finished=True, error_msg=f"reason={reason}"
-                )
+                db.update_job_status(store, self._job_id, "failed", finished=True, error_msg=f"reason={reason}")
         except Exception as e:
             _log.warning("mark job closed failed: %s", e)
         finally:

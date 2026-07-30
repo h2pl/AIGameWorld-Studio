@@ -47,6 +47,7 @@ def _locate_studio_root() -> Path:
 STUDIO_ROOT = _locate_studio_root()
 os.chdir(STUDIO_ROOT)  # 保持与 chroma_server.py 里的 cwd 一致
 
+
 # ═══════════════════════════════════════════════════════════════════════
 # 独立 argparse（不 import chroma_server，避免 --help 触发 chromadb/opentelemetry 大依赖加载）
 # ═══════════════════════════════════════════════════════════════════════
@@ -73,11 +74,15 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         default="info",
         help="chroma_server 日志级别",
     )
-    p.add_argument("--open-browser", action="store_true",
-                   help="server 起来后自动用默认浏览器打开 /viewer（不传也默认开，传 --no-browser 可关）")
+    p.add_argument(
+        "--open-browser",
+        action="store_true",
+        help="server 起来后自动用默认浏览器打开 /viewer（不传也默认开，传 --no-browser 可关）",
+    )
     p.add_argument("--no-browser", action="store_true", help="不要自动开浏览器")
-    p.add_argument("--no-viewer", action="store_true",
-                   help="不注册 /viewer 和 /_/* 路由，只保留纯 Chroma HTTP + health")
+    p.add_argument(
+        "--no-viewer", action="store_true", help="不注册 /viewer 和 /_/* 路由，只保留纯 Chroma HTTP + health"
+    )
     p.add_argument(
         "--no-kill",
         action="store_true",
@@ -103,7 +108,7 @@ def _is_port_in_use(port: int, host: str = "127.0.0.1") -> bool:
         s.settimeout(0.5)
         try:
             s.connect((host, port))
-        except (ConnectionRefusedError, OSError, TimeoutError):
+        except ConnectionRefusedError, OSError, TimeoutError:
             return False
         else:
             return True
@@ -121,9 +126,7 @@ def _kill_process_on_port(port: int, host: str = "127.0.0.1") -> int:
     pids: list[str] = []
     try:
         if sys.platform.startswith("win"):
-            out = subprocess.check_output(
-                ["netstat", "-ano"], text=True, stderr=subprocess.DEVNULL
-            )
+            out = subprocess.check_output(["netstat", "-ano"], text=True, stderr=subprocess.DEVNULL)
             for line in out.splitlines():
                 parts = line.split()
                 if len(parts) < 5:
@@ -142,22 +145,26 @@ def _kill_process_on_port(port: int, host: str = "127.0.0.1") -> int:
             if pids:
                 subprocess.run(
                     ["taskkill", "/F"] + [tok for pid in pids for tok in ("/PID", pid)],
-                    check=False, capture_output=True, text=True,
+                    check=False,
+                    capture_output=True,
+                    text=True,
                 )
         else:
             # macOS / Linux
             if _shutil.which("lsof"):
                 out = subprocess.check_output(
                     ["lsof", "-iTCP", f":{port}", "-sTCP:LISTEN", "-t"],
-                    text=True, stderr=subprocess.DEVNULL,
+                    text=True,
+                    stderr=subprocess.DEVNULL,
                 )
                 pids = [p for p in out.splitlines() if p.strip().isdigit()]
             elif _shutil.which("ss"):
                 out = subprocess.check_output(
                     ["ss", "-ltnpH", f"sport = :{port}"],
-                    text=True, stderr=subprocess.DEVNULL,
+                    text=True,
+                    stderr=subprocess.DEVNULL,
                 )
-                for m in _re.finditer(r'pid=(\d+)', out):
+                for m in _re.finditer(r"pid=(\d+)", out):
                     pid = m.group(1)
                     if pid.isdigit() and pid not in pids:
                         pids.append(pid)
@@ -191,6 +198,7 @@ def _banner() -> None:
 
 _banner()
 
+
 # ═══════════════════════════════════════════════════════════════════════
 # 端口占用检测 + 默认自动杀（传 --no-kill 关掉自动杀）
 # ═══════════════════════════════════════════════════════════════════════
@@ -201,9 +209,9 @@ def _ensure_port_free(port: int, host: str = "127.0.0.1", *, allow_kill: bool) -
         print(f"  🔪 端口 {port} 被占用，尝试杀 LISTENING 进程 ...")
         killed = _kill_process_on_port(port, host)
         if killed < 0:
-            print(f"  ⚠️  杀进程失败（异常）")
+            print("  ⚠️  杀进程失败（异常）")
         elif killed == 0:
-            print(f"  ⚠️  没找到在 LISTEN 的进程（可能是其他状态占用）")
+            print("  ⚠️  没找到在 LISTEN 的进程（可能是其他状态占用）")
         else:
             print(f"  ✅ 杀了 {killed} 个占用进程，等待释放 ...")
             time.sleep(1.5)
@@ -230,12 +238,10 @@ def _pick_python() -> list[str]:
     pyproject = STUDIO_ROOT / "pyproject.toml"
     if pyproject.exists():
         try:
-            r = subprocess.run(
-                ["uv", "--version"], check=False, capture_output=True, text=True, timeout=5
-            )
+            r = subprocess.run(["uv", "--version"], check=False, capture_output=True, text=True, timeout=5)
             if r.returncode == 0:
                 return ["uv", "run", "python"]
-        except (FileNotFoundError, PermissionError):
+        except FileNotFoundError, PermissionError:
             pass
 
     # 2) .venv/Scripts/python.exe (Windows) / .venv/bin/python (POSIX)

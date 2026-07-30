@@ -32,10 +32,11 @@ from llama_index.core.ingestion import IngestionPipeline
 from llama_index.core.node_parser import SentenceSplitter
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 
+from ...utils.sqlite_store import SQLiteStore  # noqa: F401  (对外暴露类型)
+
 # 本地模块导入
 from .reader import KnowledgeReader
 from .vector_store import KBVectorStoreFactory
-from ...utils.sqlite_store import SQLiteStore  # noqa: F401  (对外暴露类型)
 
 
 # 知识库文档处理流水线类：双写 SQLite 元数据 + 可插拔向量存储
@@ -58,9 +59,7 @@ class KnowledgePipeline:
         # BGE-M3 本地路径（ModelScope / HuggingFace 下载缓存）
         import os
 
-        _bge_path = os.path.expanduser(
-            "~/.cache/huggingface/hub/models/BAAI--bge-m3/snapshots/master"
-        )
+        _bge_path = os.path.expanduser("~/.cache/huggingface/hub/models/BAAI--bge-m3/snapshots/master")
 
         splitter = SentenceSplitter(chunk_size=500, chunk_overlap=50)
         splitter.include_metadata = True
@@ -115,9 +114,7 @@ class KnowledgePipeline:
         chunk_ids: list[str] = []
         by_doc: dict[str, list[tuple[int, object]]] = {}
         for i, n in enumerate(nodes):
-            ref = getattr(n, "ref_doc_id", None) or (
-                n.metadata.get("doc_id") if n.metadata else None
-            )
+            ref = getattr(n, "ref_doc_id", None) or (n.metadata.get("doc_id") if n.metadata else None)
             if ref not in by_doc:
                 by_doc[ref] = []
             by_doc[ref].append((i, n))
@@ -147,18 +144,20 @@ class KnowledgePipeline:
                     object.__setattr__(node, "id_", chunk_id)
                 except Exception:
                     pass
-                all_chunk_rows.append((
-                    chunk_id,
-                    doc_id,
-                    self.topic_id,
-                    idx_in_doc,
-                    chunk_count,
-                    text_hash,
-                    preview,
-                    0,
-                    meta_json,
-                    int(time.time() * 1000),
-                ))
+                all_chunk_rows.append(
+                    (
+                        chunk_id,
+                        doc_id,
+                        self.topic_id,
+                        idx_in_doc,
+                        chunk_count,
+                        text_hash,
+                        preview,
+                        0,
+                        meta_json,
+                        int(time.time() * 1000),
+                    )
+                )
                 chunk_ids.append(chunk_id)
 
         # 第五步：事务批量写 SQLite — 先写所有 kb_chunk 行，再更新 kb_document 状态为 done
@@ -350,9 +349,7 @@ class KnowledgePipeline:
 
         p = Path(fp)
         title = doc.metadata.get("title") or (p.stem if p.exists() else fp)
-        source_type = doc.metadata.get("source_type") or KnowledgeReader._infer_source_type(
-            p, Path(p).parent
-        )
+        source_type = doc.metadata.get("source_type") or KnowledgeReader._infer_source_type(p, Path(p).parent)
         content_type = doc.metadata.get("content_type") or p.suffix.lstrip(".") or "text"
         file_name = doc.metadata.get("file_name") or p.name
         try:
@@ -583,9 +580,7 @@ class KnowledgePipeline:
                 new_store = self._factory.get_vector_store(self.topic_id)
                 for attr in ("_collection", "_chroma_collection"):
                     if hasattr(new_store, attr) and hasattr(vector_store, attr):
-                        object.__setattr__(
-                            vector_store, attr, getattr(new_store, attr)
-                        )
+                        object.__setattr__(vector_store, attr, getattr(new_store, attr))
             except Exception:
                 # 实在刷不了就直接换整个 vector_store 引用
                 self._pipeline.vector_store = self._factory.get_vector_store(self.topic_id)

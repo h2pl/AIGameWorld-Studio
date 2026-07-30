@@ -5,9 +5,8 @@
 
 from __future__ import annotations
 
-import json
 import time
-from typing import Any, Iterable
+from typing import Any
 
 from ...utils.sqlite_store import SQLiteStore
 
@@ -35,6 +34,7 @@ def _now_ms() -> int:
 # ------------------------------------------------------------------
 # crawler_job
 # ------------------------------------------------------------------
+
 
 # 创建 crawler_job 记录
 # 参数 store：SQLiteStore 实例
@@ -168,6 +168,7 @@ def update_job_status(
 # crawler_item
 # ------------------------------------------------------------------
 
+
 # 创建单条 crawler_item 记录（URL 级别），初始状态 pending
 # 参数 store：SQLiteStore 实例
 # 参数 item_id：item 主键 ID
@@ -220,7 +221,14 @@ def update_item_fetched(
     status: str = "fetched",
 ) -> None:
     # 必更字段列表
-    set_fields: list[str] = ["content_type = ?", "file_path = ?", "file_size = ?", "sha256 = ?", "status = ?", "fetched_at = ?"]
+    set_fields: list[str] = [
+        "content_type = ?",
+        "file_path = ?",
+        "file_size = ?",
+        "sha256 = ?",
+        "status = ?",
+        "fetched_at = ?",
+    ]
     # 必更字段的参数
     params: list[Any] = [content_type, file_path, file_size, sha256, status, _now_ms()]
     # 传了新标题（非 None 才更新，空串也可能是有效值）

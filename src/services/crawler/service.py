@@ -42,7 +42,7 @@ import httpx
 from ...utils.sqlite_store import SQLiteStore
 from . import store as db
 from .fetcher import FetchedFile, fetch_url
-from .search import SearchResult, web_search
+from .search import web_search
 
 # 模块级 logger 实例
 _log = logging.getLogger(__name__)
@@ -69,8 +69,10 @@ def _scrapy_available() -> bool:
     # 测试 scrapy 主包是否可用
     try:
         import scrapy  # noqa: F401
+
         # 测试自定义 runner 是否可导入
         from .scrapy_app import runner  # noqa: F401
+
         # 全部导入成功，Scrapy 可用
         return True
     except Exception:
@@ -157,6 +159,58 @@ class CrawlerService:
         # 默认 data/studio.db
         return (self._root / "data" / "studio.db").resolve()
 
+    # 后台线程：等 job 状态进入终态后自动 promote。
+    # 用于 crawl_search(..., auto_promote=True) 的场景。
+    # job done → 立即 promote；job failed → 不主动 promote（用户可手动再 promote 成功的条目）
+    def _async_promote_when_done(
+        self,
+        job_id: str,
+        *,
+        topic_id: str | None = None,
+        source_type: str = "documents",
+        poll_interval: float = 2.0,
+        timeout_seconds: float = 24 * 3600,
+    ) -> None:
+        import threading as _thr
+
+        def _worker():
+            import time as _t
+
+            t0 = _t.time()
+            last_status = None
+            while _t.time() - t0 < timeout_seconds:
+                try:
+                    j = self.get_job(job_id) or {}
+                    st = j.get("status")
+                except Exception:
+                    st = None
+                if st != last_status:
+                    last_status = st
+                    _log.info("[auto_promote job=%s] status=%s", job_id, st)
+                if st in ("done",):
+                    # 成功结束：执行 promote（内部会跳过 failed 条目，只 promote fetched/promoted）
+                    try:
+                        res = self.promote_job(job_id)
+                        _log.info(
+                            "[auto_promote job=%s] done. promoted=%s skipped=%s",
+                            job_id,
+                            res.get("promoted_count"),
+                            res.get("skipped_count"),
+                        )
+                    except Exception:
+                        _log.exception("[auto_promote job=%s] promote failed", job_id)
+                    return
+                if st in ("failed", "discarded"):
+                    # 终态非 done：不主动 promote；用户可手动决定
+                    _log.info("[auto_promote job=%s] terminal status=%s, skip auto-promote", job_id, st)
+                    return
+                _t.sleep(max(0.5, float(poll_interval)))
+            # 超时
+            _log.warning("[auto_promote job=%s] timeout after %.0fs, give up", job_id, timeout_seconds)
+
+        t = _thr.Thread(target=_worker, name=f"ags-auto-promote-{job_id[:8]}", daemon=True)
+        t.start()
+
     # ------------------------------------------------------------------
     # 搜索
     # ------------------------------------------------------------------
@@ -228,18 +282,20 @@ class CrawlerService:
             # 记录映射
             url_item_ids[u] = item_id
             # 组装 item 元数据
-            items_meta.append({
-                # item 主键
-                "id": item_id,
-                # 所属 job ID
-                "job_id": job_id,
-                # 目标 URL
-                "url": u,
-                # 标题留空，抓取后回填
-                "title": "",
-                # 初始状态 pending
-                "status": "pending",
-            })
+            items_meta.append(
+                {
+                    # item 主键
+                    "id": item_id,
+                    # 所属 job ID
+                    "job_id": job_id,
+                    # 目标 URL
+                    "url": u,
+                    # 标题留空，抓取后回填
+                    "title": "",
+                    # 初始状态 pending
+                    "status": "pending",
+                }
+            )
 
         # 在 crawler_job 表创建 job 记录
         db.create_job(
@@ -321,6 +377,11 @@ class CrawlerService:
     # 参数 max_results：最大搜索结果条数
     # 参数 source_type：promote 目标子目录名
     # 参数 created_by：调用来源标识
+    # 参数 content_type_priority：内容类型优先级 "all"(默认) / "pdf_prefer" / "pdf_only"
+    #   - all: 搜所有类型，不额外过滤
+    #   - pdf_prefer: 先用 filetype:pdf 搜，不足则回退普通搜索，结果按 PDF 优先排序
+    #   - pdf_only: 只搜 filetype:pdf 的结果
+    # 参数 auto_promote：True 时 job done 后后台自动 promote（默认 False；crawl_search_pdf 里会设 True）
     # 返回 str：job_id；Scrapy 可用时立即返回（搜索+抓取都在后台），同步时全部完成才返回
     def crawl_search(
         self,
@@ -330,6 +391,8 @@ class CrawlerService:
         max_results: int = 5,
         source_type: str = "documents",
         created_by: str = "ui",
+        content_type_priority: str = "all",
+        auto_promote: bool = False,
     ) -> str:
         """搜索 + 抓取一条龙，返回 job_id.
 
@@ -368,6 +431,8 @@ class CrawlerService:
                 "mode": "search",
                 "query": query,
                 "max_results": max_results,
+                "content_type_priority": content_type_priority,
+                "auto_promote": bool(auto_promote),
                 "engine": "scrapy",
                 "created_by": created_by,
             }
@@ -379,13 +444,30 @@ class CrawlerService:
                 staging=staging,
                 query=query,
                 max_results=max_results,
+                content_type_priority=content_type_priority,
             )
+            # auto_promote：job 完成后后台自动 promote
+            if auto_promote:
+                self._async_promote_when_done(job_id, topic_id=topic_id, source_type=source_type)
             # 立即返回 job_id，不等待搜索+抓取完成
             return job_id
 
         # --- Scrapy 不可用时走原同步路径 ---
-        # 同步执行 DDGS 搜索
-        results: list[SearchResult] = web_search(query, max_results=max_results)
+        # 同步执行 DDGS 搜索（如果 pdf_only/pdf_prefer，手动拼 filetype:pdf 搜）
+        ct_prio = (content_type_priority or "all").lower()
+        if ct_prio in ("pdf_prefer", "pdf_only"):
+            results = web_search(f"{query} filetype:pdf", max_results=max_results)
+            if ct_prio == "pdf_prefer" and len(results) < max_results:
+                extra = web_search(query, max_results=(max_results - len(results)) * 2)
+                seen = {r.url for r in results}
+                for er in extra:
+                    if er.url not in seen:
+                        results.append(er)
+                        seen.add(er.url)
+                        if len(results) >= max_results:
+                            break
+        else:
+            results = web_search(query, max_results=max_results)
         # 抽取搜索结果中的 URL 列表
         urls = [r.url for r in results]
         # 建立 URL→标题映射（抓取前就已知标题）
@@ -411,6 +493,8 @@ class CrawlerService:
             "mode": "search",
             "query": query,
             "urls": urls,
+            "content_type_priority": content_type_priority,
+            "auto_promote": bool(auto_promote),
             # 完整搜索结果用于调试
             "search_results": [r.to_dict() for r in results],
             "engine": "sync-httpx",
@@ -422,8 +506,53 @@ class CrawlerService:
         db.update_job_status(self._store, job_id, "running", started=True)
         # 同步顺序抓取
         self._fetch_all(topic_id, job_id, staging, urls, source_type, url_titles=url_titles)
+        # auto_promote：同步路径 job 已经 done，直接 promote
+        if auto_promote:
+            try:
+                self.promote_job(job_id)
+            except Exception:
+                _log.exception("auto_promote failed for job=%s", job_id)
         # 全部抓完后返回 job_id
         return job_id
+
+    # 便捷入口：搜 PDF 资料 → 抓 → 自动 promote 到 documents/ 一条龙
+    # 等价于 crawl_search(..., content_type_priority="pdf_only", auto_promote=True)
+    # 用户只想"把相关 PDF 下载进知识库"时，直接调用这一个 API 即可，无需写脚本。
+    def crawl_search_pdf(
+        self,
+        topic_id: str,
+        query: str,
+        *,
+        max_results: int = 10,
+        source_type: str = "documents",
+        created_by: str = "ui",
+        pdf_only: bool = True,
+        auto_promote: bool = True,
+    ) -> str:
+        """搜索 PDF 资料 → 抓取 → 自动 promote 到知识库目录，返回 job_id.
+
+        参数：
+          - topic_id: 主题 ID（知识库名，如 "world_of_warcraft"）
+          - query: 搜索关键词（如 "魔兽世界编年史 第一卷 PDF"）
+          - max_results: 最大结果条数（默认 10）
+          - pdf_only: True=只搜 PDF，False=PDF 优先但允许回退网页
+          - auto_promote: True=job 结束后自动 promote（默认 True，不需要手动调）
+
+        用法：
+            job_id = svc.crawl_search_pdf("world_of_warcraft", "魔兽世界编年史 设定集 PDF", max_results=20)
+            # 轮询 get_job(job_id)["status"] in ("done", "failed") 看是否结束
+            # auto_promote=True 时结束后 PDF 已经在 knowledge/documents/ 下了
+        """
+        ct_prio = "pdf_only" if pdf_only else "pdf_prefer"
+        return self.crawl_search(
+            topic_id,
+            query,
+            max_results=max_results,
+            source_type=source_type,
+            created_by=created_by,
+            content_type_priority=ct_prio,
+            auto_promote=bool(auto_promote),
+        )
 
     # ------------------------------------------------------------------
     # Scrapy 启动（私有）
@@ -475,7 +604,10 @@ class CrawlerService:
             _log.exception("启动 Scrapy (urls) 失败，回退到同步抓取")
             # 标记 job 失败
             db.update_job_status(
-                self._store, job_id, "failed", finished=True,
+                self._store,
+                job_id,
+                "failed",
+                finished=True,
                 # 写入失败原因
                 error_msg=f"ScrapyLaunchFailed: {type(e).__name__}: {e}",
             )
@@ -485,6 +617,7 @@ class CrawlerService:
     # 参数 staging：暂存目录 Path
     # 参数 query：搜索关键词
     # 参数 max_results：搜索结果上限条数
+    # 参数 content_type_priority："all" / "pdf_prefer" / "pdf_only"
     # 返回 None：启动失败时记录日志并将 DB 中 job 置为 failed
     def _launch_scrapy_search(
         self,
@@ -493,6 +626,7 @@ class CrawlerService:
         staging: Path,
         query: str,
         max_results: int,
+        content_type_priority: str = "all",
     ) -> None:
         # 延迟导入 runner
         try:
@@ -514,6 +648,8 @@ class CrawlerService:
                 # 默认不追链
                 follow_links=False,
                 follow_depth=0,
+                # 内容类型优先级（PDF 优先 / 仅 PDF / 全部）
+                content_type_priority=str(content_type_priority or "all"),
                 # 并发/速率默认值
                 **_SCRAPY_DEFAULTS,
             )
@@ -523,7 +659,10 @@ class CrawlerService:
             _log.exception("启动 Scrapy (search) 失败")
             # 标记 job 失败
             db.update_job_status(
-                self._store, job_id, "failed", finished=True,
+                self._store,
+                job_id,
+                "failed",
+                finished=True,
                 error_msg=f"ScrapyLaunchFailed: {type(e).__name__}: {e}",
             )
 
@@ -724,7 +863,7 @@ class CrawlerService:
                     # 找到结束标记
                     if end != -1:
                         # 去掉 frontmatter 段
-                        txt = txt[end + 4:].lstrip()
+                        txt = txt[end + 4 :].lstrip()
                 # 只取前 500 字符作预览
                 return txt[:500]
             # PDF 二进制：不打开，显示大小提示
@@ -777,6 +916,8 @@ class CrawlerService:
         promoted: list[dict[str, Any]] = []
         # 被跳过的条目列表
         skipped: list[dict[str, Any]] = []
+        # 该 job 的 staging 目录绝对路径（用于旧数据兼容：file_path 为空时找 attachments 下的 PDF）
+        staging_abs = self._root / job["staging_dir"] if job.get("staging_dir") else None
         # 遍历待 promote 的 item
         for it in items:
             # 仅处理 fetched 状态（成功抓取）
@@ -785,48 +926,122 @@ class CrawlerService:
                 skipped.append({"item_id": it["id"], "url": it["url"], "reason": f"status={it['status']}"})
                 # 下一条
                 continue
-            # 构造源文件 Path
-            src = Path(it["file_path"]) if it["file_path"] else None
+
+            # ====== 解析源文件路径（相对→绝对）+ PDF 兼容处理 ======
+            ct = (it.get("content_type") or "").lower()
+            item_id = it["id"]
+            # 原始 file_path（可能是相对路径，也可能是绝对路径）
+            raw_fp = it.get("file_path")
+            src: Path | None = None
+            # 先转成绝对 Path
+            if raw_fp:
+                _p = Path(raw_fp)
+                src = _p if _p.is_absolute() else (self._root / _p)
+            # PDF 特殊处理：
+            # 1) 旧数据 src 指向空 .md（不存在 / 0字节）→ 去 attachments/{item_id}/source.pdf 找
+            # 2) 新数据 src 已经是 attachments/source.pdf，存在就直接用
+            if ct == "pdf":
+                # 候选 1：当前 src 如果存在且非空，就用它
+                if src and src.exists() and src.stat().st_size > 0:
+                    pass  # 用 src
+                else:
+                    # 候选 2：staging 下的 attachments/{item_id}/source.pdf
+                    if staging_abs:
+                        alt = staging_abs / "attachments" / str(item_id) / "source.pdf"
+                        if alt.exists() and alt.stat().st_size > 0:
+                            src = alt
+                        else:
+                            src = None
             # 源文件路径缺失或文件不存在
             if src is None or not src.exists():
-                # 记录跳过
                 skipped.append({"item_id": it["id"], "url": it["url"], "reason": "file missing"})
-                # 下一条
                 continue
-            # 初始目标路径：同名
-            target = target_dir / src.name
-            # 目标路径已存在同名文件，需重命名避免覆盖
+
+            # ====== 确定目标文件名（PDF 用标题命名避免都是 source.pdf）======
+            if ct == "pdf":
+                # PDF：优先用 item 的标题命名，没有就从 URL 取最后一段
+                title = (it.get("title") or "").strip()
+                if title:
+                    # Windows 文件名清洗：去掉非法字符 <>:"/\|?*
+                    safe_title = "".join(c for c in title if c not in '<>:"/\\|?*').strip()
+                    target_name = (safe_title or item_id) + ".pdf"
+                else:
+                    # 从 URL 最后一段取
+                    url = (it.get("url") or "").rstrip("/")
+                    last_seg = url.rsplit("/", 1)[-1] if url else ""
+                    last_seg_clean = "".join(c for c in last_seg if c not in '<>:"/\\|?*').strip()
+                    target_name = last_seg_clean or item_id
+                    if not target_name.lower().endswith(".pdf"):
+                        target_name += ".pdf"
+            else:
+                # 非 PDF：用源文件名
+                target_name = src.name
+
+            # 初始目标路径
+            target = target_dir / target_name
+            # 目标路径已存在同名文件 → 重命名避免覆盖（stem-1.ext, stem-2.ext...）
             if target.exists():
-                # 拆分文件名和扩展名
                 stem, suf = target.stem, target.suffix
-                # 重命名计数器
                 i = 1
-                # 循环直到找到不冲突的名字
                 while target.exists():
-                    # 拼 stem-1.ext, stem-2.ext...
                     target = target_dir / f"{stem}-{i}{suf}"
-                    # 计数器递增
                     i += 1
+
+            # ====== 执行文件移动 ======
             try:
-                # 执行文件移动（跨盘也能工作）
                 shutil.move(str(src), str(target))
             except Exception as e:
-                # 移动失败（权限、磁盘满等）
-                # 记录失败原因
                 skipped.append({"item_id": it["id"], "url": it["url"], "reason": f"move failed: {e}"})
-                # 本条失败，继续下一条
                 continue
-            # DB 标记 promoted，存新路径
-            db.mark_item_promoted(self._store, it["id"], new_path=self._rel(target))
-            # 加入成功列表，供 API 响应使用
-            promoted.append({
-                "item_id": it["id"],
-                "url": it["url"],
-                # 最终文件名
-                "file_name": target.name,
-                # 最终绝对路径
-                "target_path": str(target),
-            })
+
+            # ====== SHA256 补算（staging 阶段没算，这里 promote 时补算一次） ======
+            sha_hex: str | None = None
+            try:
+                import hashlib
+
+                _h = hashlib.sha256()
+                with target.open("rb") as _f:
+                    while True:
+                        _blk = _f.read(1024 * 1024)
+                        if not _blk:
+                            break
+                        _h.update(_blk)
+                sha_hex = _h.hexdigest()
+            except Exception:
+                sha_hex = None
+
+            # DB 标记 promoted + 新路径 + SHA256（通过 update_item_fetched 再补一次 sha256 和 file_size）
+            target_rel = self._rel(target)
+            # 先补 sha256 + file_size（mark_item_promoted 只改 status/promoted_at/file_path）
+            try:
+                db.update_item_fetched(
+                    self._store,
+                    item_id,
+                    content_type=ct,
+                    file_path=target_rel,
+                    file_size=target.stat().st_size,
+                    sha256=sha_hex,
+                    title=None,
+                    error_msg=None,
+                    status="fetched",  # 先保持 fetched，下一步改 promoted
+                )
+            except Exception:
+                # SHA/大小补算失败不阻塞 promote 主流程
+                pass
+            # 再标记 promoted（会覆盖 status 为 promoted，promoted_at 打时间戳，file_path 再覆盖一次）
+            db.mark_item_promoted(self._store, item_id, new_path=target_rel)
+
+            # 加入成功列表
+            promoted.append(
+                {
+                    "item_id": it["id"],
+                    "url": it["url"],
+                    "file_name": target.name,
+                    "target_path": str(target),
+                    "sha256": sha_hex,
+                    "file_size": target.stat().st_size,
+                }
+            )
         # 返回 promote 结果汇总
         return {
             "ok": True,

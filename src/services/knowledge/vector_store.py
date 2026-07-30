@@ -24,8 +24,9 @@ import math
 import sqlite3
 import struct
 import threading
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, Iterable, Optional, Sequence
+from typing import Any
 
 
 # 向量存储实现
@@ -121,7 +122,7 @@ class SQLiteVectorStore:
     # 参数 text：块原文
     # 参数 meta：任意 JSON 可序列化元信息
     # 返回 None
-    def upsert(self, id: str, vec: Sequence[float], text: str, meta: Optional[dict[str, Any]] = None) -> None:
+    def upsert(self, id: str, vec: Sequence[float], text: str, meta: dict[str, Any] | None = None) -> None:
         # id 空字符串不合法
         if not id:
             # 静默跳过（不抛异常，让上层 manager continue）

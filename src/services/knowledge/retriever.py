@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 # 模块级 logger
 _log = logging.getLogger(__name__)
@@ -53,6 +53,7 @@ class RetrieveResult:
     total_chars: int = 0
     # 本次用到的检索模式："hybrid" / "vector" / "keyword" / "none"
     mode: str = "none"
+
     # 原始命中的文档 ID 集合（用于展示参考文档列表）
     @property
     def doc_ids(self) -> list[str]:
@@ -259,6 +260,7 @@ class KnowledgeRetriever:
             return []
         # 关键词拆分：空格 / 中文逗号 / 英文逗号
         import re
+
         # 按空白或中英文逗号拆分
         kws = [k for k in re.split(r"[\s,，]+", query) if k]
         # 拆分不出关键词 → 整句当 1 个关键词
@@ -474,6 +476,7 @@ class KnowledgeRetriever:
                 else:
                     # 新建（拷贝一份避免改原对象）
                     import copy
+
                     # 深拷贝
                     new_rc = copy.copy(h)
                     # 分数置为混合加权
@@ -506,6 +509,7 @@ class KnowledgeRetriever:
                 else:
                     # 新建
                     import copy
+
                     # 拷贝
                     new_rc = copy.copy(h)
                     # 分数 = 关键词加权

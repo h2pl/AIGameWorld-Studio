@@ -24,10 +24,7 @@ import httpx
 
 # 用真实浏览器 UA：很多站点（Fandom / 百度百科 / 知乎等）会拦截非浏览器 UA 返回 403。
 # 这是爬虫的通行做法，robots.txt 仍被尊重（见 _can_fetch）。
-UA = (
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
-)
+UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
 # 全局超时：总30秒，连接超时10秒
 _TIMEOUT = httpx.Timeout(30.0, connect=10.0)
 _HEADERS = {
@@ -152,8 +149,8 @@ def _html_to_markdown(html: str, url: str) -> tuple[str, str]:
     用 BeautifulSoup 剔除 nav/footer/script/aside 等非正文区块，
     再用 html2text 转成 Markdown。
     """
-    from bs4 import BeautifulSoup
     import html2text  # type: ignore
+    from bs4 import BeautifulSoup
 
     # 用 lxml 解析器构建 DOM
     soup = BeautifulSoup(html, "lxml")
@@ -289,8 +286,12 @@ def fetch_url(
         if not _can_fetch(url, client):
             # 返回失败结果，记录 robots 禁止原因
             return FetchedFile(
-                url=url, title="", content_type="failed",
-                file_path=None, file_size=0, sha256=None,
+                url=url,
+                title="",
+                content_type="failed",
+                file_path=None,
+                file_size=0,
+                sha256=None,
                 # 记录失败原因
                 error="disallowed by robots.txt",
             )
@@ -343,8 +344,12 @@ def fetch_url(
             if not md_body.strip():
                 # 返回失败结果，标记正文为空
                 return FetchedFile(
-                    url=url, title=title, content_type="failed",
-                    file_path=None, file_size=0, sha256=None,
+                    url=url,
+                    title=title,
+                    content_type="failed",
+                    file_path=None,
+                    file_size=0,
+                    sha256=None,
                     error="empty body after extraction",
                 )
             # 拼装带 frontmatter 的文档
@@ -361,8 +366,12 @@ def fetch_url(
             if ext not in {".md", ".txt", ".pdf", ".png", ".jpg", ".jpeg", ".webp", ".mp4", ".webm"}:
                 # 非白名单扩展名，标记失败
                 return FetchedFile(
-                    url=url, title="", content_type="failed",
-                    file_path=None, file_size=0, sha256=None,
+                    url=url,
+                    title="",
+                    content_type="failed",
+                    file_path=None,
+                    file_size=0,
+                    sha256=None,
                     # 记录失败原因：不支持的内容类型
                     error=f"unsupported content_type: {content_type}",
                 )
@@ -397,8 +406,12 @@ def fetch_url(
     except Exception as e:
         # 返回失败结果，包含异常类型和消息
         return FetchedFile(
-            url=url, title="", content_type="failed",
-            file_path=None, file_size=0, sha256=None,
+            url=url,
+            title="",
+            content_type="failed",
+            file_path=None,
+            file_size=0,
+            sha256=None,
             # 记录异常类型和消息
             error=f"{type(e).__name__}: {e}",
         )

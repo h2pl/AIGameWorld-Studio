@@ -2,8 +2,6 @@
 
 from pathlib import Path
 
-import pytest
-
 from src.services.knowledge.reader import KnowledgeReader
 
 

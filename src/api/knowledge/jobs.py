@@ -7,14 +7,15 @@
 
 # ---- 导入依赖 ----
 from __future__ import annotations
+
 # 启用类型注解的前向引用支持
-
 from fastapi import APIRouter, Depends
-# 导入 FastAPI 路由与依赖注入工具
 
+# 导入 FastAPI 路由与依赖注入工具
 # ---- 子模块导入 ----
 # 导入同模块的 Pydantic 数据模型（响应 DTO 集中定义在 schemas.py 中）
 from . import schemas
+
 # 导入依赖：知识库管理器、主题ID校验（由 FastAPI Depends 负责注入实例）
 from .deps import get_knowledge_manager, require_topic_id
 
@@ -24,6 +25,7 @@ router = APIRouter()
 
 
 # ---- 路由分组: 索引任务列表 ----
+
 
 @router.get(
     "/{topic_id}/jobs",
@@ -49,6 +51,7 @@ def list_jobs(
 
 
 # ---- 路由分组: 审计日志列表 ----
+
 
 @router.get(
     "/{topic_id}/audit",

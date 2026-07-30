@@ -3,6 +3,10 @@
 与现有 ``crawler_item`` 表字段一一对应，方便 Pipeline 直接入库。
 同时携带抓取时的原始字节 / HTML 文本，由 Pipeline 负责落盘。
 """
+# CrawlItem 字段约定：
+# - 必填 4 项：url / item_id / job_id / idx（保证 Pipeline 能定位 DB 行和文件）
+# - 可选 7 项：Pipeline 在 parse 后填充；title 可人工后改；content_type 决定落盘扩展名（md/pdf）
+# - file_bytes / sha256 / file_size：三者同时存在时用于 SHA256 去重（同一 PDF 重复抓取自动跳过）
 
 from __future__ import annotations
 

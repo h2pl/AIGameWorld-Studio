@@ -2,14 +2,16 @@
 
 # ---- 导入依赖 ----
 from __future__ import annotations
+
 # 启用类型注解的前向引用支持
-
 from fastapi import APIRouter, Depends, HTTPException
-# 导入FastAPI路由、依赖、HTTP异常
 
+# 导入FastAPI路由、依赖、HTTP异常
 from . import schemas
+
 # 导入同模块的Pydantic数据模型
 from .deps import get_knowledge_manager, require_topic_id
+
 # 导入依赖：知识库管理器、主题ID校验
 
 # ---- 初始化路由 ----

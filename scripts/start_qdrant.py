@@ -33,6 +33,7 @@ uv run python scripts/start_qdrant.py logs
 
 数据持久化：./data/qdrant/storage（与 docker-compose.yml 对齐）
 """
+
 from __future__ import annotations
 
 import argparse
@@ -91,7 +92,9 @@ def _docker_compose_cmd() -> list[str]:
         try:
             r = subprocess.run(
                 ["docker", "compose", "version"],
-                capture_output=True, text=True, timeout=10,
+                capture_output=True,
+                text=True,
+                timeout=10,
             )
             if r.returncode == 0:
                 return ["docker", "compose"]
@@ -159,6 +162,7 @@ def cmd_start(open_browser: bool = True) -> int:
 
     # Qdrant 默认监听在 6333，从 URL 解析一下
     from urllib.parse import urlparse
+
     u = urlparse(DEFAULT_QDRANT_URL)
     port = u.port or 6333
     host = u.hostname or "127.0.0.1"

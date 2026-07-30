@@ -1,4 +1,5 @@
 """从 Tuxemon TMX 生成 AIGameWorld scene 记录并写入 DB / Generate + write to DB."""
+
 import json
 import sqlite3
 import sys
@@ -105,11 +106,13 @@ def gen_scene(tmx_path: str):
             # 传送出口
             if "transition_teleport" in act10:
                 parts = act10.replace("transition_teleport player,", "").split(",")
-                exits.append({
-                    "target": parts[0].strip() if parts else "",
-                    "position": {"x": obj_x, "y": obj_y},
-                    "name": obj_name,
-                })
+                exits.append(
+                    {
+                        "target": parts[0].strip() if parts else "",
+                        "position": {"x": obj_x, "y": obj_y},
+                        "name": obj_name,
+                    }
+                )
 
             # 出生点
             if not spawn_x and "char_at player" in obj_props.get("cond10", ""):
@@ -130,26 +133,32 @@ def gen_scene(tmx_path: str):
                 dialog_id = act10.replace("translated_dialog ", "").strip()
                 # 跳过 collision 层已有的 NPC 名
                 if obj_name and not any(n["name"] == obj_name for n in npcs):
-                    interactables.append({
-                        "name": obj_name,
-                        "dialog_id": dialog_id,
-                        "position": {"x": obj_x, "y": obj_y},
-                    })
+                    interactables.append(
+                        {
+                            "name": obj_name,
+                            "dialog_id": dialog_id,
+                            "position": {"x": obj_x, "y": obj_y},
+                        }
+                    )
                 elif not obj_name:
-                    interactables.append({
-                        "name": "",
-                        "dialog_id": dialog_id,
-                        "position": {"x": obj_x, "y": obj_y},
-                    })
+                    interactables.append(
+                        {
+                            "name": "",
+                            "dialog_id": dialog_id,
+                            "position": {"x": obj_x, "y": obj_y},
+                        }
+                    )
 
             # 战斗遭遇区
             if "random_encounter" in act10:
                 enc_type = act10.replace("random_encounter ", "").strip()
-                encounter_zones.append({
-                    "name": obj_name,
-                    "encounter_type": enc_type,
-                    "position": {"x": obj_x, "y": obj_y},
-                })
+                encounter_zones.append(
+                    {
+                        "name": obj_name,
+                        "encounter_type": enc_type,
+                        "position": {"x": obj_x, "y": obj_y},
+                    }
+                )
 
             # NPC 创建点（解析 create_npc name,x,y[,behavior]）
             if "create_npc" in act10:
@@ -159,46 +168,58 @@ def gen_scene(tmx_path: str):
                 sx = int(parts[1]) if len(parts) > 1 else obj_x
                 sy = int(parts[2]) if len(parts) > 2 else obj_y
                 behavior = parts[3].strip() if len(parts) > 3 else "stand"
-                spawns.append({
-                    "name": obj_name or npc_type,
-                    "npc_type": npc_type,
-                    "spawn_position": {"x": sx, "y": sy},
-                    "behavior": behavior,
-                })
+                spawns.append(
+                    {
+                        "name": obj_name or npc_type,
+                        "npc_type": npc_type,
+                        "spawn_position": {"x": sx, "y": sy},
+                        "behavior": behavior,
+                    }
+                )
 
             # Boss 战斗
             if "start_battle" in act10 and "transition_teleport" not in act10:
                 raw = act10.replace("start_battle ", "").strip()
-                start_battles.append({
-                    "name": obj_name or raw,
-                    "battle_id": raw,
-                    "position": {"x": obj_x, "y": obj_y},
-                })
+                start_battles.append(
+                    {
+                        "name": obj_name or raw,
+                        "battle_id": raw,
+                        "position": {"x": obj_x, "y": obj_y},
+                    }
+                )
 
             # 商店
             if "open_shop" in act10:
-                shops.append({
-                    "name": obj_name,
-                    "position": {"x": obj_x, "y": obj_y},
-                })
+                shops.append(
+                    {
+                        "name": obj_name,
+                        "position": {"x": obj_x, "y": obj_y},
+                    }
+                )
 
     # ── 区域标注 / Zone labelling (仅出口+战斗区，不含交互物) ──
     zones: list[dict] = []
     for e in exits:
-        zones.append({
-            "name": e["name"] or e["target"].replace(".tmx", ""),
-            "position": e["position"],
-        })
+        zones.append(
+            {
+                "name": e["name"] or e["target"].replace(".tmx", ""),
+                "position": e["position"],
+            }
+        )
     for ez in encounter_zones:
-        zones.append({
-            "name": ez["name"] or ez["encounter_type"],
-            "position": ez["position"],
-        })
+        zones.append(
+            {
+                "name": ez["name"] or ez["encounter_type"],
+                "position": ez["position"],
+            }
+        )
     for bb in start_battles:
-        zones.append({
-            "name": bb["name"],
-            "position": bb["position"],
-        })
+        zones.append(
+            {
+                "name": bb["name"],
+                "position": bb["position"],
+            }
+        )
 
     if not spawn_x:
         spawn_x, spawn_y = w // 2, h // 2
@@ -218,40 +239,45 @@ def gen_scene(tmx_path: str):
         "inside": inside,
         "edges": "clamped" if clamped else "",
         "scenario": scenario,
-        "size": f"{w}×{h}（{w*tw}×{h*tw} 像素）",
+        "size": f"{w}×{h}（{w * tw}×{h * tw} 像素）",
         "tile_size": tw,
         "tilesets": ts_names,
         "layers": layer_names,
         "terrain": {
-            "water": has_water, "nature": has_nature,
-            "building": has_building, "cave": has_cave, "ice_snow": has_ice,
-            "surfable": has_surfable, "endure_terrain": has_endure,
+            "water": has_water,
+            "nature": has_nature,
+            "building": has_building,
+            "cave": has_cave,
+            "ice_snow": has_ice,
+            "surfable": has_surfable,
+            "endure_terrain": has_endure,
         },
         "cardinal_directions": cardinal,
         "exits": exits,
         "npcs": [n["name"] for n in npcs if n["name"]],
         "interactables": [
-            {"name": i["name"] or i["dialog_id"], "dialog_id": i["dialog_id"],
-             "position": i["position"]} for i in interactables if i["dialog_id"]
+            {"name": i["name"] or i["dialog_id"], "dialog_id": i["dialog_id"], "position": i["position"]}
+            for i in interactables
+            if i["dialog_id"]
         ],
         "encounter_zones": [
-            {"name": e["name"] or e["encounter_type"], "type": e["encounter_type"],
-             "position": e["position"]} for e in encounter_zones
+            {"name": e["name"] or e["encounter_type"], "type": e["encounter_type"], "position": e["position"]}
+            for e in encounter_zones
         ],
         "spawn_points": [
-            {"name": s["name"] or s["npc_type"], "npc_type": s["npc_type"],
-             "position": s["spawn_position"], "behavior": s["behavior"]} for s in spawns
+            {
+                "name": s["name"] or s["npc_type"],
+                "npc_type": s["npc_type"],
+                "position": s["spawn_position"],
+                "behavior": s["behavior"],
+            }
+            for s in spawns
         ],
-        "shops": [
-            {"name": s["name"] or "shop", "position": s["position"]} for s in shops
-        ],
+        "shops": [{"name": s["name"] or "shop", "position": s["position"]} for s in shops],
         "start_battles": [
-            {"name": b["name"], "battle_id": b["battle_id"],
-             "position": b["position"]} for b in start_battles
+            {"name": b["name"], "battle_id": b["battle_id"], "position": b["position"]} for b in start_battles
         ],
-        "zones": [
-            {"name": z["name"], "position": z["position"]} for z in zones
-        ],
+        "zones": [{"name": z["name"], "position": z["position"]} for z in zones],
         "spawn": {"x": spawn_x, "y": spawn_y},
         "endure": endure,
         "enter_from": enter_from,
@@ -262,11 +288,33 @@ def gen_scene(tmx_path: str):
 
     # ── 完整解读 / Full interpretation + description ──
     full, desc = _build_interpretation(
-        name, map_type, inside, clamped, scenario,
-        w, h, tw, ts_names, has_water, has_nature, has_building,
-        has_cave, has_ice, has_surfable, has_endure,
-        layer_names, cardinal, exits, npcs, interactables,
-        encounter_zones, start_battles, shops, zones, spawn_x, spawn_y,
+        name,
+        map_type,
+        inside,
+        clamped,
+        scenario,
+        w,
+        h,
+        tw,
+        ts_names,
+        has_water,
+        has_nature,
+        has_building,
+        has_cave,
+        has_ice,
+        has_surfable,
+        has_endure,
+        layer_names,
+        cardinal,
+        exits,
+        npcs,
+        interactables,
+        encounter_zones,
+        start_battles,
+        shops,
+        zones,
+        spawn_x,
+        spawn_y,
     )
     summary["full_interpretation"] = full
     summary_json = json.dumps(summary, ensure_ascii=False)
@@ -308,6 +356,7 @@ def gen_scene(tmx_path: str):
 # 辅助函数 / Helpers
 # ──────────────────────────────────────────────
 
+
 def _as_bool(val) -> bool:
     """Normalize bool/str/int to Python bool."""
     if isinstance(val, bool):
@@ -315,23 +364,54 @@ def _as_bool(val) -> bool:
     return str(val).lower() in ("true", "1")
 
 
-def _build_interpretation(name, map_type, inside, clamped, scenario,
-                          w, h, tw, ts_names, has_water, has_nature, has_building,
-                          has_cave, has_ice, has_surfable, has_endure,
-                          layer_names, cardinal, exits, npcs, interactables,
-                          encounter_zones, start_battles, shops, zones, spawn_x, spawn_y):
+def _build_interpretation(
+    name,
+    map_type,
+    inside,
+    clamped,
+    scenario,
+    w,
+    h,
+    tw,
+    ts_names,
+    has_water,
+    has_nature,
+    has_building,
+    has_cave,
+    has_ice,
+    has_surfable,
+    has_endure,
+    layer_names,
+    cardinal,
+    exits,
+    npcs,
+    interactables,
+    encounter_zones,
+    start_battles,
+    shops,
+    zones,
+    spawn_x,
+    spawn_y,
+):
     """生成中文完整解读，返回 (full_interpretation, description).
     description 不含战役信息和图层信息，适配项目 prompt 上下文.
     """
-    type_label = {"town": "城镇", "route": "野外路线", "dungeon": "地下城",
-                  "indoor": "室内空间", "shop": "商店", "clinic": "诊所",
-                  "notype": "特殊区域", "outdoor": "室外区域"}
+    type_label = {
+        "town": "城镇",
+        "route": "野外路线",
+        "dungeon": "地下城",
+        "indoor": "室内空间",
+        "shop": "商店",
+        "clinic": "诊所",
+        "notype": "特殊区域",
+        "outdoor": "室外区域",
+    }
     t_label = type_label.get(map_type, map_type)
     quantifier = "一座" if map_type == "town" else "一个"
 
     # 公共基础 / shared base
     base = [f"{name}，{quantifier}{t_label}。"]
-    base.append(f"地图尺寸 {w}×{h} 格（{w*tw}×{h*tw} 像素），使用 16×16 的瓦片规格。")
+    base.append(f"地图尺寸 {w}×{h} 格（{w * tw}×{h * tw} 像素），使用 16×16 的瓦片规格。")
 
     # 边界（仅 full）
     clamped_part = "地图边界锁定，玩家无法走出地图范围，这是一个封闭区域。" if clamped else ""
@@ -362,13 +442,21 @@ def _build_interpretation(name, map_type, inside, clamped, scenario,
 
     # tileset 外观
     visual = {
-        "core_outdoor": "草地和石砖路面", "core_buildings": "房屋墙壁和屋顶",
-        "core_indoor_floors": "室内木地板", "core_indoor_walls": "室内砖墙",
-        "core_indoor_stairs": "楼梯结构", "core_outdoor_nature": "树木和灌木",
-        "core_outdoor_water": "水面和河岸", "core_city_and_country": "栅栏和城镇装饰",
-        "core_set pieces": "场景摆件", "factory": "工业设施",
-        "oceanset_outside": "海滩和浅水", "rubberduck_outdoor": "彩色街道路面",
-        "cave": "洞穴岩壁", "ice": "冰面", "snow": "雪地",
+        "core_outdoor": "草地和石砖路面",
+        "core_buildings": "房屋墙壁和屋顶",
+        "core_indoor_floors": "室内木地板",
+        "core_indoor_walls": "室内砖墙",
+        "core_indoor_stairs": "楼梯结构",
+        "core_outdoor_nature": "树木和灌木",
+        "core_outdoor_water": "水面和河岸",
+        "core_city_and_country": "栅栏和城镇装饰",
+        "core_set pieces": "场景摆件",
+        "factory": "工业设施",
+        "oceanset_outside": "海滩和浅水",
+        "rubberduck_outdoor": "彩色街道路面",
+        "cave": "洞穴岩壁",
+        "ice": "冰面",
+        "snow": "雪地",
     }
     vis_desc = [visual.get(t, t) for t in ts_names if visual.get(t)]
     vis_part = f"地面铺设了{'、'.join(vis_desc)}等瓦片素材。" if vis_desc else ""
@@ -422,10 +510,7 @@ def _build_interpretation(name, map_type, inside, clamped, scenario,
     # 图层（仅 full）
     layer_part = ""
     if layer_names:
-        layer_part = (
-            f"地图使用 {len(layer_names)} 个渲染图层，"
-            f"从下到上依次为：{'、'.join(layer_names)}。"
-        )
+        layer_part = f"地图使用 {len(layer_names)} 个渲染图层，从下到上依次为：{'、'.join(layer_names)}。"
 
     # 结语
     if inside:
@@ -440,15 +525,44 @@ def _build_interpretation(name, map_type, inside, clamped, scenario,
 
     # ── 组装 ──
     full = "".join(
-        p for p in [*base, clamped_part, scenario_part, *terrain, vis_part,
-                     cardinal_part, exit_part, npc_part, sign_part,
-                     zone_text, zone_part, boss_part, shop_part,
-                     spawn_part, layer_part, ending] if p
+        p
+        for p in [
+            *base,
+            clamped_part,
+            scenario_part,
+            *terrain,
+            vis_part,
+            cardinal_part,
+            exit_part,
+            npc_part,
+            sign_part,
+            zone_text,
+            zone_part,
+            boss_part,
+            shop_part,
+            spawn_part,
+            layer_part,
+            ending,
+        ]
+        if p
     )
     desc = "".join(
-        p for p in [*base, *terrain, vis_part, cardinal_part,
-                     npc_part, sign_part, zone_text, zone_part,
-                     boss_part, shop_part, spawn_part, ending] if p
+        p
+        for p in [
+            *base,
+            *terrain,
+            vis_part,
+            cardinal_part,
+            npc_part,
+            sign_part,
+            zone_text,
+            zone_part,
+            boss_part,
+            shop_part,
+            spawn_part,
+            ending,
+        ]
+        if p
     )
     return full, desc
 
@@ -470,10 +584,7 @@ def _copy_assets(tmx: Path, tilesets: list[dict], tsx_paths: list[str] = None):
         tux_tsx.mkdir(parents=True, exist_ok=True)
         for tsx_url in tsx_paths:
             tsx_name = tsx_url.split("/")[-1]
-            studio_tsx = (
-                PROJECT_ROOT / "templates" / "assets" / "maps" / "tuxemon"
-                / "gfx" / "tilesets" / tsx_name
-            )
+            studio_tsx = PROJECT_ROOT / "templates" / "assets" / "maps" / "tuxemon" / "gfx" / "tilesets" / tsx_name
             if studio_tsx.exists():
                 dest_tsx = tux_tsx / tsx_name
                 if not dest_tsx.exists():
@@ -483,7 +594,7 @@ def _copy_assets(tmx: Path, tilesets: list[dict], tsx_paths: list[str] = None):
     for ts in tilesets:
         url = ts["url"]
         if url.startswith("assets/"):
-            png_rel = url[len("assets/"):]
+            png_rel = url[len("assets/") :]
             png_path = ASSETS / png_rel
             if not png_path.exists():
                 studio_png = PROJECT_ROOT / "templates" / "assets" / "maps" / png_rel
@@ -501,17 +612,20 @@ def _convert_to_json(map_data, dest: Path) -> str:
             data = []
             for row in layer.data:
                 data.extend(row)
-            json_layers.append({
-                "id": layer.id,
-                "name": layer.name,
-                "type": "tilelayer",
-                "width": layer.size.width,
-                "height": layer.size.height,
-                "x": 0, "y": 0,
-                "opacity": layer.opacity,
-                "visible": layer.visible,
-                "data": data,
-            })
+            json_layers.append(
+                {
+                    "id": layer.id,
+                    "name": layer.name,
+                    "type": "tilelayer",
+                    "width": layer.size.width,
+                    "height": layer.size.height,
+                    "x": 0,
+                    "y": 0,
+                    "opacity": layer.opacity,
+                    "visible": layer.visible,
+                    "data": data,
+                }
+            )
 
     # ── Object layers ──
     for layer in map_data.layers:
@@ -522,39 +636,45 @@ def _convert_to_json(map_data, dest: Path) -> str:
                 if obj.properties:
                     for pk, pv in obj.properties.items():
                         props_list.append({"name": pk, "type": "string", "value": str(pv)})
-                objects.append({
-                    "id": obj.id,
-                    "name": obj.name or "",
-                    "type": getattr(obj, "class_", "") or "",
-                    "x": obj.coordinates.x if obj.coordinates else 0,
-                    "y": obj.coordinates.y if obj.coordinates else 0,
-                    "width": obj.size.width if obj.size else 0,
-                    "height": obj.size.height if obj.size else 0,
-                    "properties": props_list,
-                })
-            json_layers.append({
-                "id": layer.id,
-                "name": layer.name,
-                "type": "objectgroup",
-                "opacity": layer.opacity,
-                "visible": layer.visible,
-                "draworder": layer.draw_order or "topdown",
-                "objects": objects,
-            })
+                objects.append(
+                    {
+                        "id": obj.id,
+                        "name": obj.name or "",
+                        "type": getattr(obj, "class_", "") or "",
+                        "x": obj.coordinates.x if obj.coordinates else 0,
+                        "y": obj.coordinates.y if obj.coordinates else 0,
+                        "width": obj.size.width if obj.size else 0,
+                        "height": obj.size.height if obj.size else 0,
+                        "properties": props_list,
+                    }
+                )
+            json_layers.append(
+                {
+                    "id": layer.id,
+                    "name": layer.name,
+                    "type": "objectgroup",
+                    "opacity": layer.opacity,
+                    "visible": layer.visible,
+                    "draworder": layer.draw_order or "topdown",
+                    "objects": objects,
+                }
+            )
 
     # ── Tilesets ──
     json_tilesets = []
     for _ts_key, ts in map_data.tilesets.items():
-        json_tilesets.append({
-            "firstgid": ts.firstgid,
-            "name": ts.name or str(_ts_key),
-            "tilewidth": ts.tile_width,
-            "tileheight": ts.tile_height,
-            "tilecount": ts.tile_count,
-            "image": f"../gfx/tilesets/{ts.image.name}",
-            "imagewidth": ts.image_width,
-            "imageheight": ts.image_height,
-        })
+        json_tilesets.append(
+            {
+                "firstgid": ts.firstgid,
+                "name": ts.name or str(_ts_key),
+                "tilewidth": ts.tile_width,
+                "tileheight": ts.tile_height,
+                "tilecount": ts.tile_count,
+                "image": f"../gfx/tilesets/{ts.image.name}",
+                "imagewidth": ts.image_width,
+                "imageheight": ts.image_height,
+            }
+        )
 
     # ── Map properties ──
     map_props = []
@@ -588,23 +708,33 @@ def upsert_scene(scene: dict, db_path: str = None):
     """写入或更新场景记录到 scenes 表."""
     db_path = db_path or str(AIGAME_DB)
     conn = sqlite3.connect(db_path)
-    conn.execute("""
+    conn.execute(
+        """
         INSERT OR REPLACE INTO scenes
           (id, name, type, description, spawn_x, spawn_y,
            map_width, map_height, world_id, tilemap_summary, ext_json, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now', 'localtime'))
-    """, (
-        scene["id"], scene["name"], scene["type"], scene["description"],
-        scene["spawn_x"], scene["spawn_y"], scene["map_width"], scene["map_height"],
-        scene["world_id"], scene.get("tilemap_summary", ""), scene["ext_json"],
-    ))
+    """,
+        (
+            scene["id"],
+            scene["name"],
+            scene["type"],
+            scene["description"],
+            scene["spawn_x"],
+            scene["spawn_y"],
+            scene["map_width"],
+            scene["map_height"],
+            scene["world_id"],
+            scene.get("tilemap_summary", ""),
+            scene["ext_json"],
+        ),
+    )
     conn.commit()
     conn.close()
     return scene["id"]
 
 
-def upsert_actors(scene_id: str, world_id: str, npcs: list[dict],
-                  spawns: list[dict], db_path: str = None):
+def upsert_actors(scene_id: str, world_id: str, npcs: list[dict], spawns: list[dict], db_path: str = None):
     """从 TMX 解析结果创建场景 NPC 的 Actor 记录 / Create Actor records from parsed NPCs."""
     if not npcs and not spawns:
         return
@@ -618,44 +748,56 @@ def upsert_actors(scene_id: str, world_id: str, npcs: list[dict],
     for i, npc in enumerate(npcs):
         if not npc.get("name"):
             continue
-        entries.append((
-            f"{scene_id}_npc_{i + 1}",
-            npc["name"],               # name
-            "npc",                     # role
-            None,                      # race
-            "active",                  # status
-            "neutral",                 # disposition
-            scene_id,                  # scene_id
-            npc["x"],                  # position_x
-            npc["y"],                  # position_y
-            "{}",                      # attributes_json
-            "{}",                      # combat_json
-            "[]",                      # functions_json
-            "{}",                      # function_data_json
-            "[]",                      # inventory_json
-            "{}",                      # relationships_json
-            0,                         # dm_assigned
-            None,                      # motivation_injected
-            world_id,                  # world_id
-            '{"source":"tmx"}',        # ext_json
-        ))
+        entries.append(
+            (
+                f"{scene_id}_npc_{i + 1}",
+                npc["name"],  # name
+                "npc",  # role
+                None,  # race
+                "active",  # status
+                "neutral",  # disposition
+                scene_id,  # scene_id
+                npc["x"],  # position_x
+                npc["y"],  # position_y
+                "{}",  # attributes_json
+                "{}",  # combat_json
+                "[]",  # functions_json
+                "{}",  # function_data_json
+                "[]",  # inventory_json
+                "{}",  # relationships_json
+                0,  # dm_assigned
+                None,  # motivation_injected
+                world_id,  # world_id
+                '{"source":"tmx"}',  # ext_json
+            )
+        )
 
     # create_npc 生成点 / NPC spawn points
     for i, sp in enumerate(spawns):
         name = sp["name"] or sp["npc_type"]
-        entries.append((
-            f"{scene_id}_spawn_{i + 1}",
-            name,
-            "npc",
-            None,
-            "active",
-            "neutral",
-            scene_id,
-            sp["spawn_position"]["x"],
-            sp["spawn_position"]["y"],
-            "{}", "{}", "[]", "{}", "[]", "{}", 0, None, world_id,
-            '{"source":"tmx"}',
-        ))
+        entries.append(
+            (
+                f"{scene_id}_spawn_{i + 1}",
+                name,
+                "npc",
+                None,
+                "active",
+                "neutral",
+                scene_id,
+                sp["spawn_position"]["x"],
+                sp["spawn_position"]["y"],
+                "{}",
+                "{}",
+                "[]",
+                "{}",
+                "[]",
+                "{}",
+                0,
+                None,
+                world_id,
+                '{"source":"tmx"}',
+            )
+        )
 
     for row in entries:
         conn.execute(
@@ -677,8 +819,7 @@ def upsert_actors(scene_id: str, world_id: str, npcs: list[dict],
     conn.close()
 
 
-def upsert_scene_objects(scene_id: str, world_id: str,
-                         interactables: list[dict], db_path: str = None):
+def upsert_scene_objects(scene_id: str, world_id: str, interactables: list[dict], db_path: str = None):
     """从 TMX 解析结果创建可交互物体记录 / Create SceneObject records from parsed interactables."""
     if not interactables:
         return
@@ -688,9 +829,7 @@ def upsert_scene_objects(scene_id: str, world_id: str,
 
     for i, obj in enumerate(interactables):
         obj_name = obj["name"] or obj.get("dialog_id", f"object_{i + 1}")
-        interact_data = json.dumps(
-            {"dialog_id": obj.get("dialog_id", "")}, ensure_ascii=False
-        )
+        interact_data = json.dumps({"dialog_id": obj.get("dialog_id", "")}, ensure_ascii=False)
         conn.execute(
             """INSERT OR REPLACE INTO scene_objects
             (id, name, object_type, scene_id, position_x, position_y,
@@ -699,14 +838,14 @@ def upsert_scene_objects(scene_id: str, world_id: str,
             (
                 f"{scene_id}_obj_{i + 1}",
                 obj_name,
-                "decoration",              # object_type — 默认装饰物
+                "decoration",  # object_type — 默认装饰物
                 scene_id,
                 obj["position"]["x"],
                 obj["position"]["y"],
-                1,                         # interactable = True
+                1,  # interactable = True
                 interact_data,
                 world_id,
-                '{"source":"tmx"}',        # ext_json — 标记 TMX 来源
+                '{"source":"tmx"}',  # ext_json — 标记 TMX 来源
             ),
         )
 
@@ -718,10 +857,7 @@ if __name__ == "__main__":
     if len(sys.argv) > 1:
         tmx = sys.argv[1]
     else:
-        tmx = str(
-            PROJECT_ROOT / "templates" / "assets" / "maps"
-            / "tuxemon" / "maps" / "azure_town.tmx"
-        )
+        tmx = str(PROJECT_ROOT / "templates" / "assets" / "maps" / "tuxemon" / "maps" / "azure_town.tmx")
 
     rec = gen_scene(tmx)
     try:
@@ -730,7 +866,7 @@ if __name__ == "__main__":
         scid = rec["id"]
     print(f"[OK] {scid} → {rec['name']} ({rec['type']} {rec['map_width']}×{rec['map_height']})")
     ext = json.loads(rec["ext_json"])
-    print(f"  tilesets: {len(ext.get('tilesets',[]))}, spawn=({rec['spawn_x']},{rec['spawn_y']})")
+    print(f"  tilesets: {len(ext.get('tilesets', []))}, spawn=({rec['spawn_x']},{rec['spawn_y']})")
     print(f"  完整解读: {rec['description'][:120]}...")
 
     # 同步写入 NPC Actor + 可交互物体 / Sync actors & scene objects

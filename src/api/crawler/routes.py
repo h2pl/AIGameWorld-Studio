@@ -5,16 +5,19 @@
 
 # ---- 导入依赖 ----
 from __future__ import annotations
+
 # 启用类型注解的前向引用支持
-
 from fastapi import APIRouter, Depends, HTTPException, Query
-# 导入FastAPI路由、依赖、HTTP异常、查询参数
 
+# 导入FastAPI路由、依赖、HTTP异常、查询参数
 from ...services.crawler import CrawlerService
+
 # 导入爬虫服务类
 from . import schemas
+
 # 导入同模块的Pydantic数据模型
-from .deps import get_crawler_service, require_topic_id
+from .deps import get_crawler_service
+
 # 导入依赖：爬虫服务获取、主题ID校验
 
 # ---- 初始化路由 ----
@@ -23,6 +26,7 @@ router = APIRouter()
 
 
 # ---- 路由分组: 搜索 / Search Endpoints ----
+
 
 @router.post(
     "/search",
@@ -53,6 +57,7 @@ def search(
 
 
 # ---- 路由分组: 抓取任务 / Crawl Job Endpoints ----
+
 
 @router.post(
     "/jobs/urls",
@@ -133,6 +138,7 @@ def crawl_search(
 
 
 # ---- 路由分组: 任务查询 / Job Query Endpoints ----
+
 
 @router.get(
     "/jobs",
@@ -224,6 +230,7 @@ def list_job_items(
 
 
 # ---- 路由分组: Promote / Discard / 批准与丢弃 ----
+
 
 @router.post(
     "/jobs/{job_id}/promote",

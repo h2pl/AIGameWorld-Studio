@@ -53,6 +53,7 @@ _RUNNING: dict[str, dict[str, Any]] = {}
 # 返回值结构
 # ---------------------------------------------------------------------------
 
+
 # 启动函数的返回值数据类，保持与 v2 API 兼容
 @dataclass
 class JobLaunchResult:
@@ -66,6 +67,7 @@ class JobLaunchResult:
 # 公共辅助：失败安全地标 DB 为 failed（子进程启动失败时用）
 # ---------------------------------------------------------------------------
 
+
 # 启动失败时兜底把 job 标记为 failed（不抛异常）
 # 参数 db_path：SQLite DB 文件路径
 # 参数 job_id：任务 ID
@@ -74,8 +76,8 @@ class JobLaunchResult:
 def _mark_failed_safe(db_path: Path, job_id: str, err: str) -> None:
     # 延迟导入避免循环引用
     try:
-        from ..store import update_job_status  # type: ignore
         from ....utils.sqlite_store import SQLiteStore as _S  # 延迟导入 SQLiteStore
+        from ..store import update_job_status  # type: ignore
 
         # db_path 为空就啥也不做
         if not db_path:
@@ -97,6 +99,7 @@ def _mark_failed_safe(db_path: Path, job_id: str, err: str) -> None:
 # ---------------------------------------------------------------------------
 # 子进程入口定位（我们把 launcher 和本模块放同一目录）
 # ---------------------------------------------------------------------------
+
 
 # 找到 _job_launcher.py 的绝对路径
 # 返回 Path：launcher 脚本路径
@@ -145,6 +148,7 @@ def _find_python_exe() -> str:
 # ---------------------------------------------------------------------------
 # 子进程启动 & 监控
 # ---------------------------------------------------------------------------
+
 
 # 核心：把参数写 JSON，拉起子进程，启监控线程
 # 参数 job_id：任务 ID
@@ -324,6 +328,7 @@ def _launch_subprocess(
 # Settings 构造（和 v2 一样，但不 import Scrapy；直接返回 dict，传给子进程序列化）
 # ---------------------------------------------------------------------------
 
+
 # 以 settings.py 大写常量为基准，叠加本次 job 的运行时参数
 # 参数 job_id：任务 ID
 # 参数 staging_dir：暂存目录 Path
@@ -501,6 +506,7 @@ def run_generic_crawl(
 # 参数 concurrent_per_domain：单域并发请求数
 # 参数 download_delay：同域下载延迟秒数
 # 参数 log_level：Scrapy 日志级别
+# 参数 content_type_priority：内容类型优先级 — "all"(默认) / "pdf_prefer" / "pdf_only"
 # 返回 JobLaunchResult：启动结果
 def run_topic_crawl(
     *,
@@ -516,6 +522,7 @@ def run_topic_crawl(
     concurrent_per_domain: int = 2,
     download_delay: float = 1.0,
     log_level: str = "INFO",
+    content_type_priority: str = "all",
 ) -> JobLaunchResult:
     # 构造 settings，带 extra 自定义项
     settings_dict = _build_settings_dict(
@@ -545,6 +552,8 @@ def run_topic_crawl(
         follow_depth=max(0, int(follow_depth or 0)),
         # 域名白名单
         allowed_domains=list(allowed_domains) if allowed_domains else None,
+        # 内容类型优先级（PDF 优先/仅 PDF）
+        content_type_priority=str(content_type_priority or "all"),
     )
     # 子进程启动
     return _launch_subprocess(

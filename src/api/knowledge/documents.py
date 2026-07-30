@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException
 # ---- 子模块导入 ----
 # 复用 schemas（响应 DTO 集中定义）
 from . import schemas
+
 # 复用 deps：主题 id 校验 + manager 依赖注入
 from .deps import get_knowledge_manager, require_topic_id
 
@@ -42,9 +43,7 @@ def list_documents(
     # 2. DTO 转换：Pydantic 做字段映射 + 序列化（from_attributes=True 兼容 dict 输入）
     docs = [schemas.DocumentListItem(**d) for d in rows]
     # 3. 返回组装好的响应
-    return schemas.DocumentListResponse(
-        topic_id=topic_id, total=len(docs), documents=docs
-    )
+    return schemas.DocumentListResponse(topic_id=topic_id, total=len(docs), documents=docs)
 
 
 # ---- 路由: 软删单个文档 ----

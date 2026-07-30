@@ -7,11 +7,12 @@
 # ---- 导入依赖 ----
 from __future__ import annotations
 
+from collections.abc import Iterator
 from functools import lru_cache
 from pathlib import Path
-from typing import Iterator
 
-from fastapi import HTTPException, Path as FPath, Request
+from fastapi import HTTPException, Request
+from fastapi import Path as FPath
 
 # ---- 业务层依赖 ----
 # KnowledgeManager 负责 KB 全流程；KBVectorStoreFactory 负责按环境变量切换向量库后端
@@ -73,9 +74,7 @@ def get_knowledge_manager(
 
     # 2. 向量库：按环境变量切换，不再手写 chromadb client
     # 允许 serve.py 在启动时在 app.state 注入自定义 factory；否则走默认单例
-    factory: KBVectorStoreFactory | None = getattr(
-        request.app.state, "KB_VECTOR_FACTORY", None
-    )
+    factory: KBVectorStoreFactory | None = getattr(request.app.state, "KB_VECTOR_FACTORY", None)
     if factory is None:
         # 默认单例：进程内共享同一个 factory 实例（避免每请求重新建立 Qdrant gRPC 连接）
         factory = KBVectorStoreFactory.get_default(project_root=root)

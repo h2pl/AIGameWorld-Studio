@@ -130,12 +130,14 @@ class KnowledgeReader:
                 text = self._ocr_image(img_path)
                 if not text:
                     continue
-                documents.append(self._make_doc(
-                    text=text,
-                    fp=img_path,
-                    directory=directory,
-                    content_type="image",
-                ))
+                documents.append(
+                    self._make_doc(
+                        text=text,
+                        fp=img_path,
+                        directory=directory,
+                        content_type="image",
+                    )
+                )
         return documents
 
     # ------------------------------------------------------------------
@@ -150,12 +152,14 @@ class KnowledgeReader:
                 text = self._ocr_video(vid_path)
                 if not text:
                     continue
-                documents.append(self._make_doc(
-                    text=text,
-                    fp=vid_path,
-                    directory=directory,
-                    content_type="video",
-                ))
+                documents.append(
+                    self._make_doc(
+                        text=text,
+                        fp=vid_path,
+                        directory=directory,
+                        content_type="video",
+                    )
+                )
         return documents
 
     # ------------------------------------------------------------------
@@ -252,9 +256,7 @@ class KnowledgeReader:
                     if sub_v is None:
                         continue
                     flat[f"{k}_{sub_k}"] = (
-                        ",".join(str(x) for x in sub_v)
-                        if isinstance(sub_v, (list, tuple))
-                        else str(sub_v)
+                        ",".join(str(x) for x in sub_v) if isinstance(sub_v, (list, tuple)) else str(sub_v)
                     )
             else:
                 flat[str(k)] = str(v)
@@ -280,8 +282,9 @@ class KnowledgeReader:
     @staticmethod
     def _ocr_video(video_path: Path) -> str | None:
         try:
-            import cv2  # type: ignore
             import tempfile
+
+            import cv2  # type: ignore
 
             cap = cv2.VideoCapture(str(video_path))
             fps = cap.get(cv2.CAP_PROP_FPS) or 30

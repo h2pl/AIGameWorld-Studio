@@ -2,19 +2,22 @@
 
 # ---- 导入依赖 ----
 from __future__ import annotations
+
 # 启用类型注解的前向引用支持
-
 from typing import Any
-# 导入任意类型注解
 
+# 导入任意类型注解
 from pydantic import BaseModel, Field
+
 # 导入 Pydantic 基础模型和字段定义
 
 
 # === Topic Registry / 主题注册相关模型 ===
 
+
 class TopicCreateRequest(BaseModel):
     """创建/更新主题请求."""
+
     # 主题唯一标识（短 slug），必填，不能为空
     topic_id: str = Field(..., min_length=1, description="主题唯一标识（短 slug）")
     # 选填：主题显示名称，默认用 topic_id
@@ -29,6 +32,7 @@ class TopicCreateRequest(BaseModel):
 
 class TopicResponse(BaseModel):
     """主题详情响应."""
+
     # 主题唯一ID
     topic_id: str = Field(..., description="主题唯一标识")
     # 主题展示名
@@ -49,18 +53,22 @@ class TopicResponse(BaseModel):
 
 class TopicListResponse(BaseModel):
     """主题列表响应."""
+
     # 主题总数
     total: int
     # 主题详情列表
     topics: list[TopicResponse]
+
 
 # === Topic 分组结束 ===
 
 
 # === World-Topic Binding / World包与主题绑定 ===
 
+
 class BindingRequest(BaseModel):
     """绑定 world 到主题请求."""
+
     # 必填：World包ID（如 mordor）
     world_id: str = Field(..., description="world pack id，如 mordor")
     # 必填：目标主题ID
@@ -71,6 +79,7 @@ class BindingRequest(BaseModel):
 
 class BindingResponse(BaseModel):
     """绑定操作响应."""
+
     # 操作是否成功
     ok: bool
     # 操作涉及的World包ID
@@ -85,15 +94,18 @@ class BindingResponse(BaseModel):
 
 class BindingListResponse(BaseModel):
     """绑定列表响应."""
+
     # 绑定记录总数
     total: int
     # 绑定记录列表（字典格式）
     bindings: list[dict]
 
+
 # === Binding 分组结束 ===
 
 
 # === Search / 语义检索相关模型 ===
+
 
 class SearchHit(BaseModel):
     # 匹配到的分块文本内容
@@ -129,10 +141,12 @@ class SearchResponse(BaseModel):
     # 匹配命中的结果列表
     hits: list[SearchHit]
 
+
 # === Search 分组结束 ===
 
 
 # === Documents / 文档管理相关模型 ===
+
 
 class DocumentListItem(BaseModel):
     # 文档唯一ID
@@ -182,10 +196,12 @@ class DocumentDeleteResponse(BaseModel):
     # 被删除的分块ID数量
     deleted_chunk_ids_count: int
 
+
 # === Documents 分组结束 ===
 
 
 # === Index / Trigger reindex / 索引触发相关模型 ===
+
 
 class IndexRequest(BaseModel):
     # 是否强制全量重建索引，默认False（增量）
@@ -212,10 +228,12 @@ class IndexResponse(BaseModel):
     # 错误信息（失败时填充）
     error: str | None = None
 
+
 # === Index 分组结束 ===
 
 
 # === Jobs / 索引任务相关模型 ===
+
 
 class JobItem(BaseModel):
     # 任务唯一ID
@@ -248,10 +266,12 @@ class JobListResponse(BaseModel):
     # 任务列表
     jobs: list[JobItem]
 
+
 # === Jobs 分组结束 ===
 
 
 # === Audit / 审计日志相关模型 ===
+
 
 class AuditItem(BaseModel):
     # 审计记录ID
@@ -284,10 +304,12 @@ class AuditListResponse(BaseModel):
     # 审计记录列表
     audit: list[AuditItem]
 
+
 # === Audit 分组结束 ===
 
 
 # === Stats / 统计与清空相关模型 ===
+
 
 class StatsResponse(BaseModel):
     # 主题ID
@@ -325,5 +347,6 @@ class ClearResponse(BaseModel):
     soft_deleted_documents: int
     # 清空后剩余的分块数（应为0）
     total_chunks: int
+
 
 # === Stats 分组结束 ===

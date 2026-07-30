@@ -45,9 +45,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 #    因为要先解析 --persist-path 参数，才能知道 persist_directory 实际路径。
 _chroma_settings: Settings | None = None
 _chroma_server: ChromaFastAPI | None = None
-chroma_app: FastAPI | None = (
-    None  # 用 FastAPI 类型标注（实际是 chromadb FastAPI app 实例，也是 FastAPI 子类）
-)
+chroma_app: FastAPI | None = None  # 用 FastAPI 类型标注（实际是 chromadb FastAPI app 实例，也是 FastAPI 子类）
 
 
 def _init_chroma_app(persist_path: Path):
@@ -153,9 +151,7 @@ def _api_list_collections() -> list[dict]:
             cnt = int(cnt_resp.get("count", cnt_resp) if isinstance(cnt_resp, dict) else cnt_resp)
         except Exception:
             cnt = -1
-        out.append(
-            {"id": str(cid), "name": str(col.get("name", col.get("name"))), "count": int(cnt)}
-        )
+        out.append({"id": str(cid), "name": str(col.get("name", col.get("name"))), "count": int(cnt)})
     out.sort(key=lambda x: (-x["count"], x["name"]))
     return out
 
@@ -194,9 +190,7 @@ def viewer_get_records(name: str, limit: int = 10, embeddings: bool = False):
             if emb is None:
                 shortened.append(None)
             else:
-                shortened.append(
-                    {"dim": len(emb), "first_values": emb[:5], "last_values": emb[-3:]}
-                )
+                shortened.append({"dim": len(emb), "first_values": emb[:5], "last_values": emb[-3:]})
         data["embeddings_preview"] = shortened
         del data["embeddings"]  # 不返回完整 embedding（太大），用 preview 代替
     return JSONResponse(data)
@@ -411,14 +405,12 @@ def _open_browser_when_ready(url: str, timeout_s: int = 40) -> None:
                         pass
                     print(f"[viewer] opened in browser → {url}")
                     return
-            except (_requests.exceptions.ConnectionError, TimeoutError):
+            except _requests.exceptions.ConnectionError, TimeoutError:
                 pass
             except Exception:
                 pass
             time.sleep(1.0)
-        print(
-            f"[viewer] timeout waiting for server up, not opening browser (last tried {health_url})"
-        )
+        print(f"[viewer] timeout waiting for server up, not opening browser (last tried {health_url})")
 
     threading.Thread(target=_worker, name="open-browser", daemon=True).start()
 
@@ -478,8 +470,7 @@ def main(argv: list[str] | None = None) -> None:
         routes_to_remove = [
             r
             for r in app.routes
-            if getattr(r, "path", "").startswith("/viewer")
-            or getattr(r, "path", "").startswith("/_/")
+            if getattr(r, "path", "").startswith("/viewer") or getattr(r, "path", "").startswith("/_/")
         ]
         for r in routes_to_remove:
             try:

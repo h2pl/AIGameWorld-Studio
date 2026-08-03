@@ -52,12 +52,13 @@ class KnowledgePipeline:
         *,
         chunk_size: int = 800,
         chunk_overlap: int = 120,
+        enrichers: list | None = None,
     ):
         self.topic_id = topic_id
         self.collection_name = f"kb_{topic_id}"
         self._factory = factory or KBVectorStoreFactory.get_default()
         self._store = store
-        self._reader = KnowledgeReader()
+        self._reader = KnowledgeReader(enrichers=enrichers)
 
         # BGE-M3 本地路径（ModelScope / HuggingFace 下载缓存）
         import os

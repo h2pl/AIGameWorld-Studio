@@ -57,6 +57,7 @@ class KnowledgeManager:
         self._chunk_size = chunk_size
         self._chunk_overlap = chunk_overlap
         self._reader = KnowledgeReader()
+        self._readers: dict[str, KnowledgeReader] = {}  # topic → 带 enrichers 的 reader
         self._pipelines: dict[str, KnowledgePipeline] = {}
 
         if auto_run_migrations:
@@ -68,6 +69,14 @@ class KnowledgeManager:
     # 辅助方法
     # ------------------------------------------------------------------
 
+    def _get_reader(self, topic_id: str) -> KnowledgeReader:
+        """获取/缓存指定 topic 的 KnowledgeReader（带主题特定的 enrichers）."""
+        if topic_id not in self._readers:
+            from .enrichers import get_enrichers_for_topic
+
+            self._readers[topic_id] = KnowledgeReader(enrichers=get_enrichers_for_topic(topic_id))
+        return self._readers[topic_id]
+
     def _get_pipeline(self, topic_id: str) -> KnowledgePipeline:
         """获取/缓存指定 topic 的 KnowledgePipeline 实例."""
         if topic_id not in self._pipelines:
@@ -77,6 +86,7 @@ class KnowledgeManager:
                 store=self._store,
                 chunk_size=self._chunk_size,
                 chunk_overlap=self._chunk_overlap,
+                enrichers=self._get_reader(topic_id)._enrichers,
             )
         return self._pipelines[topic_id]
 
@@ -685,8 +695,9 @@ class KnowledgeManager:
         """
         self.ensure_topic(topic_id)
 
-        # 加载文档（逻辑在 KnowledgeReader）
-        docs = self._reader.load_documents(files)
+        # 加载文档（用带主题 enrichers 的 reader）
+        reader = self._get_reader(topic_id)
+        docs = reader.load_documents(files)
         if not docs:
             return {"ok": False, "error": "没有读到任何文件", "doc_ids": [], "chunks": 0}
 

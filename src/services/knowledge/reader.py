@@ -21,13 +21,30 @@ from pathlib import Path
 import yaml
 from llama_index.core import Document, SimpleDirectoryReader
 
+from .enrichers import MetadataEnricher
+
 
 class KnowledgeReader:
-    """多模态知识库文件加载器."""
+    """多模态知识库文件加载器.
+
+    通用元数据（file_path / sha256 / page_number / content_type 等）由本类负责提取。
+    主题特定的业务元数据（如编年史卷数）通过 ``enrichers`` 注入，本类不包含任何 IP 专属逻辑。
+    """
 
     SUPPORTED_TEXT = {".md", ".pdf"}
     SUPPORTED_IMAGE = {".png", ".jpg", ".jpeg", ".webp"}
     SUPPORTED_VIDEO = {".mp4", ".webm"}
+
+    def __init__(self, enrichers: list[MetadataEnricher] | None = None):
+        """构造 Reader.
+
+        Parameters
+        ----------
+        enrichers : list[MetadataEnricher] | None
+            主题特定的元数据增强器列表，按顺序对每个文件的 metadata 执行增强。
+            None 或空列表表示不做业务元数据增强（纯通用模式）。
+        """
+        self._enrichers: list[MetadataEnricher] = list(enrichers) if enrichers else []
 
     _FRONTMATTER_RE = re.compile(
         r"^---\s*\n(?P<meta>.*?)\n---\s*\n?(?P<body>.*)$",
@@ -338,24 +355,19 @@ class KnowledgeReader:
 
     @staticmethod
     def infer_chronicle_volume(file_name: str) -> str | None:
-        """从文件名识别编年史卷数，支持中英文混合命名.
+        """[已废弃] 从文件名识别编年史卷数.
 
-        例：
-          01_魔兽世界编年史·第一卷（Chronicle Vol.1）.pdf → "Chronicle Vol.1 / 第一卷"
-          魔兽世界编年史·第二卷.pdf                        → "第二卷"
-          Chronicle_Vol_3.pdf                              → "Chronicle Vol.3"
+        .. deprecated::
+            此逻辑已迁移到 ``enrichers.ChronicleVolumeEnricher``，
+            通过 ``KnowledgeReader(enrichers=[...])`` 注入。
+            保留此方法仅为向后兼容，后续将移除。
         """
-        if not file_name:
-            return None
-        # 1) 优先匹配 "Vol" + 数字
-        m = re.search(r"Vol[\.\s_\-]*(\d+)", file_name, flags=re.IGNORECASE)
-        vol_en = f"Chronicle Vol.{m.group(1)}" if m else None
-        # 2) 匹配中文 "第X卷"
-        m2 = re.search(r"第\s*([一二三四五六七八九十百千0-9]+)\s*卷", file_name)
-        vol_cn = f"第{m2.group(1)}卷" if m2 else None
-        if vol_en and vol_cn:
-            return f"{vol_en} / {vol_cn}"
-        return vol_en or vol_cn
+        from .enrichers import ChronicleVolumeEnricher
+
+        enricher = ChronicleVolumeEnricher()
+        meta: dict = {}
+        enricher.enrich(Path(file_name), meta)
+        return meta.get("chronicle_volume")
 
     def load_documents(self, files: list[Path]) -> list[Document]:
         """加载指定的文件列表，按后缀选择 reader，附带标准元数据.
@@ -370,7 +382,8 @@ class KnowledgeReader:
         list[Document]
             每个文件的每页/每段生成一个 Document，metadata 含
             file_path / file_name / file_size / sha256 / content_type /
-            source_type / title / page_number / tags / chronicle_volume 等。
+            source_type / title / page_number / tags 等通用字段。
+            主题特定的业务字段由 enrichers 注入（见 ``__init__`` 参数）。
         """
         import logging
 
@@ -394,7 +407,6 @@ class KnowledgeReader:
 
             file_size = fp.stat().st_size
             sha256 = hashlib.sha256(fp.read_bytes()).hexdigest()
-            chronicle_vol = self.infer_chronicle_volume(fp.name)
 
             for idx, d in enumerate(sub_docs):
                 meta = dict(d.metadata or {})
@@ -413,17 +425,17 @@ class KnowledgeReader:
                         "related_packs": [],
                     }
                 )
-                if chronicle_vol:
-                    meta["chronicle_volume"] = chronicle_vol
+                # 主题特定的业务元数据增强（编年史卷数 / 地区分类 / 世代等）
+                for enricher in self._enrichers:
+                    meta = enricher.enrich(fp, meta)
                 d.metadata = meta
                 d.excluded_llm_metadata_keys = []
                 d.excluded_embed_metadata_keys = []
                 out.append(d)
 
             _log.info(
-                "加载完成: %s%s → %d segments  %.2fMB  sha256=%s…",
+                "加载完成: %s → %d segments  %.2fMB  sha256=%s…",
                 fp.name,
-                f" [{chronicle_vol}]" if chronicle_vol else "",
                 len(sub_docs),
                 file_size / 1024 / 1024,
                 sha256[:12],

@@ -4,6 +4,7 @@
 - 线程安全的 execute / executemany / fetch 封装；
 - crawler 表初始化（crawler_job / crawler_item / crawler_topic 三张表）；
 - 所有写操作都在内部 commit，失败自动 rollback，避免主流程 try/except。
+- 时间字段统一用 TEXT 存 'yyyy-MM-dd HH:mm:ss' 格式，直接可读。
 """
 
 from __future__ import annotations
@@ -13,6 +14,7 @@ import sqlite3
 import threading
 from collections.abc import Iterable, Iterator, Sequence
 from contextlib import contextmanager
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -34,6 +36,11 @@ class SQLiteStore:
     def new_id() -> str:
         """生成全局唯一 ID（UUID4 hex，32 位十六进制，不带短横，DB/URL/文件名友好）."""
         return _uuid.uuid4().hex
+
+    @staticmethod
+    def now_str() -> str:
+        """返回当前时间的字符串格式 'yyyy-MM-dd HH:mm:ss'，用于所有时间字段."""
+        return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     def __init__(
         self,
@@ -113,8 +120,8 @@ class SQLiteStore:
                     id          TEXT PRIMARY KEY,
                     title       TEXT NOT NULL DEFAULT '',
                     description TEXT NOT NULL DEFAULT '',
-                    created_at  INTEGER NOT NULL DEFAULT 0,
-                    updated_at  INTEGER NOT NULL DEFAULT 0
+                    created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S','now')),
+                    updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S','now'))
                 )
                 """
             )
@@ -133,9 +140,9 @@ class SQLiteStore:
                     staging_dir TEXT NOT NULL DEFAULT '',
                     created_by  TEXT NOT NULL DEFAULT 'ui',
                     error_msg   TEXT,
-                    created_at  INTEGER NOT NULL DEFAULT 0,
-                    started_at  INTEGER,
-                    finished_at INTEGER
+                    created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S','now')),
+                    started_at  TEXT,
+                    finished_at TEXT
                 )
                 """
             )
@@ -157,9 +164,9 @@ class SQLiteStore:
                     size_bytes      INTEGER NOT NULL DEFAULT 0,
                     content         TEXT NOT NULL DEFAULT '',
                     error_msg       TEXT,
-                    created_at      INTEGER NOT NULL DEFAULT 0,
-                    fetched_at      INTEGER,
-                    promoted_at     INTEGER
+                    created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S','now')),
+                    fetched_at      TEXT,
+                    promoted_at     TEXT
                 )
                 """
             )
@@ -338,52 +345,44 @@ class SQLiteStore:
                 self._conn = None
 
     # ------------------------------------------------------------------
-    # Migrations
+    # Schema 初始化（幂等，无 migration 记录表）
     # ------------------------------------------------------------------
 
-    # 按文件名前缀数字排序执行 migrations 目录下的 *.sql，幂等（用 _migrations 表记录已执行）
+    # 按文件名排序执行 migrations 目录下的 *.sql，全部幂等（CREATE TABLE IF NOT EXISTS）
     # 参数 migrations_dir：包含 0001_xxx.sql / 0002_xxx.sql 的目录
-    # 返回 list[str]：本次新执行过的文件名（空列表 = 全部已执行过）
-    def run_migrations(self, migrations_dir: str | Path) -> list[str]:
-        """幂等执行 migrations_dir 下的 .sql 文件，按编号升序."""
+    # 返回 list[str]：本次执行的文件名
+    def init_schema(self, migrations_dir: str | Path) -> list[str]:
+        """幂等执行 migrations_dir 下的 .sql 文件，按编号升序.
+
+        与 migration 机制不同，不维护 _migrations 记录表：
+        每次调用都执行所有 SQL 文件，靠 CREATE TABLE IF NOT EXISTS 保证幂等。
+        """
         md = Path(migrations_dir).resolve()
         if not md.is_dir():
-            _log.warning("run_migrations: migrations dir not found: %s", md)
+            _log.warning("init_schema: migrations dir not found: %s", md)
             return []
 
         with self._lock:
-            # 建元表：记录已执行过的文件名
-            self._conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS _migrations (
-                    filename   TEXT PRIMARY KEY,
-                    applied_at INTEGER NOT NULL DEFAULT (unixepoch('subsec') * 1000)
-                )
-                """
-            )
-            self._conn.commit()
-
             # 列出目录下全部 .sql，按文件名排序
             sql_files = sorted([p for p in md.iterdir() if p.is_file() and p.suffix.lower() == ".sql"])
 
             applied: list[str] = []
             for fp in sql_files:
                 name = fp.name
-                # 查是否已执行
-                row = self._conn.execute("SELECT 1 FROM _migrations WHERE filename = ?", (name,)).fetchone()
-                if row is not None:
-                    continue  # 已跑过，跳过
-
                 # 读文件内容，executescript 批量执行（多个 SQL 语句）
                 sql = fp.read_text(encoding="utf-8")
                 try:
                     self._conn.executescript(sql)
-                    self._conn.execute("INSERT INTO _migrations (filename) VALUES (?)", (name,))
                     self._conn.commit()
                     applied.append(name)
-                    _log.info("run_migrations: applied %s", name)
+                    _log.info("init_schema: applied %s", name)
                 except Exception:
                     self._conn.rollback()
-                    _log.exception("run_migrations FAILED at file: %s", name)
+                    _log.exception("init_schema FAILED at file: %s", name)
                     raise
             return applied
+
+    # 向后兼容：run_migrations → init_schema
+    def run_migrations(self, migrations_dir: str | Path) -> list[str]:
+        """[已废弃] init_schema 的别名，向后兼容."""
+        return self.init_schema(migrations_dir)

@@ -28,8 +28,8 @@ from __future__ import annotations
 import argparse
 import contextlib
 import json
-import time
 from collections.abc import Iterator
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -302,7 +302,7 @@ def create_app(
         return {
             "status": "ok",
             "service": "aw-studio-serve",
-            "ts_ms": int(time.time() * 1000),
+            "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "source_dir": str(SOURCE_DIR_GLOBAL),
             "chroma_path": str(chroma_path),
             "data_dir": str(data_dir),

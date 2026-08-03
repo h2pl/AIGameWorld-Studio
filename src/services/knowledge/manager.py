@@ -44,7 +44,7 @@ class KnowledgeManager:
         factory: KBVectorStoreFactory | None = None,
         store: SQLiteStore | None = None,
         project_root: Path | str | None = None,
-        auto_run_migrations: bool = True,
+        auto_init_schema: bool = True,
         created_by: str = "ui",
         bootstrap_default_topics: bool = False,
         chunk_size: int = 800,
@@ -60,8 +60,8 @@ class KnowledgeManager:
         self._readers: dict[str, KnowledgeReader] = {}  # topic → 带 enrichers 的 reader
         self._pipelines: dict[str, KnowledgePipeline] = {}
 
-        if auto_run_migrations:
-            self._store.run_migrations(self._project_root / "migrations")
+        if auto_init_schema:
+            self._store.init_schema(self._project_root / "migrations")
         if bootstrap_default_topics:
             self._bootstrap_default_topics()
 
@@ -117,7 +117,7 @@ class KnowledgeManager:
         """写审计日志到 kb_audit_log 表."""
         try:
             audit_id = SQLiteStore.new_id()
-            now_ms = int(time.time() * 1000)
+            now_str = SQLiteStore.now_str()
             filters_json = json.dumps(filters, ensure_ascii=False) if filters else None
             result_json = json.dumps(result_summary, ensure_ascii=False) if result_summary else None
             self._store.execute(
@@ -139,7 +139,7 @@ class KnowledgeManager:
                     filters_json,
                     result_json,
                     error,
-                    now_ms,
+                    now_str,
                 ),
             )
         except Exception:
@@ -315,7 +315,7 @@ class KnowledgeManager:
         )
         chunk_ids = [r["id"] for r in rows]
 
-        now_ms = int(time.time() * 1000)
+        now_str = SQLiteStore.now_str()
         with self._store.transaction():
             self._store.execute(
                 """
@@ -323,7 +323,7 @@ class KnowledgeManager:
                    SET status = 'deleted', updated_at = ?, deleted_at = ?
                  WHERE id = ? AND topic_id = ?
                 """,
-                (now_ms, now_ms, doc_id, topic_id),
+                (now_str, now_str, doc_id, topic_id),
             )
             self._store.execute(
                 "DELETE FROM kb_chunk WHERE document_id = ?",
@@ -469,14 +469,14 @@ class KnowledgeManager:
         job_id = ""
         try:
             job_id = SQLiteStore.new_id()
-            now_ms = int(time.time() * 1000)
+            now_str = SQLiteStore.now_str()
             self._store.execute(
                 """
                 INSERT INTO kb_index_job
                     (id, topic_id, document_id, mode, status, progress, created_by, created_at)
                 VALUES (?, ?, NULL, ?, 'pending', 0, ?, ?)
                 """,
-                (job_id, topic_id, mode, self._created_by, now_ms),
+                (job_id, topic_id, mode, self._created_by, now_str),
             )
             self._audit("index_start", topic_id=topic_id, job_id=job_id)
         except Exception:
@@ -488,14 +488,14 @@ class KnowledgeManager:
         """后台线程执行索引（由 FastAPI BackgroundTasks 调度）."""
         try:
             # 更新 job 状态为 running
-            now_ms = int(time.time() * 1000)
+            now_str = SQLiteStore.now_str()
             self._store.execute(
                 """
                 UPDATE kb_index_job
                    SET status = 'running', started_at = ?
                  WHERE id = ?
                 """,
-                (now_ms, job_id),
+                (now_str, job_id),
             )
 
             pipeline = self._get_pipeline(topic_id)
@@ -514,7 +514,7 @@ class KnowledgeManager:
                        file_total = ?,
                        file_done = ?,
                        chunk_total = ?,
-                       finished_at = unixepoch('subsec') * 1000
+                       finished_at = strftime('%Y-%m-%d %H:%M:%S','now')
                  WHERE id = ?
                 """,
                 (files, files, chunks, job_id),
@@ -529,7 +529,7 @@ class KnowledgeManager:
                     UPDATE kb_index_job
                        SET status = 'failed',
                            error_msg = ?,
-                           finished_at = unixepoch('subsec') * 1000
+                           finished_at = strftime('%Y-%m-%d %H:%M:%S','now')
                      WHERE id = ?
                     """,
                     (error, job_id),
@@ -550,14 +550,14 @@ class KnowledgeManager:
         """后台线程执行文件级 ingest（由 /ingest-files 端点的 BackgroundTasks 调度）."""
         try:
             # 更新 job 状态为 running
-            now_ms = int(time.time() * 1000)
+            now_str = SQLiteStore.now_str()
             self._store.execute(
                 """
                 UPDATE kb_index_job
                    SET status = 'running', started_at = ?, file_total = ?
                  WHERE id = ?
                 """,
-                (now_ms, len(file_paths), job_id),
+                (now_str, len(file_paths), job_id),
             )
 
             result = self.ingest_files(
@@ -578,7 +578,7 @@ class KnowledgeManager:
                        file_total = ?,
                        file_done = ?,
                        chunk_total = ?,
-                       finished_at = unixepoch('subsec') * 1000
+                       finished_at = strftime('%Y-%m-%d %H:%M:%S','now')
                  WHERE id = ?
                 """,
                 (len(file_paths), len(file_paths), chunks, job_id),
@@ -598,7 +598,7 @@ class KnowledgeManager:
                     UPDATE kb_index_job
                        SET status = 'failed',
                            error_msg = ?,
-                           finished_at = unixepoch('subsec') * 1000
+                           finished_at = strftime('%Y-%m-%d %H:%M:%S','now')
                      WHERE id = ?
                     """,
                     (error, job_id),
@@ -806,7 +806,7 @@ class KnowledgeManager:
         """创建或更新主题（幂等）."""
         display_name = name or topic_id
         tags_json = json.dumps(tags or [], ensure_ascii=False)
-        now_ms = int(time.time() * 1000)
+        now_str = SQLiteStore.now_str()
 
         existing = self._store.fetch_one(
             "SELECT topic_id FROM knowledge_topic WHERE topic_id = ?",
@@ -830,7 +830,7 @@ class KnowledgeManager:
                 params.append(status)
             if set_parts:
                 set_parts.append("updated_at = ?")
-                params.append(now_ms)
+                params.append(now_str)
                 params.append(topic_id)
                 self._store.execute(
                     f"UPDATE knowledge_topic SET {', '.join(set_parts)} WHERE topic_id = ?",
@@ -851,8 +851,8 @@ class KnowledgeManager:
                     tags_json,
                     status or "active",
                     self._created_by,
-                    now_ms,
-                    now_ms,
+                    now_str,
+                    now_str,
                 ),
             )
             # 同时创建 knowledge 目录骨架

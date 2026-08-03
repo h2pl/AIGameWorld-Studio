@@ -22,7 +22,6 @@ from __future__ import annotations
 # 标准库导入
 import hashlib
 import json
-import time
 from pathlib import Path
 from typing import Any
 
@@ -170,7 +169,7 @@ class KnowledgePipeline:
                         preview,
                         0,
                         meta_json,
-                        int(time.time() * 1000),
+                        SQLiteStore.now_str(),
                     )
                 )
                 chunk_ids.append(chunk_id)
@@ -191,7 +190,7 @@ class KnowledgePipeline:
                     """
                     UPDATE kb_document
                        SET status       = 'done',
-                           updated_at   = unixepoch('subsec') * 1000,
+                           updated_at   = strftime('%Y-%m-%d %H:%M:%S','now'),
                            error_msg    = NULL
                      WHERE id = ?
                        AND status != 'deleted'
@@ -217,7 +216,7 @@ class KnowledgePipeline:
 
         count_docs = 0
         if self._store is not None:
-            now_ms = int(time.time() * 1000)
+            now_str = SQLiteStore.now_str()
             # SQL: 软删 kb_document（status = deleted，填 updated_at / deleted_at）
             # 注意：SQLiteStore.execute 返回 int = rowcount，不是 cursor 对象
             count_docs = self._store.execute(
@@ -229,7 +228,7 @@ class KnowledgePipeline:
                  WHERE topic_id   = ?
                    AND status    != 'deleted'
                 """,
-                (now_ms, now_ms, self.topic_id),
+                (now_str, now_str, self.topic_id),
             )
             # 软删 document 不会触发 ON DELETE CASCADE（因为只是 UPDATE），所以要真删 chunk
             self._store.execute(
@@ -424,7 +423,7 @@ class KnowledgePipeline:
             if sha_row and sha_row["sha256"] == sha256:
                 return existing["id"]
             # 哈希不一致 → 软删旧版本，version + 1
-            now_ms = int(time.time() * 1000)
+            now_str = SQLiteStore.now_str()
             # SQL: 软删旧版本（status=deleted + 填时间戳）
             self._store.execute(
                 """
@@ -434,7 +433,7 @@ class KnowledgePipeline:
                        deleted_at = ?
                  WHERE id = ?
                 """,
-                (now_ms, now_ms, existing["id"]),
+                (now_str, now_str, existing["id"]),
             )
             new_version = int(existing["version"] or 1) + 1
         else:
@@ -483,7 +482,7 @@ class KnowledgePipeline:
             """
             INSERT INTO kb_index_job
                 (id, topic_id, document_id, mode, status, progress, created_by, created_at)
-            VALUES (?, ?, ?, ?, 'pending', 0, ?, unixepoch('subsec') * 1000)
+            VALUES (?, ?, ?, ?, 'pending', 0, ?, strftime('%Y-%m-%d %H:%M:%S','now'))
             """,
             (job_id, self.topic_id, document_id, mode, created_by),
         )
@@ -526,11 +525,11 @@ class KnowledgePipeline:
             set_fields.append("error_msg = ?")
             params.append(error_msg)
         if status in {"done", "failed", "canceled"}:
-            set_fields.append("finished_at = unixepoch('subsec') * 1000")
+            set_fields.append("finished_at = strftime('%Y-%m-%d %H:%M:%S','now')")
             if status == "running":
-                set_fields.append("started_at  = unixepoch('subsec') * 1000")
+                set_fields.append("started_at  = strftime('%Y-%m-%d %H:%M:%S','now')")
         elif status == "running":
-            set_fields.append("started_at  = IFNULL(started_at, unixepoch('subsec') * 1000)")
+            set_fields.append("started_at  = IFNULL(started_at, strftime('%Y-%m-%d %H:%M:%S','now'))")
         params.append(job_id)
         self._store.execute(f"UPDATE kb_index_job SET {', '.join(set_fields)} WHERE id = ?", tuple(params))
 
@@ -561,7 +560,7 @@ class KnowledgePipeline:
             INSERT INTO kb_audit
                 (id, actor, op, topic_id, world_id, document_id, job_id, query_text, top_k,
                  filters_json, result_json, error_msg, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, unixepoch('subsec') * 1000)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%d %H:%M:%S','now'))
             """,
             (
                 SQLiteStore.new_id(),

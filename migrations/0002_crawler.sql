@@ -16,9 +16,9 @@ CREATE TABLE IF NOT EXISTS crawler_job (
     done_items   INTEGER NOT NULL DEFAULT 0,  -- 成功抓取数
     staging_dir  TEXT NOT NULL,               -- 暂存目录相对项目根的路径
     created_by   TEXT NOT NULL DEFAULT 'system',
-    created_at   INTEGER NOT NULL DEFAULT (unixepoch('subsec') * 1000),
-    started_at   INTEGER,
-    finished_at  INTEGER,
+    created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S','now')),
+    started_at   TEXT,
+    finished_at  TEXT,
     error_msg    TEXT
 ) STRICT;
 
@@ -33,8 +33,8 @@ CREATE TABLE IF NOT EXISTS crawler_item (
     sha256       TEXT,                        -- 内容哈希，用于去重
     status       TEXT NOT NULL,               -- 'pending' | 'fetched' | 'failed' | 'promoted' | 'discarded'
     error_msg    TEXT,
-    fetched_at   INTEGER,                     -- 抓取完成时间戳（ms）
-    promoted_at  INTEGER                      -- promote 到 knowledge/ 的时间戳（ms）
+    fetched_at   TEXT,                     -- 抓取完成时间
+    promoted_at  TEXT                      -- promote 到 knowledge/ 的时间
 ) STRICT;
 
 CREATE INDEX IF NOT EXISTS idx_crawler_item_job ON crawler_item(job_id);

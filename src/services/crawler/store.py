@@ -24,11 +24,11 @@ def _row_to_dict(row) -> dict[str, Any]:
     return {k: row[k] for k in row.keys()}
 
 
-# 获取当前 Unix 时间戳（毫秒级整数）
-# 返回 int：1970-01-01 以来的毫秒数
-def _now_ms() -> int:
-    # 秒转毫秒，截断小数
-    return int(time.time() * 1000)
+# 获取当前时间字符串（yyyy-MM-dd HH:mm:ss 格式，直接可读）
+# 返回 str：当前时间的字符串表示
+def _now_str() -> str:
+    # 格式化当前时间
+    return time.strftime("%Y-%m-%d %H:%M:%S")
 
 
 # ------------------------------------------------------------------
@@ -68,7 +68,7 @@ def create_job(
         VALUES (?, ?, ?, ?, 'pending', ?, ?, 0, ?, ?, ?)
         """,
         # status 默认 pending，done_items 默认 0
-        (job_id, topic_id, query, mode, source_type, total_items, staging_dir, created_by, _now_ms()),
+        (job_id, topic_id, query, mode, source_type, total_items, staging_dir, created_by, _now_str()),
     )
     # 查回刚插入的记录返回，失败则空 dict
     return get_job(store, job_id) or {}
@@ -149,7 +149,7 @@ def update_job_status(
         set_fields.append("error_msg = ?")
         params.append(error_msg)
     # 统一取一次时间戳，保证 started_at/finished_at 相同
-    now = _now_ms()
+    now = _now_str()
     # 标记任务开始
     if started:
         set_fields.append("started_at = ?")
@@ -230,7 +230,7 @@ def update_item_fetched(
         "fetched_at = ?",
     ]
     # 必更字段的参数
-    params: list[Any] = [content_type, file_path, file_size, sha256, status, _now_ms()]
+    params: list[Any] = [content_type, file_path, file_size, sha256, status, _now_str()]
     # 传了新标题（非 None 才更新，空串也可能是有效值）
     if title is not None:
         # 追加 title 更新
@@ -283,7 +283,7 @@ def mark_item_promoted(store: SQLiteStore, item_id: str, new_path: str | None = 
     # 固定更状态+ promote 时间
     set_fields: list[str] = ["status = 'promoted'", "promoted_at = ?"]
     # promoted_at 参数
-    params: list[Any] = [_now_ms()]
+    params: list[Any] = [_now_str()]
     # 传了 promote 后的新路径
     if new_path is not None:
         # 更 file_path 为 promote 后目标路径

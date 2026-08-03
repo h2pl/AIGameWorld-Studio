@@ -410,7 +410,7 @@ def _make_kb_manager(args):
     topic_id = getattr(args, "topic_id", None) or getattr(args, "world_id", "default")
     return KnowledgeManager(
         project_root=Path.cwd(),
-        auto_run_migrations=True,
+        auto_init_schema=True,
         created_by="cli",
     ), topic_id
 

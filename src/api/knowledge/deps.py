@@ -61,7 +61,7 @@ def get_knowledge_manager(
 
     - 向量库：通过 KBVectorStoreFactory.get_default() 按 KB_VECTOR_STORE 环境变量选择 Qdrant/Chroma
       （默认：qdrant，Docker 容器暴露 http://127.0.0.1:6333；设 KB_VECTOR_STORE=chroma 切回旧模式）
-    - SQLite：project_root/data/studio.db，每次请求前确保 migrations 已跑（store.run_migrations 幂等）
+    - SQLite：project_root/data/studio.db，每次请求前确保 schema 已初始化（store.init_schema 幂等）
     - 自动 ensure 默认主题（genshin / wow_worldview），打开 UI 直接可见
     - 请求结束后自动 close
     """
@@ -81,16 +81,16 @@ def get_knowledge_manager(
 
     # 3. SQLite 连接：用 data/studio.db；每个请求新建独立连接，避免 SQLite 跨线程共享出问题
     store = SQLiteStore(dd / "studio.db")
-    # 幂等迁移：版本号由 migrations 表管理，重复跑不报错
-    store.run_migrations(migrations_dir)
+    # 幂等初始化 schema：全部 CREATE TABLE IF NOT EXISTS，重复跑不报错
+    store.init_schema(migrations_dir)
 
     # 4. 构造 KnowledgeManager 实例并通过生成器注入
     kb = KnowledgeManager(
         factory=factory,
         store=store,
         project_root=root,
-        auto_run_migrations=False,
-        # 上面 store.run_migrations 已经跑过一次，避免重复
+        auto_init_schema=False,
+        # 上面 store.init_schema 已经跑过一次，避免重复
         created_by="ui",
         bootstrap_default_topics=True,
         # 首启自动建 genshin / wow_worldview 两个默认主题占位
@@ -116,11 +116,11 @@ def require_topic_id(
 # ---- 启动时一次性迁移（带缓存） ----
 @lru_cache(maxsize=1)
 def _migrate_once(root: Path) -> list[str]:
-    """进程内只跑一次迁移（serve.py 启动时调一下就好）."""
-    # 带 lru_cache(maxsize=1)：重复调也只执行一次，避免多 worker 下重复写 SQLite 迁移表
+    """进程内只跑一次 schema 初始化（serve.py 启动时调一下就好）."""
+    # 带 lru_cache(maxsize=1)：重复调也只执行一次
     store = SQLiteStore(root / "data" / "studio.db")
     try:
-        return store.run_migrations(root / "migrations")
+        return store.init_schema(root / "migrations")
     finally:
         # 用完就关：启动时的临时连接，不参与后续请求复用
         store.close()

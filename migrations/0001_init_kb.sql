@@ -1,24 +1,17 @@
 -- =====================================================================
--- AIGameWorld Studio — 知识库系统表 (Knowledge Base Schema v0001 · 主题中心版)
+-- AIGameWorld Studio — 知识库系统表 (Knowledge Base Schema · 主题中心版)
 -- 组织维度: **topic_id (主题/IP/游戏作品)**，例如 genshin / wow_worldview / xianjian
---   不再按 world / pack 切库！每个主题一个独立 Chroma collection (kb_{topic_id})，
+--   不再按 world / pack 切库！每个主题一个独立 Qdrant collection (kb_{topic_id})，
 --   干净隔离，互不影响。world/pack 只是运行时引用关系，通过 world_topic_binding
 --   表做绑定（N:1，预留 N:N），GameWorld RAG 侧按 world_id 查对应 topic_id 即可。
--- 双写分离: SQLite 存文档/Chunk/任务/审计等元数据，Chroma 只存 embedding + chunk_id。
+-- 双写分离: SQLite 存文档/Chunk/任务/审计等元数据，Qdrant 只存 embedding + chunk_id。
+-- 时间格式: 所有时间字段用 TEXT 存 'yyyy-MM-dd HH:mm:ss'，直接可读。
 -- 兼容性: SQLite 3.45+ (JSON1 + STRICT 模式)
 -- =====================================================================
 
 PRAGMA foreign_keys = ON;
 PRAGMA journal_mode = WAL;
 PRAGMA synchronous = NORMAL;
-
--- ---------------------------------------------------------------------
--- schema migration tracker (Alembic-lite): 只记录哪些迁移文件被执行过
--- ---------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS _schema_migrations (
-    name        TEXT PRIMARY KEY,
-    applied_at  INTEGER NOT NULL DEFAULT (unixepoch('subsec') * 1000)
-) STRICT;
 
 -- ---------------------------------------------------------------------
 -- knowledge_topic: 主题知识库注册表
@@ -32,8 +25,8 @@ CREATE TABLE IF NOT EXISTS knowledge_topic (
     tags_json       TEXT,                        -- 标签 JSON 数组
     status          TEXT NOT NULL DEFAULT 'active', -- active | archived | building
     created_by      TEXT NOT NULL DEFAULT 'system',
-    created_at      INTEGER NOT NULL DEFAULT (unixepoch('subsec') * 1000),
-    updated_at      INTEGER NOT NULL DEFAULT (unixepoch('subsec') * 1000)
+    created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S','now')),
+    updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S','now'))
 ) STRICT;
 
 -- ---------------------------------------------------------------------
@@ -46,7 +39,7 @@ CREATE TABLE IF NOT EXISTS world_topic_binding (
     world_id        TEXT NOT NULL,
     topic_id        TEXT NOT NULL REFERENCES knowledge_topic(topic_id) ON DELETE CASCADE,
     priority        INTEGER NOT NULL DEFAULT 0, -- 预留 N:N 时的排序
-    created_at      INTEGER NOT NULL DEFAULT (unixepoch('subsec') * 1000),
+    created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S','now')),
     PRIMARY KEY (world_id, topic_id),
     UNIQUE(world_id)
 ) STRICT;
@@ -70,9 +63,9 @@ CREATE TABLE IF NOT EXISTS kb_document (
     status          TEXT NOT NULL DEFAULT 'parsing', -- parsing | done | failed | deleted
     error_msg       TEXT,
     created_by      TEXT NOT NULL DEFAULT 'system',
-    created_at      INTEGER NOT NULL DEFAULT (unixepoch('subsec') * 1000),
-    updated_at      INTEGER NOT NULL DEFAULT (unixepoch('subsec') * 1000),
-    deleted_at      INTEGER,                         -- 软删除时间戳；NULL=未删除
+    created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S','now')),
+    updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S','now')),
+    deleted_at      TEXT,                           -- 软删除时间戳；NULL=未删除
     -- 运行时引用：这个文档被哪些 pack 用到（仅参考，非主键维度；JSON 数组字符串，默认 '[]'）
     related_packs   TEXT NOT NULL DEFAULT '[]',
     -- 冗余存所有 tag（JSON 数组），UI 展示不用 JOIN
@@ -96,8 +89,8 @@ CREATE TABLE IF NOT EXISTS kb_chunk (
     text_hash       TEXT NOT NULL,                   -- chunk 文本 SHA256
     text_preview    TEXT NOT NULL,                   -- 正文前 200 字
     token_count     INTEGER NOT NULL DEFAULT 0,
-    meta_json       TEXT,                            -- 冗余写回 Chroma metadata 的 JSON
-    created_at      INTEGER NOT NULL DEFAULT (unixepoch('subsec') * 1000)
+    meta_json       TEXT,                            -- 冗余写回 Qdrant metadata 的 JSON
+    created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S','now'))
 ) STRICT;
 
 CREATE INDEX IF NOT EXISTS idx_kb_chunk_doc    ON kb_chunk(document_id, chunk_index);
@@ -117,10 +110,10 @@ CREATE TABLE IF NOT EXISTS kb_index_job (
     file_done       INTEGER NOT NULL DEFAULT 0,
     chunk_total     INTEGER NOT NULL DEFAULT 0,
     error_msg       TEXT,
-    started_at      INTEGER,
-    finished_at     INTEGER,
+    started_at      TEXT,
+    finished_at     TEXT,
     created_by      TEXT NOT NULL DEFAULT 'system',
-    created_at      INTEGER NOT NULL DEFAULT (unixepoch('subsec') * 1000)
+    created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S','now'))
 ) STRICT;
 
 CREATE INDEX IF NOT EXISTS idx_kb_index_job_topic  ON kb_index_job(topic_id, status);
@@ -135,14 +128,14 @@ CREATE TABLE IF NOT EXISTS kb_tag (
     name            TEXT NOT NULL,
     display_name    TEXT,
     color           TEXT,
-    created_at      INTEGER NOT NULL DEFAULT (unixepoch('subsec') * 1000),
+    created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S','now')),
     UNIQUE(topic_id, name)
 ) STRICT;
 
 CREATE TABLE IF NOT EXISTS kb_document_tag (
     document_id TEXT NOT NULL REFERENCES kb_document(id) ON DELETE CASCADE,
     tag_id      TEXT NOT NULL REFERENCES kb_tag(id) ON DELETE CASCADE,
-    created_at  INTEGER NOT NULL DEFAULT (unixepoch('subsec') * 1000),
+    created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S','now')),
     PRIMARY KEY (document_id, tag_id)
 ) STRICT;
 
@@ -164,15 +157,10 @@ CREATE TABLE IF NOT EXISTS kb_audit (
     filters_json    TEXT,
     result_json     TEXT,
     error_msg       TEXT,
-    created_at      INTEGER NOT NULL DEFAULT (unixepoch('subsec') * 1000)
+    created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S','now'))
 ) STRICT;
 
 CREATE INDEX IF NOT EXISTS idx_kb_audit_op      ON kb_audit(op, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_kb_audit_topic   ON kb_audit(topic_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_kb_audit_world   ON kb_audit(world_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_kb_audit_actor   ON kb_audit(actor, created_at DESC);
-
--- =====================================================================
--- 迁移记录（本行必须作为本文件最后一条 SQL）
--- =====================================================================
-INSERT OR IGNORE INTO _schema_migrations(name) VALUES ('0001_init_kb');

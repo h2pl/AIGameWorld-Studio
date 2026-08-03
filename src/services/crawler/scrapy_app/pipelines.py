@@ -111,8 +111,8 @@ class StagingWritePipeline:
                 "size": item.get("size"),
                 # 落盘的相对文件名（给 service.py promote 用）
                 "content_file": f"{item_id}.md",
-                # 抓取时间戳（ms）
-                "fetched_at": int(time.time() * 1000),
+                # 抓取时间（yyyy-MM-dd HH:mm:ss）
+                "fetched_at": time.strftime("%Y-%m-%d %H:%M:%S"),
             }
             # metadata 以 UTF-8 追加写一行 JSON
             with meta_file.open("a", encoding="utf-8") as f:

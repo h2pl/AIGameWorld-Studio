@@ -22,6 +22,8 @@ from __future__ import annotations
 # 标准库导入
 import hashlib
 import json
+import logging
+import os
 from pathlib import Path
 from typing import Any
 
@@ -36,6 +38,32 @@ from ...utils.sqlite_store import SQLiteStore  # noqa: F401  (对外暴露类型
 # 本地模块导入
 from .reader import KnowledgeReader
 from .vector_store import KBVectorStoreFactory
+
+logger = logging.getLogger(__name__)
+
+
+def _resolve_bge_m3_model_name() -> str:
+    """解析 BGE-M3 模型名 / Resolve BGE-M3 model name.
+
+    优先返回本地 HF 缓存中 BAAI/bge-m3 的 snapshot 绝对路径，使离线环境下
+    无需联网解析 revision 即可加载。兼容新旧两种 HF 缓存目录结构：
+      - 新版：hub/models--BAAI--bge-m3/snapshots/<rev>/
+      - 旧版：hub/models/BAAI--bge-m3/snapshots/<rev>/
+    若均不存在则返回标准模型名 "BAAI/bge-m3"（触发联网下载）。
+    """
+    hf_home = Path(os.environ.get("HF_HOME", Path.home() / ".cache" / "huggingface"))
+    candidates = [
+        hf_home / "hub" / "models--BAAI--bge-m3" / "snapshots",
+        hf_home / "hub" / "models" / "BAAI--bge-m3" / "snapshots",
+    ]
+    for base in candidates:
+        if base.exists():
+            snapshots = [p for p in base.iterdir() if p.is_dir()]
+            if snapshots:
+                # 取最新修改的 snapshot（通常即 main/master）
+                latest = max(snapshots, key=lambda p: p.stat().st_mtime)
+                return str(latest)
+    return "BAAI/bge-m3"
 
 
 # 知识库文档处理流水线类：双写 SQLite 元数据 + 可插拔向量存储
@@ -60,9 +88,11 @@ class KnowledgePipeline:
         self._reader = KnowledgeReader(enrichers=enrichers)
 
         # BGE-M3 本地路径（ModelScope / HuggingFace 下载缓存）
-        import os
-
-        _bge_path = os.path.expanduser("~/.cache/huggingface/hub/models/BAAI--bge-m3/snapshots/master")
+        # 不硬编码 snapshot 目录名，离线优先探测本地缓存，避免：
+        #   - 目录名是 main/其它 revision hash 时加载失败（之前踩过坑）；
+        #   - 只认旧版 models/ 结构、不兼容新版 models--BAAI--bge-m3；
+        #   - 本地无缓存时走联网下载（离线环境会超时/失败）。
+        _bge_path = _resolve_bge_m3_model_name()
 
         splitter = SentenceSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
         splitter.include_metadata = True
@@ -73,7 +103,24 @@ class KnowledgePipeline:
         except Exception:
             pass
 
-        self._embedding_model = HuggingFaceEmbedding(model_name=_bge_path, trust_remote_code=True)
+        # 离线优先：本地缓存命中时不走网络解析 revision
+        # embed_batch_size=64：CPU 环境下利用 BLAS 向量化计算，相比默认 10 提升 2-3 倍
+        _embed_kwargs: dict[str, Any] = {"trust_remote_code": True, "embed_batch_size": 64}
+        if _bge_path != "BAAI/bge-m3":
+            _embed_kwargs["local_files_only"] = True
+
+        try:
+            self._embedding_model = HuggingFaceEmbedding(model_name=_bge_path, **_embed_kwargs)
+            logger.info("[kb] BGE-M3 embedding model loaded (model=%s, embed_batch_size=64)", _bge_path)
+        except Exception as e:
+            logger.warning(
+                "[kb] BGE-M3 本地加载失败 (%s)，回退联网下载模式（需可访问 HuggingFace）",
+                e,
+            )
+            # 回退：用标准模型名让库自动联网解析（本地无缓存时）
+            self._embedding_model = HuggingFaceEmbedding(
+                model_name="BAAI/bge-m3", trust_remote_code=True, embed_batch_size=64
+            )
 
         # IMPORTANT：IngestionPipeline **不传 vector_store 参数**。
         # 原因：LlamaIndex IngestionPipeline 的 pydantic schema 要求 vector_store 必须是

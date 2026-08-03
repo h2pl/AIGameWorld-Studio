@@ -5,7 +5,7 @@
 - 触发索引 → 调 KnowledgePipeline.index_directory（支持异步 BackgroundTasks）
 - 语义检索 → BGE-M3 embedding + Qdrant dense search
 - 文档/主题/绑定 CRUD → SQLite 正式表
-  (kb_document / kb_chunk / knowledge_topic / world_topic_binding / kb_index_job / kb_audit_log)
+  (kb_document / kb_chunk / knowledge_topic / world_topic_binding / kb_index_job / kb_audit)
 - 统计 / 清空 / 审计查询
 """
 
@@ -114,7 +114,7 @@ class KnowledgeManager:
         result_summary: Any = None,
         error: str | None = None,
     ) -> None:
-        """写审计日志到 kb_audit_log 表."""
+        """写审计日志到 kb_audit 表."""
         try:
             audit_id = SQLiteStore.new_id()
             now_str = SQLiteStore.now_str()
@@ -122,7 +122,7 @@ class KnowledgeManager:
             result_json = json.dumps(result_summary, ensure_ascii=False) if result_summary else None
             self._store.execute(
                 """
-                INSERT INTO kb_audit_log
+                INSERT INTO kb_audit
                     (id, op, actor, topic_id, document_id, job_id,
                      query_text, top_k, filters_json, result_json, error_msg, created_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -987,7 +987,7 @@ class KnowledgeManager:
             """
             SELECT id, op, actor, topic_id, document_id, job_id,
                    query_text, top_k, filters_json, result_json, error_msg, created_at
-              FROM kb_audit_log
+              FROM kb_audit
              WHERE topic_id = ?
              ORDER BY created_at DESC
              LIMIT ?

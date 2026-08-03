@@ -46,7 +46,7 @@ def _make_manager():
 
     return KnowledgeManager(
         project_root=PROJECT_ROOT,
-        auto_run_migrations=True,
+        auto_init_schema=True,
         created_by="cli",
     )
 

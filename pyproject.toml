@@ -16,6 +16,8 @@ dependencies = [
     "pytiled-parser>=2.2.9",
     "llama-index-core>=0.14.23",
     "llama-index-embeddings-huggingface>=0.7.0",
+    "sentence-transformers>=5.6",   # BGE-M3 嵌入模型 / BGE-M3 embedding (Chinese semantic retrieval)
+    "tokenizers>=0.22.0,<=0.23.0",  # 锁定兼容版本，避免 sentence-transformers import 失败
     "llama-index-vector-stores-chroma>=0.5.5",
     "chromadb>=1.5",
     "python-multipart>=0.0.32",

@@ -45,10 +45,10 @@ class TopicResponse(BaseModel):
     status: str = Field(default="active", description="状态")
     # 该主题向量分块总数
     chunks_in_collection: int = Field(default=0, description="当前主题下的 chunk 总数")
-    # 创建时间（毫秒级时间戳）
-    created_at: int | None = Field(default=None, description="创建时间戳（毫秒）")
-    # 更新时间（毫秒级时间戳）
-    updated_at: int | None = Field(default=None, description="更新时间戳（毫秒）")
+    # 创建时间（yyyy-MM-dd HH:mm:ss 格式字符串）
+    created_at: str | None = Field(default=None, description="创建时间（yyyy-MM-dd HH:mm:ss）")
+    # 更新时间（yyyy-MM-dd HH:mm:ss 格式字符串）
+    updated_at: str | None = Field(default=None, description="更新时间（yyyy-MM-dd HH:mm:ss）")
 
 
 class TopicListResponse(BaseModel):
@@ -174,9 +174,9 @@ class DocumentListItem(BaseModel):
     # 该文档切分出的分块数，默认0
     chunk_count: int = 0
     # 创建时间戳
-    created_at: int | None = None
+    created_at: str | None = None
     # 更新时间戳
-    updated_at: int | None = None
+    updated_at: str | None = None
 
 
 class DocumentListResponse(BaseModel):
@@ -255,11 +255,11 @@ class JobItem(BaseModel):
     # 错误信息（失败时）
     error_msg: str | None = None
     # 任务开始时间戳
-    started_at: int | None = None
+    started_at: str | None = None
     # 任务结束时间戳
-    finished_at: int | None = None
+    finished_at: str | None = None
     # 任务创建时间戳
-    created_at: int | None = None
+    created_at: str | None = None
 
 
 class JobListResponse(BaseModel):
@@ -279,7 +279,7 @@ class AuditItem(BaseModel):
     # 审计记录ID
     id: str | None = None
     # 记录创建时间戳
-    created_at: int | None = None
+    created_at: str | None = None
     # 操作类型（index_start/retrieve 等）
     op: str = ""
     # 操作者标识

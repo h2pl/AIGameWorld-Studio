@@ -1,778 +1,1009 @@
-"""知识管理服务（Topic → Promote → Chunk → Embed → Store）.
+"""KnowledgeManager — 知识库统一管理门面（组合 KnowledgePipeline + KBVectorStoreFactory + SQLiteStore）.
 
-对外暴露 :class:`KnowledgeManager`：
-
-- ``ensure_topic(topic_id, ...)`` 创建/读取 topic 根目录
-- ``promote_documents(topic_id, staging_dir, source_type)`` 把 crawler 暂存的文件合并进
-  topic 文档子目录 + 在 metadata.sqlite 登记
-- ``rebuild_vector_index(topic_id)`` 重新切块 → Embed → 存向量（失败不抛，由上层决定提示）
-- ``document_paths(topic_id, source_type=None)`` 列出已入库文档的 Path 列表
+对外暴露 :class:`KnowledgeManager`，是 API/UI 层的唯一入口：
+- 上传文件 / 粘贴文本 → 保存到 knowledge 目录 + 登记 kb_document
+- 触发索引 → 调 KnowledgePipeline.index_directory（支持异步 BackgroundTasks）
+- 语义检索 → BGE-M3 embedding + Qdrant dense search
+- 文档/主题/绑定 CRUD → SQLite 正式表
+  (kb_document / kb_chunk / knowledge_topic / world_topic_binding / kb_index_job / kb_audit_log)
+- 统计 / 清空 / 审计查询
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
-import re
-import shutil
-import threading
-from dataclasses import dataclass
+import time
 from pathlib import Path
 from typing import Any
 
-# 模块级 logger
+from ...utils.sqlite_store import SQLiteStore
+from .pipeline import KnowledgePipeline
+from .reader import KnowledgeReader
+from .vector_store import KBVectorStoreFactory
+
 _log = logging.getLogger(__name__)
 
-# 文档目录内 metadata JSONL 文件名（每条一行，顺序即展示顺序）
-_DOC_META_JSONL = "documents.jsonl"
-# 切块/向量索引目录（每个 topic 一个子目录存 sqlite 向量库）
-_VECTOR_DIRNAME = "_vector_index"
-# 每块默认最大字符数（中文按字符算，够用；EMBED 模型通常 512~8192 token）
-_DEFAULT_CHUNK_CHARS = 1500
-# 块之间重叠字符数（避免边界信息丢失）
-_DEFAULT_CHUNK_OVERLAP = 150
+# 默认知识库文件根目录（相对于 project_root）
+_KB_DATA_DIR = "knowledge-bases"
+
+# 预置主题（deps.py bootstrap_default_topics=True 时自动创建）
+_DEFAULT_TOPICS = [
+    {"topic_id": "genshin", "name": "原神", "description": "原神世界观与设定集"},
+    {"topic_id": "wow_worldview", "name": "魔兽世界", "description": "魔兽世界编年史与官方设定集"},
+]
 
 
-# Document 记录（Topic 子目录里的单篇文档）
-@dataclass
-class TopicDocument:
-    # 文档 ID（主键，默认基于路径 hash）
-    id: str
-    # 主题 ID
-    topic_id: str
-    # 文档子目录类型（documents/notes/...）
-    source_type: str
-    # 相对 topic_dir 的文件路径字符串
-    rel_path: str
-    # 展示标题
-    title: str
-    # 作者（可为空）
-    author: str
-    # 来源 URL（可为空）
-    source_url: str
-    # 正文大小（字符数，空为 0）
-    size_chars: int
-    # 入库时间戳（毫秒）
-    promoted_at: int
-
-
-# 主类
 class KnowledgeManager:
-    # 构造函数
-    # 参数 projects_root：所有 topic 的父目录（默认 ./data/topics）
-    # 参数 embed_fn：可选的文本→向量 回调（None 表示向量索引不启用）
-    # 参数 vector_store_factory：可选的向量存储工厂（lambda path, dims -> VectorStore）
-    # 参数 chunk_chars：切块大小，默认 1500 字符
-    # 参数 chunk_overlap：块重叠字符数，默认 150
+    """知识库统一管理门面 — 组合 Pipeline + Factory + Store + Reader."""
+
     def __init__(
         self,
-        projects_root: str | Path,
         *,
-        embed_fn: Any = None,
-        vector_store_factory: Any = None,
-        chunk_chars: int = _DEFAULT_CHUNK_CHARS,
-        chunk_overlap: int = _DEFAULT_CHUNK_OVERLAP,
+        factory: KBVectorStoreFactory | None = None,
+        store: SQLiteStore | None = None,
+        project_root: Path | str | None = None,
+        auto_run_migrations: bool = True,
+        created_by: str = "ui",
+        bootstrap_default_topics: bool = False,
+        chunk_size: int = 800,
+        chunk_overlap: int = 120,
     ):
-        # 转 Path
-        self._root = Path(projects_root)
-        # 根目录不存在就创建（连同父目录）
-        self._root.mkdir(parents=True, exist_ok=True)
-        # Embed 回调函数（文本→向量列表）
-        self._embed_fn = embed_fn
-        # VectorStore 工厂函数
-        self._vec_factory = vector_store_factory
-        # 切块大小
-        self._chunk_chars = max(100, int(chunk_chars or _DEFAULT_CHUNK_CHARS))
-        # 块重叠
-        self._chunk_overlap = max(0, int(chunk_overlap or _DEFAULT_CHUNK_OVERLAP))
-        # topic_id 级别的重入锁（避免并行 promote/rebuild 互相覆盖）
-        self._locks: dict[str, threading.RLock] = {}
-        # _locks 字典自身的读写锁
-        self._locks_guard = threading.Lock()
+        self._project_root = Path(project_root or Path.cwd()).resolve()
+        self._store = store or SQLiteStore(self._project_root / "data" / "studio.db")
+        self._factory = factory or KBVectorStoreFactory.get_default(project_root=self._project_root)
+        self._created_by = created_by
+        self._chunk_size = chunk_size
+        self._chunk_overlap = chunk_overlap
+        self._reader = KnowledgeReader()
+        self._pipelines: dict[str, KnowledgePipeline] = {}
 
-    # 取/建 topic 级别的锁
-    # 参数 topic_id：主题 ID
-    # 返回 threading.RLock：该 topic 的可重入锁
-    def _lock_for(self, topic_id: str) -> threading.RLock:
-        # 先加字典锁读
-        with self._locks_guard:
-            # 已存在就直接返回
-            if topic_id in self._locks:
-                return self._locks[topic_id]
-            # 不存在就新建 RLock
-            lock = threading.RLock()
-            # 存字典
-            self._locks[topic_id] = lock
-            # 返回锁
-            return lock
+        if auto_run_migrations:
+            self._store.run_migrations(self._project_root / "migrations")
+        if bootstrap_default_topics:
+            self._bootstrap_default_topics()
 
-    # 确保 topic 目录存在（不存在就创建）
-    # 参数 topic_id：主题 ID
-    # 参数 topic_title：可选的主题标题（首次创建时写入 topic.json）
-    # 返回 Path：topic 根目录
-    def ensure_topic(self, topic_id: str, *, topic_title: str = "") -> Path:
-        # topic 根目录
-        d = self._root / topic_id
-        # 不存在则创建
-        d.mkdir(parents=True, exist_ok=True)
-        # 子目录：文档默认目录
-        (d / "documents").mkdir(exist_ok=True)
-        # 子目录：笔记默认目录
-        (d / "notes").mkdir(exist_ok=True)
-        # 子目录：向量索引目录
-        (d / _VECTOR_DIRNAME).mkdir(exist_ok=True)
-        # topic 元信息文件（topic.json）
-        meta_file = d / "topic.json"
-        # 有传标题 + 没 topic.json → 写一个
-        if topic_title and not meta_file.exists():
-            # 初始化 topic 元信息字典
-            info: dict[str, Any] = {
-                # 主题 ID
-                "id": topic_id,
-                # 主题标题
-                "title": topic_title,
-                # 创建时间戳
-                "created_at": int(__import__("time").time() * 1000),
-            }
-            try:
-                # 以 UTF-8 写 JSON
-                meta_file.write_text(json.dumps(info, ensure_ascii=False, indent=2), encoding="utf-8")
-            except Exception:
-                # 写失败只记日志
-                _log.exception("write topic.json failed: %s", meta_file)
-        # 返回 topic 根目录
-        return d
+    # ------------------------------------------------------------------
+    # 辅助方法
+    # ------------------------------------------------------------------
 
-    # 返回 topic 根目录（不自动创建）
-    # 参数 topic_id：主题 ID
-    # 返回 Path：可能不存在的 topic 根路径
-    def topic_dir(self, topic_id: str) -> Path:
-        # 直接拼
-        return self._root / topic_id
+    def _get_pipeline(self, topic_id: str) -> KnowledgePipeline:
+        """获取/缓存指定 topic 的 KnowledgePipeline 实例."""
+        if topic_id not in self._pipelines:
+            self._pipelines[topic_id] = KnowledgePipeline(
+                topic_id,
+                factory=self._factory,
+                store=self._store,
+                chunk_size=self._chunk_size,
+                chunk_overlap=self._chunk_overlap,
+            )
+        return self._pipelines[topic_id]
 
-    # 列出 Topic 下已登记的文档
-    # 参数 topic_id：主题 ID
-    # 参数 source_type：可选；只返回该子目录类型（documents/notes...）
-    # 返回 list[TopicDocument]：已登记文档列表
-    def list_documents(self, topic_id: str, *, source_type: str | None = None) -> list[TopicDocument]:
-        # topic 根目录
-        d = self.topic_dir(topic_id)
-        # metadata jsonl 路径
-        meta = d / _DOC_META_JSONL
-        # 没文件 → 空列表
-        if not meta.exists():
-            return []
-        # 结果列表
-        out: list[TopicDocument] = []
-        # 按行读 JSONL
+    def _knowledge_dir(self, topic_id: str) -> Path:
+        """返回知识库文件目录: project_root/knowledge-bases/{topic_id}/knowledge."""
+        return self._project_root / _KB_DATA_DIR / topic_id / "knowledge"
+
+    def _ensure_knowledge_dir(self, topic_id: str) -> Path:
+        """确保知识库目录骨架存在 (lore/documents/images/videos)."""
+        kdir = self._knowledge_dir(topic_id)
+        for sub in ("lore", "documents", "images", "videos"):
+            (kdir / sub).mkdir(parents=True, exist_ok=True)
+        return kdir
+
+    def _audit(
+        self,
+        op: str,
+        *,
+        topic_id: str | None = None,
+        document_id: str | None = None,
+        job_id: str | None = None,
+        query_text: str | None = None,
+        top_k: int | None = None,
+        filters: dict | None = None,
+        result_summary: Any = None,
+        error: str | None = None,
+    ) -> None:
+        """写审计日志到 kb_audit_log 表."""
         try:
-            # 以 UTF-8 打开
-            with meta.open("r", encoding="utf-8") as f:
-                # 遍历每一行
-                for line in f:
-                    # 行去空白
-                    line = line.strip()
-                    # 空行跳过
-                    if not line:
-                        continue
-                    # 解析 JSON，处理异常
-                    try:
-                        # 解析
-                        obj = json.loads(line)
-                    except Exception:
-                        # 解析失败跳过
-                        continue
-                    # source_type 过滤
-                    if source_type and obj.get("source_type") != source_type:
-                        # 不是指定类型跳过
-                        continue
-                    # 组装 TopicDocument
-                    doc = TopicDocument(
-                        # ID
-                        id=str(obj.get("id", "")),
-                        # 主题 ID
-                        topic_id=topic_id,
-                        # 类型
-                        source_type=str(obj.get("source_type", "")),
-                        # 相对路径
-                        rel_path=str(obj.get("rel_path", "")),
-                        # 标题
-                        title=str(obj.get("title", "")),
-                        # 作者
-                        author=str(obj.get("author", "")),
-                        # 来源 URL
-                        source_url=str(obj.get("source_url", "")),
-                        # 字符数
-                        size_chars=int(obj.get("size_chars", 0) or 0),
-                        # 入库时间
-                        promoted_at=int(obj.get("promoted_at", 0) or 0),
-                    )
-                    # 过滤掉 id 空的（坏行）
-                    if doc.id:
-                        # 加入结果
-                        out.append(doc)
+            audit_id = SQLiteStore.new_id()
+            now_ms = int(time.time() * 1000)
+            filters_json = json.dumps(filters, ensure_ascii=False) if filters else None
+            result_json = json.dumps(result_summary, ensure_ascii=False) if result_summary else None
+            self._store.execute(
+                """
+                INSERT INTO kb_audit_log
+                    (id, op, actor, topic_id, document_id, job_id,
+                     query_text, top_k, filters_json, result_json, error_msg, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    audit_id,
+                    op,
+                    self._created_by,
+                    topic_id,
+                    document_id,
+                    job_id,
+                    query_text,
+                    top_k,
+                    filters_json,
+                    result_json,
+                    error,
+                    now_ms,
+                ),
+            )
         except Exception:
-            # 读取失败（权限、磁盘坏块）→ 记日志，返回已读部分
-            _log.exception("list_documents failed: topic=%s", topic_id)
-        # 返回列表
-        return out
+            _log.exception("audit write failed: op=%s", op)
 
-    # 返回文档绝对路径列表（给 retriever / 前端下载用）
-    # 参数 topic_id：主题 ID
-    # 参数 source_type：可选过滤子目录类型
-    # 返回 list[Path]：文档绝对路径（只含存在的）
-    def document_paths(self, topic_id: str, *, source_type: str | None = None) -> list[Path]:
-        # 先列 TopicDocument
-        docs = self.list_documents(topic_id, source_type=source_type)
-        # topic 根目录
-        d = self.topic_dir(topic_id)
-        # 结果
-        out: list[Path] = []
-        # 遍历文档
-        for doc in docs:
-            # 相对路径转绝对
-            p = d / doc.rel_path
-            # 文件确实存在才加（防止文件被手动删了但 metadata 还留着）
-            if p.is_file():
-                # 加入
-                out.append(p)
-        # 返回
-        return out
+    def _qdrant_points_count(self, collection: str) -> int | None:
+        """通过 Qdrant HTTP 查 points_count."""
+        try:
+            import urllib.request as u
 
-    # 把 crawler 暂存的结果搬到 topic 目录并登记（幂等：基于 item_id 去重）
-    # 参数 topic_id：主题 ID
-    # 参数 staging_dir：crawler 暂存目录（应含 _metadata.jsonl + *.md）
-    # 参数 source_type：目标子目录名（documents / notes / ...）
-    # 返回 list[TopicDocument]：本次新 promote 的文档列表
-    def promote_documents(
+            raw = u.urlopen(f"{self._factory.qdrant_url}/collections/{collection}", timeout=8).read()
+            return json.loads(raw)["result"].get("points_count")
+        except Exception:
+            return None
+
+    def _qdrant_delete_points(self, collection: str, point_ids: list[str]) -> bool:
+        """通过 Qdrant HTTP 批量删 points."""
+        if not point_ids:
+            return True
+        try:
+            import urllib.request as u
+
+            url = f"{self._factory.qdrant_url}/collections/{collection}/points/delete"
+            body = json.dumps({"ids": point_ids}, ensure_ascii=False).encode("utf-8")
+            req = u.Request(
+                url,
+                data=body,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with u.urlopen(req, timeout=15) as resp:
+                resp.read()
+            return True
+        except Exception:
+            _log.exception("Qdrant delete points failed: collection=%s count=%d", collection, len(point_ids))
+            return False
+
+    def _sanitize_filename(self, name: str) -> str:
+        """Windows 文件名安全化：转义特殊字符."""
+        for ch in r'<>:"/\|?*':
+            name = name.replace(ch, "_")
+        return name
+
+    # ------------------------------------------------------------------
+    # 上传
+    # ------------------------------------------------------------------
+
+    def save_uploaded_bytes(
         self,
         topic_id: str,
-        staging_dir: str | Path,
+        data: bytes,
+        source_type: str,
+        filename: str,
         *,
-        source_type: str = "documents",
-    ) -> list[TopicDocument]:
-        # staging_dir 转 Path
-        staging = Path(staging_dir)
-        # staging 不存在直接返回空
-        if not staging.exists():
-            return []
-        # 先确保 topic 目录存在
-        self.ensure_topic(topic_id)
-        # 加 topic 级别锁（避免两个线程同时 promote 相互覆盖 metadata）
-        with self._lock_for(topic_id):
-            # topic 根
-            d = self.topic_dir(topic_id)
-            # 目标子目录
-            dest_dir = d / source_type
-            # 不存在就创建
-            dest_dir.mkdir(parents=True, exist_ok=True)
-            # metadata 文件路径
-            meta_file = d / _DOC_META_JSONL
-            # 先读已有登记（用于去重：已存在的 item_id 不再重复加）
-            existing_ids: set[str] = set()
-            # 先读已有 metadata
-            if meta_file.exists():
-                # 按行解析
-                try:
-                    # 读文件
-                    for line in meta_file.read_text(encoding="utf-8").splitlines():
-                        # 去空白
-                        line = line.strip()
-                        # 空行跳过
-                        if not line:
-                            continue
-                        # 解析 JSON
-                        try:
-                            # 解析
-                            obj = json.loads(line)
-                        except Exception:
-                            # 解析失败跳过
-                            continue
-                        # id 字段
-                        doc_id = obj.get("id")
-                        # 非空加入去重集合
-                        if doc_id:
-                            # 加入 existing_ids
-                            existing_ids.add(str(doc_id))
-                except Exception:
-                    # 读 metadata 失败：保守处理，不去重了，最多重复 append
-                    _log.exception("promote: read existing meta failed, will append blindly")
+        prefix: str = "",
+    ) -> dict[str, Any]:
+        """保存上传的文件字节流到 knowledge 目录 + 登记 kb_document."""
+        kdir = self._ensure_knowledge_dir(topic_id)
+        dest_dir = kdir / source_type
+        if prefix:
+            dest_dir = dest_dir / prefix
+        dest_dir.mkdir(parents=True, exist_ok=True)
 
-            # staging 下的 metadata jsonl
-            stage_meta = staging / "_metadata.jsonl"
-            # 没 metadata（旧版 crawler 或同步回退）：只靠 *.md 也能 promote
-            staged_rows: list[dict[str, Any]] = []
-            # metadata 文件存在则解析
-            if stage_meta.exists():
-                # 遍历 JSONL 行
-                try:
-                    # 读行
-                    for line in stage_meta.read_text(encoding="utf-8").splitlines():
-                        # 去空白
-                        line = line.strip()
-                        # 空行跳过
-                        if not line:
-                            continue
-                        # 解析 JSON
-                        try:
-                            # 解析
-                            obj = json.loads(line)
-                        except Exception:
-                            # 解析失败跳过
-                            continue
-                        # 追加行
-                        staged_rows.append(obj)
-                except Exception:
-                    # 解析失败记日志，后面用 glob 兜底
-                    _log.exception("promote: parse staging metadata failed, fallback glob")
+        safe_name = self._sanitize_filename(filename)
+        target = dest_dir / safe_name
 
-            # staged_rows 为空（metadata 空或解析全失败）→ 用 glob 扫 .md 文件兜底
-            if not staged_rows:
-                # 遍历 staging 下所有 md 文件
-                for md in sorted(staging.glob("*.md")):
-                    # 按文件名（不含后缀）当 item_id
-                    item_id = md.stem
-                    # 构造最小 metadata 行
-                    staged_rows.append(
-                        {
-                            # item_id
-                            "item_id": item_id,
-                            # URL 空
-                            "url": "",
-                            # 标题用文件名
-                            "title": item_id,
-                            # 作者空
-                            "author": "",
-                            # 域名空
-                            "domain": "",
-                            # 内容文件
-                            "content_file": md.name,
-                        }
-                    )
+        # 同名文件追加序号
+        if target.exists():
+            stem, suffix = target.stem, target.suffix
+            idx = 1
+            while target.exists():
+                target = dest_dir / f"{stem}-{idx}{suffix}"
+                idx += 1
 
-            # 本次 promote 成功的文档列表
-            promoted: list[TopicDocument] = []
-            # 当前时间戳（ms）
-            import time
+        target.write_bytes(data)
 
-            # 取当前毫秒时间
-            now_ms = int(time.time() * 1000)
+        sha256 = hashlib.sha256(data).hexdigest()
+        file_size = len(data)
+        content_type = Path(filename).suffix.lstrip(".") or "binary"
 
-            # metadata 追加写模式（所有新 doc 一次追加完再关）
+        # 在 kb_document 表 INSERT 元数据
+        doc_id = SQLiteStore.new_id()
+        try:
+            self._store.execute(
+                """
+                INSERT INTO kb_document
+                    (id, topic_id, title, source_type, file_name, file_path,
+                     file_size, sha256, content_type, version, status,
+                     created_by, related_packs, tags_json)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 'uploaded', ?, '[]', '[]')
+                """,
+                (
+                    doc_id,
+                    topic_id,
+                    Path(filename).stem,
+                    source_type,
+                    safe_name,
+                    str(target),
+                    file_size,
+                    sha256,
+                    content_type,
+                    self._created_by,
+                ),
+            )
+        except Exception:
+            _log.exception("save_uploaded_bytes: kb_document INSERT failed")
+
+        return {"ok": True, "file_path": str(target), "doc_id": doc_id, "file_name": safe_name}
+
+    def save_uploaded_text(
+        self,
+        topic_id: str,
+        text: str,
+        source_type: str,
+        *,
+        file_name: str = "pasted.md",
+        prefix: str = "",
+    ) -> dict[str, Any]:
+        """保存粘贴的文本到 knowledge 目录 + 登记 kb_document."""
+        data = text.encode("utf-8")
+        return self.save_uploaded_bytes(topic_id, data, source_type, file_name, prefix=prefix)
+
+    # ------------------------------------------------------------------
+    # 文档 CRUD
+    # ------------------------------------------------------------------
+
+    def document_list(
+        self,
+        topic_id: str,
+        *,
+        limit: int = 200,
+        offset: int = 0,
+        include_deleted: bool = False,
+    ) -> list[dict]:
+        """分页返回 kb_document 列表（含每个文档的 chunk_count）."""
+        where = "WHERE topic_id = ?"
+        params: list[Any] = [topic_id]
+        if not include_deleted:
+            where += " AND status != 'deleted'"
+
+        rows = self._store.fetch_all(
+            f"""
+            SELECT d.id, d.topic_id, d.title, d.source_type, d.content_type,
+                   d.file_name, d.file_path, d.file_size, d.version, d.status,
+                   d.tags_json, d.created_at, d.updated_at,
+                   (SELECT COUNT(*) FROM kb_chunk c WHERE c.document_id = d.id) AS chunk_count
+              FROM kb_document d
+             {where}
+             ORDER BY d.updated_at DESC
+             LIMIT ? OFFSET ?
+            """,
+            (*params, limit, offset),
+        )
+
+        result = []
+        for r in rows:
+            d = dict(r)
+            # 解析 tags_json → tags list
             try:
-                # 以 UTF-8 追加打开
-                meta_fh = meta_file.open("a", encoding="utf-8")
+                d["tags"] = json.loads(d.get("tags_json") or "[]")
             except Exception:
-                # 打不开 metadata：promote 没法登记，记 warning
-                _log.exception("promote: cannot open meta for append, will skip registry")
-                # 用 None 当哨兵
-                meta_fh = None
+                d["tags"] = []
+            d.pop("tags_json", None)
+            result.append(d)
+        return result
 
-            # 遍历 staging 每条
-            for row in staged_rows:
-                # item_id（主键）
-                item_id = str(row.get("item_id", "")).strip()
-                # 没 item_id 跳过
-                if not item_id:
-                    continue
-                # 已 promote 过（去重）
-                if item_id in existing_ids:
-                    # 跳过
-                    continue
-                # 正文内容文件名（默认 {item_id}.md）
-                content_file = str(row.get("content_file") or f"{item_id}.md")
-                # staging 下的源文件
-                src_md = staging / content_file
-                # 源文件不存在（爬失败了可能只有 metadata 没 md）→ 跳过
-                if not src_md.is_file():
-                    continue
+    def document_delete(self, topic_id: str, doc_id: str) -> dict[str, Any]:
+        """软删文档：kb_document.status='deleted' + 真删 kb_chunk + Qdrant 删 points."""
+        # 查出该文档的所有 chunk_id
+        rows = self._store.fetch_all(
+            "SELECT id FROM kb_chunk WHERE document_id = ? AND topic_id = ?",
+            (doc_id, topic_id),
+        )
+        chunk_ids = [r["id"] for r in rows]
 
-                # 目标路径：{source_type}/{item_id}.md（若 content_file 有后缀保留）
-                # 保留 content_file 的文件名（通常就是 item_id.md，但兼容带后缀 hash 等）
-                target_rel = f"{source_type}/{Path(content_file).name}"
-                # 绝对路径
-                target_abs = d / target_rel
-                # 复制文件（覆盖写：幂等）
+        now_ms = int(time.time() * 1000)
+        with self._store.transaction():
+            self._store.execute(
+                """
+                UPDATE kb_document
+                   SET status = 'deleted', updated_at = ?, deleted_at = ?
+                 WHERE id = ? AND topic_id = ?
+                """,
+                (now_ms, now_ms, doc_id, topic_id),
+            )
+            self._store.execute(
+                "DELETE FROM kb_chunk WHERE document_id = ?",
+                (doc_id,),
+            )
+
+        # Qdrant 删 points
+        collection = f"kb_{topic_id}"
+        self._qdrant_delete_points(collection, chunk_ids)
+
+        self._audit("doc_delete", topic_id=topic_id, document_id=doc_id)
+        return {"ok": True, "soft_deleted": 1, "deleted_chunk_ids_count": len(chunk_ids)}
+
+    # ------------------------------------------------------------------
+    # 检索
+    # ------------------------------------------------------------------
+
+    def search_with_meta(
+        self,
+        topic_id: str,
+        query: str,
+        *,
+        top_k: int = 5,
+        min_score: float = 0.0,
+        filters: dict | None = None,
+    ) -> list[dict]:
+        """语义检索：BGE-M3 embedding → Qdrant dense search → 补 text → 审计."""
+        pipeline = self._get_pipeline(topic_id)
+
+        # 生成 query embedding
+        qvec = pipeline._embedding_model.get_query_embedding(query)
+
+        # Qdrant HTTP search
+        collection = f"kb_{topic_id}"
+        url = f"{self._factory.qdrant_url}/collections/{collection}/points/search"
+        body = json.dumps(
+            {
+                "vector": qvec,
+                "limit": top_k,
+                "with_payload": True,
+                "with_vectors": False,
+            },
+            ensure_ascii=False,
+        ).encode("utf-8")
+
+        import urllib.request as u
+
+        req = u.Request(
+            url,
+            data=body,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with u.urlopen(req, timeout=30) as resp:
+            raw = resp.read().decode("utf-8")
+        hits_data = json.loads(raw).get("result") or []
+
+        hits = []
+        for h in hits_data:
+            score = float(h.get("score") or 0.0)
+            if min_score > 0 and score < min_score:
+                continue
+            meta = h.get("payload") or {}
+            chunk_id = str(h.get("id") or "")
+
+            # 提取 text：优先 payload 里的 text/content，其次 _node_content JSON
+            text = ""
+            for k in ("text", "content"):
+                if k in meta and isinstance(meta[k], str) and meta[k].strip():
+                    text = meta[k]
+                    break
+            if not text and "_node_content" in meta and isinstance(meta["_node_content"], str):
                 try:
-                    # shutil 拷贝（保留文件元信息：创建时间等）
-                    shutil.copy2(src_md, target_abs)
+                    nc = json.loads(meta["_node_content"])
+                    if isinstance(nc, dict):
+                        for kk in ("text", "__text__", "content"):
+                            if kk in nc and isinstance(nc[kk], str) and nc[kk].strip():
+                                text = nc[kk]
+                                break
                 except Exception:
-                    # 拷贝失败（权限、磁盘满）→ 记日志跳过
-                    _log.exception("promote: copy failed: %s -> %s", src_md, target_abs)
-                    # 继续下一个
-                    continue
+                    pass
+            # 兜底：SQLite text_preview
+            if not text and chunk_id:
+                row = self._store.fetch_one(
+                    "SELECT text_preview FROM kb_chunk WHERE id = ?",
+                    (chunk_id,),
+                )
+                text = (row or {}).get("text_preview") or ""
 
-                # 读一次正文，算字符数 + 给标题兜底
-                try:
-                    # 以 UTF-8 读
-                    text = target_abs.read_text(encoding="utf-8", errors="replace")
-                except Exception:
-                    # 读失败：空字符串
-                    text = ""
-                # 字符数
-                size_chars = len(text)
+            hits.append(
+                {
+                    "text": text,
+                    "score_cosine_sim": score,
+                    "distance": 1.0 - score,
+                    "metadata": meta,
+                }
+            )
 
-                # 标题：优先 metadata title，再取正文第一行非空
-                title = str(row.get("title") or "").strip()
-                # 没标题
-                if not title:
-                    # 从正文第一行拿
-                    for ln in text.splitlines():
-                        # 去空白
-                        ln = ln.strip()
-                        # 非空就 break
-                        if ln:
-                            # 去掉 markdown 前缀 "# "
-                            title = re.sub(r"^#+\s*", "", ln).strip()
-                            # 取前 200 字符
-                            title = title[:200]
-                            # 找到就停止
-                            break
-                    # 最终还是空 → 用文件名
-                    if not title:
-                        # 用文件名（无后缀）
-                        title = Path(content_file).stem
-                # 作者
-                author = str(row.get("author") or "").strip()
-                # 来源 URL
-                source_url = str(row.get("url") or "").strip()
+        self._audit(
+            "retrieve",
+            topic_id=topic_id,
+            query_text=query,
+            top_k=top_k,
+            filters=filters,
+            result_summary=[{"score": h["score_cosine_sim"]} for h in hits[:5]],
+        )
+        return hits
 
-                # 组装文档对象
-                doc = TopicDocument(
-                    # id=item_id（确保和 crawler item id 对齐，去重依赖它）
-                    id=item_id,
-                    # 主题 ID
-                    topic_id=topic_id,
-                    # 子目录类型
-                    source_type=source_type,
-                    # 相对路径
-                    rel_path=target_rel,
-                    # 标题
-                    title=title,
-                    # 作者
-                    author=author,
-                    # 来源 URL
-                    source_url=source_url,
-                    # 字符数
-                    size_chars=size_chars,
-                    # 入库时间
-                    promoted_at=now_ms,
+    # ------------------------------------------------------------------
+    # 索引
+    # ------------------------------------------------------------------
+
+    def index(self, topic_id: str, *, force: bool = False) -> dict[str, Any]:
+        """同步触发索引（阻塞）— 直接调 pipeline.index_directory."""
+        pipeline = self._get_pipeline(topic_id)
+        knowledge_dir = self._knowledge_dir(topic_id)
+        if not knowledge_dir.exists():
+            self._ensure_knowledge_dir(topic_id)
+
+        mode = "force" if force else "incremental"
+        try:
+            result = pipeline.index_directory(knowledge_dir, mode=mode, created_by=self._created_by)
+        except Exception as exc:
+            error = f"{type(exc).__name__}: {exc}"
+            self._audit("index_done", topic_id=topic_id, error=error)
+            return {"ok": False, "error": error, "total_chunks": 0}
+
+        total_chunks = result.get("chunks", 0)
+        self._audit(
+            "index_done",
+            topic_id=topic_id,
+            job_id=result.get("job_id"),
+            result_summary=result,
+        )
+        return {"ok": True, "total_chunks": total_chunks, "indexed": result}
+
+    def index_async(self, topic_id: str, *, force: bool = False) -> dict[str, Any]:
+        """创建索引任务记录并返回 job_id（不执行，由 BackgroundTasks 调 _run_index_job）."""
+        mode = "force" if force else "incremental"
+        # 先确保 knowledge 目录存在
+        self._ensure_knowledge_dir(topic_id)
+        # 创建 job 记录（pipeline 内部的 _create_job 需要 store）
+        job_id = ""
+        try:
+            job_id = SQLiteStore.new_id()
+            now_ms = int(time.time() * 1000)
+            self._store.execute(
+                """
+                INSERT INTO kb_index_job
+                    (id, topic_id, document_id, mode, status, progress, created_by, created_at)
+                VALUES (?, ?, NULL, ?, 'pending', 0, ?, ?)
+                """,
+                (job_id, topic_id, mode, self._created_by, now_ms),
+            )
+            self._audit("index_start", topic_id=topic_id, job_id=job_id)
+        except Exception:
+            _log.exception("index_async: create job failed")
+
+        return {"ok": True, "topic_id": topic_id, "job_id": job_id, "status": "pending"}
+
+    def _run_index_job(self, topic_id: str, job_id: str, *, force: bool = False) -> None:
+        """后台线程执行索引（由 FastAPI BackgroundTasks 调度）."""
+        try:
+            # 更新 job 状态为 running
+            now_ms = int(time.time() * 1000)
+            self._store.execute(
+                """
+                UPDATE kb_index_job
+                   SET status = 'running', started_at = ?
+                 WHERE id = ?
+                """,
+                (now_ms, job_id),
+            )
+
+            pipeline = self._get_pipeline(topic_id)
+            knowledge_dir = self._knowledge_dir(topic_id)
+            mode = "force" if force else "incremental"
+            result = pipeline.index_directory(knowledge_dir, mode=mode, created_by=self._created_by)
+
+            # 更新 job 状态为 done
+            chunks = result.get("chunks", 0)
+            files = result.get("files", 0)
+            self._store.execute(
+                """
+                UPDATE kb_index_job
+                   SET status = 'done',
+                       progress = 100,
+                       file_total = ?,
+                       file_done = ?,
+                       chunk_total = ?,
+                       finished_at = unixepoch('subsec') * 1000
+                 WHERE id = ?
+                """,
+                (files, files, chunks, job_id),
+            )
+            self._audit("index_done", topic_id=topic_id, job_id=job_id, result_summary=result)
+        except Exception as exc:
+            error = f"{type(exc).__name__}: {exc}"
+            _log.exception("_run_index_job failed: job_id=%s", job_id)
+            try:
+                self._store.execute(
+                    """
+                    UPDATE kb_index_job
+                       SET status = 'failed',
+                           error_msg = ?,
+                           finished_at = unixepoch('subsec') * 1000
+                     WHERE id = ?
+                    """,
+                    (error, job_id),
+                )
+            except Exception:
+                pass
+            self._audit("index_done", topic_id=topic_id, job_id=job_id, error=error)
+
+    def _run_ingest_files_job(
+        self,
+        topic_id: str,
+        job_id: str,
+        file_paths: list[Path],
+        *,
+        chunk_size: int = 800,
+        chunk_overlap: int = 120,
+    ) -> None:
+        """后台线程执行文件级 ingest（由 /ingest-files 端点的 BackgroundTasks 调度）."""
+        try:
+            # 更新 job 状态为 running
+            now_ms = int(time.time() * 1000)
+            self._store.execute(
+                """
+                UPDATE kb_index_job
+                   SET status = 'running', started_at = ?, file_total = ?
+                 WHERE id = ?
+                """,
+                (now_ms, len(file_paths), job_id),
+            )
+
+            result = self.ingest_files(
+                topic_id,
+                file_paths,
+                chunk_size=chunk_size,
+                chunk_overlap=chunk_overlap,
+            )
+
+            # 更新 job 状态为 done
+            chunks = result.get("chunks", 0)
+            doc_count = len(result.get("doc_ids", []))
+            self._store.execute(
+                """
+                UPDATE kb_index_job
+                   SET status = 'done',
+                       progress = 100,
+                       file_total = ?,
+                       file_done = ?,
+                       chunk_total = ?,
+                       finished_at = unixepoch('subsec') * 1000
+                 WHERE id = ?
+                """,
+                (len(file_paths), len(file_paths), chunks, job_id),
+            )
+            self._audit(
+                "ingest_files_done",
+                topic_id=topic_id,
+                job_id=job_id,
+                result_summary={"doc_count": doc_count, "chunks": chunks},
+            )
+        except Exception as exc:
+            error = f"{type(exc).__name__}: {exc}"
+            _log.exception("_run_ingest_files_job failed: job_id=%s", job_id)
+            try:
+                self._store.execute(
+                    """
+                    UPDATE kb_index_job
+                       SET status = 'failed',
+                           error_msg = ?,
+                           finished_at = unixepoch('subsec') * 1000
+                     WHERE id = ?
+                    """,
+                    (error, job_id),
+                )
+            except Exception:
+                pass
+            self._audit("ingest_files_done", topic_id=topic_id, job_id=job_id, error=error)
+
+    # ------------------------------------------------------------------
+    # 统计 / 清空
+    # ------------------------------------------------------------------
+
+    def stats(self, topic_id: str) -> dict[str, Any]:
+        """知识库统计."""
+        total_chunks = self._store.fetch_one("SELECT COUNT(*) c FROM kb_chunk WHERE topic_id = ?", (topic_id,))["c"]
+        doc_count = self._store.fetch_one(
+            "SELECT COUNT(*) c FROM kb_document WHERE topic_id = ? AND status != 'deleted'",
+            (topic_id,),
+        )["c"]
+        by_type_rows = self._store.fetch_all(
+            """
+            SELECT d.source_type, COUNT(*) c
+              FROM kb_chunk c
+              JOIN kb_document d ON c.document_id = d.id
+             WHERE c.topic_id = ?
+             GROUP BY d.source_type
+            """,
+            (topic_id,),
+        )
+        by_source_type = {r["source_type"] or "unknown": r["c"] for r in by_type_rows}
+        successful_jobs = self._store.fetch_one(
+            "SELECT COUNT(*) c FROM kb_index_job WHERE topic_id = ? AND status = 'done'",
+            (topic_id,),
+        )["c"]
+        kdir = self._knowledge_dir(topic_id)
+        collection = f"kb_{topic_id}"
+        points_count = self._qdrant_points_count(collection)
+
+        return {
+            "topic_id": topic_id,
+            "collection": collection,
+            "topic_dir": str(self._project_root / _KB_DATA_DIR / topic_id),
+            "topic_knowledge_dir": str(kdir),
+            "topic_knowledge_dir_exists": kdir.exists(),
+            "total_chunks": total_chunks,
+            "documents": doc_count,
+            "chunks_in_meta": points_count if points_count is not None else total_chunks,
+            "by_source_type": by_source_type,
+            "successful_jobs": successful_jobs,
+        }
+
+    def clear(self, topic_id: str) -> dict[str, Any]:
+        """清空知识库：Qdrant 删 collection + kb_document 软删."""
+        pipeline = self._get_pipeline(topic_id)
+        r = pipeline.clear(created_by=self._created_by)
+        collection = f"kb_{topic_id}"
+        total_chunks = self._store.fetch_one("SELECT COUNT(*) c FROM kb_chunk WHERE topic_id = ?", (topic_id,))["c"]
+        return {
+            "ok": r.get("ok", True),
+            "topic_id": topic_id,
+            "collection": collection,
+            "cleared": True,
+            "soft_deleted_documents": r.get("soft_deleted_documents", 0),
+            "total_chunks": total_chunks,
+        }
+
+    # ------------------------------------------------------------------
+    # 文件级 Ingest（供 CLI 直接指定文件路径使用）
+    # ------------------------------------------------------------------
+
+    def ingest_files(
+        self,
+        topic_id: str,
+        files: list[Path],
+        *,
+        chunk_size: int | None = None,
+        chunk_overlap: int | None = None,
+    ) -> dict[str, Any]:
+        """直接把指定的文件列表写入知识库（读取 → 切块 → 嵌入 → 双写）.
+
+        Parameters
+        ----------
+        topic_id : str
+            目标主题 ID。
+        files : list[Path]
+            文件路径列表（支持 pdf / md / txt）。
+        chunk_size / chunk_overlap : int | None
+            覆盖默认值。
+
+        Returns
+        -------
+        dict
+            含 doc_ids / chunks / elapsed 等信息。
+        """
+        self.ensure_topic(topic_id)
+
+        # 加载文档（逻辑在 KnowledgeReader）
+        docs = self._reader.load_documents(files)
+        if not docs:
+            return {"ok": False, "error": "没有读到任何文件", "doc_ids": [], "chunks": 0}
+
+        # 走 pipeline ingest
+        cs = chunk_size or self._chunk_size
+        co = chunk_overlap or self._chunk_overlap
+        pipeline = self._get_pipeline(topic_id)
+        # 如果 chunk_size / chunk_overlap 与 pipeline 不同，临时创建新 pipeline
+        if cs != self._chunk_size or co != self._chunk_overlap:
+            pipeline = KnowledgePipeline(
+                topic_id,
+                factory=self._factory,
+                store=self._store,
+                chunk_size=cs,
+                chunk_overlap=co,
+            )
+
+        t0 = time.time()
+        result = pipeline.ingest(docs)
+        elapsed = time.time() - t0
+
+        return {
+            "ok": True,
+            "doc_ids": result.get("doc_ids", []),
+            "chunks": result.get("chunks", 0),
+            "elapsed": elapsed,
+        }
+
+    # ------------------------------------------------------------------
+    # 状态详情（供 CLI 的 status 子命令使用）
+    # ------------------------------------------------------------------
+
+    def status_detail(self, topic_id: str) -> dict[str, Any]:
+        """返回 CLI status 所需的详细信息（比 stats() 更丰富）."""
+        self.ensure_topic(topic_id)
+
+        done = self._store.fetch_one(
+            "SELECT COUNT(*) c FROM kb_document WHERE topic_id = ? AND status = 'done'",
+            (topic_id,),
+        )["c"]
+        deleted = self._store.fetch_one(
+            "SELECT COUNT(*) c FROM kb_document WHERE topic_id = ? AND status = 'deleted'",
+            (topic_id,),
+        )["c"]
+        parsing = self._store.fetch_one(
+            "SELECT COUNT(*) c FROM kb_document WHERE topic_id = ? AND status NOT IN ('done','deleted')",
+            (topic_id,),
+        )["c"]
+        chunks = self._store.fetch_one(
+            "SELECT COUNT(*) c FROM kb_chunk WHERE topic_id = ?",
+            (topic_id,),
+        )["c"]
+        collection = f"kb_{topic_id}"
+        points_count = self._qdrant_points_count(collection)
+
+        # 最近 10 条文档
+        recent_docs = []
+        if done:
+            rows = self._store.fetch_all(
+                """
+                SELECT id, version, title, file_name, file_size, updated_at
+                  FROM kb_document
+                 WHERE topic_id = ? AND status = 'done'
+                 ORDER BY updated_at DESC
+                 LIMIT 10
+                """,
+                (topic_id,),
+            )
+            for r in rows:
+                recent_docs.append(
+                    {
+                        "id": r["id"],
+                        "version": r["version"],
+                        "title": r["title"],
+                        "file_name": r["file_name"],
+                        "file_size_kb": int((r["file_size"] or 0) / 1024),
+                    }
                 )
 
-                # 写 metadata JSONL
-                if meta_fh is not None:
-                    # 组装字典
-                    info_dict = {
-                        # ID
-                        "id": doc.id,
-                        # 类型
-                        "source_type": doc.source_type,
-                        # 相对路径
-                        "rel_path": doc.rel_path,
-                        # 标题
-                        "title": doc.title,
-                        # 作者
-                        "author": doc.author,
-                        # 来源 URL
-                        "source_url": doc.source_url,
-                        # 字符数
-                        "size_chars": doc.size_chars,
-                        # 入库时间
-                        "promoted_at": doc.promoted_at,
-                    }
-                    try:
-                        # 写一行 JSON
-                        meta_fh.write(json.dumps(info_dict, ensure_ascii=False) + "\n")
-                    except Exception:
-                        # 写失败记日志
-                        _log.exception("promote: append meta line failed")
-                # 加入本次 promote 结果
-                promoted.append(doc)
-                # 登记进 existing_ids 避免本次循环里重复（极端情况）
-                existing_ids.add(doc.id)
+        return {
+            "topic_id": topic_id,
+            "collection": collection,
+            "backend": self._factory.backend,
+            "qdrant_url": self._factory.qdrant_url,
+            "documents_done": done,
+            "documents_other": parsing,
+            "documents_deleted": deleted,
+            "chunks_total": chunks,
+            "qdrant_points": points_count,
+            "recent_docs": recent_docs,
+        }
 
-            # 关闭 metadata 文件句柄
-            if meta_fh is not None:
-                try:
-                    # 安全关闭
-                    meta_fh.close()
-                except Exception:
-                    # 关闭失败记日志
-                    _log.exception("promote: close meta file failed")
-            # 返回本次新 promote 的文档列表
-            return promoted
+    # ------------------------------------------------------------------
+    # 主题 CRUD
+    # ------------------------------------------------------------------
 
-    # --- 切块 / 向量 ---
-    # 对单篇长文本做简单切块（标点/换行优先；不做 embed 依赖）
-    # 参数 text：长文本字符串
-    # 返回 list[tuple[str, int]]：(chunk_text, start_offset)
-    def _chunk_text(self, text: str) -> list[tuple[str, int]]:
-        # 空文本 → 空列表
-        if not text:
-            return []
-        # 结果列表
-        chunks: list[tuple[str, int]] = []
-        # 起始游标
-        start = 0
-        # 文本总长度
-        n = len(text)
-        # 切块窗口大小
-        win = self._chunk_chars
-        # 重叠大小
-        lap = min(self._chunk_overlap, max(0, win - 1))
-        # 游标没到末尾就继续
-        while start < n:
-            # 窗口终点（不超文本长度）
-            end = min(start + win, n)
-            # 本块原始切片
-            piece = text[start:end]
+    def ensure_topic(
+        self,
+        topic_id: str,
+        *,
+        name: str | None = None,
+        description: str | None = None,
+        tags: list[str] | None = None,
+        status: str | None = None,
+    ) -> dict[str, Any]:
+        """创建或更新主题（幂等）."""
+        display_name = name or topic_id
+        tags_json = json.dumps(tags or [], ensure_ascii=False)
+        now_ms = int(time.time() * 1000)
 
-            # 最后一块直接收（不需要找边界，避免空块）
-            if end >= n:
-                # 空 piece 跳过
-                if piece.strip():
-                    # 加入最后一块
-                    chunks.append((piece, start))
-                # 结束循环
-                break
-
-            # 非最后一块：在 piece 尾部找"好的断点"（优先段落空行，其次标点换行，其次退回到 win/2）
-            # 搜索尾部 20% 区间
-            tail_len = max(40, win // 5)
-            # 断点初值：end
-            cut_pos = len(piece)
-            # 候选断点子串列表
-            candidates = ["\n\n", "\n。", "。\n", "\n", "。", "！", "？", ". ", "! ", "? ", ";", "；"]
-            # 遍历候选
-            for cand in candidates:
-                # 在 piece 的后 tail_len 里找最后一次出现位置
-                search_from = max(0, len(piece) - tail_len)
-                # 从 search_from 开始找，但从尾找更近
-                idx = piece.rfind(cand, search_from)
-                # 找到了
-                if idx >= search_from:
-                    # 切点位置：候选词的结束
-                    cut_pos = idx + len(cand)
-                    # 已经找到合适的了（列表越前优先级越高）
-                    break
-            # 没找到任何候选（或切点太小 < 20% 窗口）→ 退回 win//2 的位置避免死循环
-            if cut_pos <= win // 4:
-                # 硬切在 win 位置
-                cut_pos = len(piece)
-            # 最终 piece：按 cut_pos 截断
-            final_piece = piece[:cut_pos]
-            # 空串跳过（没内容）
-            if final_piece.strip():
-                # 加入 chunks
-                chunks.append((final_piece, start))
-            # 下一块起点：end - overlap（保证重叠），但至少前进 1 字符避免死循环
-            advance = max(1, cut_pos - lap)
-            # 游标前进
-            start += advance
-        # 返回切块列表
-        return chunks
-
-    # 重新生成 topic 的向量索引（失败不抛异常，返回 bool 表示是否成功）
-    # 参数 topic_id：主题 ID
-    # 返回 bool：True 表示重建成功；False 表示失败/未启用
-    def rebuild_vector_index(self, topic_id: str) -> bool:
-        # 没向量工厂 / 没 embed → 无法重建，返回失败
-        if self._vec_factory is None or self._embed_fn is None:
-            # 记 warning
-            _log.warning("rebuild_vector_index skipped: embed_fn or vector_store_factory not configured")
-            # 返回失败
-            return False
-        # topic 锁（防止并发重建）
-        with self._lock_for(topic_id):
-            # 先确保 topic 目录存在
-            topic_dir = self.ensure_topic(topic_id)
-            # 向量子目录
-            vec_dir = topic_dir / _VECTOR_DIRNAME
-            # 确保存在
-            vec_dir.mkdir(parents=True, exist_ok=True)
-
-            # 先拿文档列表
-            docs = self.list_documents(topic_id)
-            # 没文档：返回成功（空索引也合理）
-            if not docs:
-                # 返回成功
-                return True
-
-            # --- 1. 计算 embed 维度（调用一次 embed_fn 拿维度） ---
-            # embed 调用异常处理
-            try:
-                # 调用 embed_fn 拿第一篇前几个字符的向量
-                probe_vec = self._embed_fn("probe")
-            except Exception:
-                # 失败记日志
-                _log.exception("rebuild_vector_index: embed_fn call failed (probe)")
-                # 返回失败
-                return False
-            # 向量得是 list[float] 或等价 Iterable
-            try:
-                # 转 list 拿长度
-                probe_list = list(probe_vec)
-            except Exception:
-                # 拿不到维度
-                _log.error("rebuild_vector_index: embed_fn return cannot list()")
-                return False
-            # 空向量不行
-            if not probe_list:
-                # 记错误
-                _log.error("rebuild_vector_index: embed_fn returns empty vector")
-                return False
-            # 维度
-            dims = len(probe_list)
-
-            # --- 2. 打开/重建向量存储（先扫所有块再批量 upsert，减少 IO） ---
-            # 向量存储路径（按 topic 建独立库，便于按 topic 管理）
-            db_path = vec_dir / "vectors.sqlite"
-            # 先尝试创建 VectorStore，失败返回 False
-            try:
-                # 创建向量库实例（工厂 lambda）
-                vec_store = self._vec_factory(db_path, dims)
-            except Exception:
-                # 创建失败
-                _log.exception("rebuild_vector_index: open vector store failed")
-                # 返回 False
-                return False
-
-            # 先清掉旧索引（重建语义 = 删旧 + 插新）；VectorStore 自己实现 clear_all()
-            try:
-                # 尝试清空
-                vec_store.clear_all()
-            except Exception:
-                # 有些后端可能不支持 clear_all；尝试删除 db_path 再重建（失败就算了）
-                try:
-                    # 关当前连接
-                    vec_store.close()
-                except Exception:
-                    # 关失败忽略
-                    pass
-                try:
-                    # 删物理文件
-                    db_path.unlink(missing_ok=True)
-                    # 再创建一次
-                    vec_store = self._vec_factory(db_path, dims)
-                except Exception:
-                    # 重建失败，返回
-                    _log.exception("rebuild_vector_index: recreate store after clear failed")
-                    return False
-
-            # --- 3. 每篇文档切块 → 取向量 → upsert 进向量库 ---
-            # 统计成功/失败
-            ok_chunks = 0
-            # 失败文档数
-            fail_docs = 0
-            # 遍历文档
-            for doc in docs:
-                # 文档绝对路径
-                p = topic_dir / doc.rel_path
-                # 文件不存在跳过（用户手动删了文件）
-                if not p.is_file():
-                    continue
-                # 读文档文本
-                try:
-                    # 以 UTF-8 读，遇坏字符替换
-                    text = p.read_text(encoding="utf-8", errors="replace")
-                except Exception:
-                    # 读失败记 warning + 统计
-                    fail_docs += 1
-                    # 继续
-                    continue
-                # 切块
-                chunks = self._chunk_text(text)
-                # 空文档没块跳过
-                if not chunks:
-                    continue
-                # 块文本列表（用于 embed 批量调，避免 n 次 RPC）
-                chunk_texts = [c[0] for c in chunks]
-                # 块偏移
-                chunk_offsets = [c[1] for c in chunks]
-                # Embed（批量）
-                try:
-                    # 假设 embed_fn 支持 list[str]→list[list[float]]；不支持的话 fallback 逐次调
-                    vecs = self._embed_fn(chunk_texts)
-                except Exception:
-                    # 批量失败 → 逐个 embed（更稳，但慢）
-                    vecs = []
-                    # 遍历每个 chunk
-                    for ct in chunk_texts:
-                        try:
-                            # 单条 embed
-                            v = self._embed_fn(ct)
-                            # 加进 vecs
-                            vecs.append(v)
-                        except Exception:
-                            # 单条失败塞 None 占位（后面跳过）
-                            vecs.append(None)
-                # 遍历块 + 向量，写入向量库
-                for idx, (chunk, off) in enumerate(chunks):
-                    # 取对应向量
-                    v = vecs[idx] if idx < len(vecs) else None
-                    # None 跳过
-                    if v is None:
-                        continue
-                    # 保证是 list[float]
-                    try:
-                        # list 化
-                        v_list = list(v)
-                    except Exception:
-                        # 转换失败跳过
-                        continue
-                    # 维度不匹配跳过
-                    if len(v_list) != dims:
-                        continue
-                    # chunk 唯一 id = {doc.id}#{idx}
-                    chunk_id = f"{doc.id}#{idx}"
-                    # 元信息：保留 doc_id + source_type + start_offset，便于 retrieve 时反查
-                    meta: dict[str, Any] = {
-                        # 文档 ID
-                        "doc_id": doc.id,
-                        # 主题 ID
-                        "topic_id": topic_id,
-                        # 目录类型
-                        "source_type": doc.source_type,
-                        # 相对路径
-                        "rel_path": doc.rel_path,
-                        # 文档标题
-                        "title": doc.title,
-                        # 作者
-                        "author": doc.author,
-                        # 来源 URL
-                        "source_url": doc.source_url,
-                        # 块起始偏移（字符）
-                        "start_offset": int(off),
-                        # 块长度（字符）
-                        "length": int(len(chunk)),
-                        # 块索引
-                        "chunk_index": int(idx),
-                    }
-                    # 写向量库
-                    try:
-                        # upsert（按 chunk_id 覆盖）
-                        vec_store.upsert(chunk_id, v_list, chunk, meta)
-                        # 成功计数+1
-                        ok_chunks += 1
-                    except Exception:
-                        # upsert 失败记 warning
-                        _log.exception("vec upsert failed: chunk_id=%s", chunk_id)
-                        # 继续
-                        continue
-            # 关向量库
-            try:
-                # 安全关闭
-                vec_store.close()
-            except Exception:
-                # 关失败忽略
-                pass
-            # 全部结束：记 info 日志（成功块 + 失败文档数）
-            _log.info(
-                "rebuild_vector_index done: topic=%s docs=%s ok_chunks=%d fail_docs=%d",
-                topic_id,
-                len(docs),
-                ok_chunks,
-                fail_docs,
+        existing = self._store.fetch_one(
+            "SELECT topic_id FROM knowledge_topic WHERE topic_id = ?",
+            (topic_id,),
+        )
+        if existing:
+            # 更新
+            set_parts: list[str] = []
+            params: list[Any] = []
+            if name is not None:
+                set_parts.append("name = ?")
+                params.append(display_name)
+            if description is not None:
+                set_parts.append("description = ?")
+                params.append(description)
+            if tags is not None:
+                set_parts.append("tags_json = ?")
+                params.append(tags_json)
+            if status is not None:
+                set_parts.append("status = ?")
+                params.append(status)
+            if set_parts:
+                set_parts.append("updated_at = ?")
+                params.append(now_ms)
+                params.append(topic_id)
+                self._store.execute(
+                    f"UPDATE knowledge_topic SET {', '.join(set_parts)} WHERE topic_id = ?",
+                    tuple(params),
+                )
+        else:
+            # 新建
+            self._store.execute(
+                """
+                INSERT INTO knowledge_topic
+                    (topic_id, name, description, tags_json, status, created_by, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    topic_id,
+                    display_name,
+                    description or "",
+                    tags_json,
+                    status or "active",
+                    self._created_by,
+                    now_ms,
+                    now_ms,
+                ),
             )
-            # 返回成功
-            return True
+            # 同时创建 knowledge 目录骨架
+            self._ensure_knowledge_dir(topic_id)
+
+        return self.get_topic(topic_id) or {"topic_id": topic_id, "name": display_name}
+
+    def list_topics(self, *, include_archived: bool = False) -> list[dict]:
+        """返回所有主题列表."""
+        where = "" if include_archived else "WHERE status != 'archived'"
+        rows = self._store.fetch_all(
+            f"""
+            SELECT t.topic_id, t.name, t.description, t.tags_json, t.status,
+                   t.created_at, t.updated_at,
+                   (SELECT COUNT(*) FROM kb_chunk c WHERE c.topic_id = t.topic_id) AS chunks_in_collection
+              FROM knowledge_topic t
+             {where}
+             ORDER BY t.updated_at DESC
+            """
+        )
+        result = []
+        for r in rows:
+            d = dict(r)
+            try:
+                d["tags"] = json.loads(d.get("tags_json") or "[]")
+            except Exception:
+                d["tags"] = []
+            d.pop("tags_json", None)
+            result.append(d)
+        return result
+
+    def get_topic(self, topic_id: str) -> dict[str, Any] | None:
+        """获取单个主题详情."""
+        row = self._store.fetch_one(
+            """
+            SELECT t.topic_id, t.name, t.description, t.tags_json, t.status,
+                   t.created_at, t.updated_at,
+                   (SELECT COUNT(*) FROM kb_chunk c WHERE c.topic_id = t.topic_id) AS chunks_in_collection
+              FROM knowledge_topic t
+             WHERE t.topic_id = ?
+            """,
+            (topic_id,),
+        )
+        if row is None:
+            return None
+        d = dict(row)
+        try:
+            d["tags"] = json.loads(d.get("tags_json") or "[]")
+        except Exception:
+            d["tags"] = []
+        d.pop("tags_json", None)
+        return d
+
+    def delete_topic(self, topic_id: str) -> dict[str, Any]:
+        """删除主题记录."""
+        count = self._store.execute(
+            "DELETE FROM knowledge_topic WHERE topic_id = ?",
+            (topic_id,),
+        )
+        return {"removed_rows": count}
+
+    # ------------------------------------------------------------------
+    # World-Topic 绑定
+    # ------------------------------------------------------------------
+
+    def list_bindings(self, *, topic_id: str | None = None) -> list[dict]:
+        """查询绑定列表."""
+        if topic_id:
+            return self._store.fetch_all(
+                "SELECT world_id, topic_id, priority FROM world_topic_binding"
+                " WHERE topic_id = ? ORDER BY priority DESC",
+                (topic_id,),
+            )
+        return self._store.fetch_all(
+            "SELECT world_id, topic_id, priority FROM world_topic_binding ORDER BY priority DESC"
+        )
+
+    def get_world_binding(self, world_id: str) -> dict[str, Any] | None:
+        """查询单个 world 的绑定."""
+        return self._store.fetch_one(
+            "SELECT world_id, topic_id, priority FROM world_topic_binding WHERE world_id = ?",
+            (world_id,),
+        )
+
+    def bind_world_topic(self, world_id: str, topic_id: str, *, priority: int = 0) -> dict[str, Any]:
+        """绑定 world 到主题."""
+        removed = 0
+        # 先删旧绑定（同一 world_id）
+        removed = self._store.execute(
+            "DELETE FROM world_topic_binding WHERE world_id = ?",
+            (world_id,),
+        )
+        self._store.execute(
+            """
+            INSERT INTO world_topic_binding (world_id, topic_id, priority)
+            VALUES (?, ?, ?)
+            """,
+            (world_id, topic_id, priority),
+        )
+        return {"ok": True, "removed_rows": removed}
+
+    def unbind_world(self, world_id: str) -> dict[str, Any]:
+        """解绑 world."""
+        removed = self._store.execute(
+            "DELETE FROM world_topic_binding WHERE world_id = ?",
+            (world_id,),
+        )
+        return {"removed_rows": removed}
+
+    # ------------------------------------------------------------------
+    # 索引任务 + 审计
+    # ------------------------------------------------------------------
+
+    def job_list(self, topic_id: str, *, limit: int = 50) -> list[dict]:
+        """索引任务列表."""
+        return self._store.fetch_all(
+            """
+            SELECT id, topic_id, mode, status, progress,
+                   file_total, file_done, chunk_total, error_msg,
+                   started_at, finished_at, created_at
+              FROM kb_index_job
+             WHERE topic_id = ?
+             ORDER BY created_at DESC
+             LIMIT ?
+            """,
+            (topic_id, limit),
+        )
+
+    def audit_list(self, topic_id: str, *, limit: int = 100) -> list[dict]:
+        """审计日志列表."""
+        return self._store.fetch_all(
+            """
+            SELECT id, op, actor, topic_id, document_id, job_id,
+                   query_text, top_k, filters_json, result_json, error_msg, created_at
+              FROM kb_audit_log
+             WHERE topic_id = ?
+             ORDER BY created_at DESC
+             LIMIT ?
+            """,
+            (topic_id, limit),
+        )
+
+    # ------------------------------------------------------------------
+    # 预置主题 + 关闭
+    # ------------------------------------------------------------------
+
+    def _bootstrap_default_topics(self) -> None:
+        """自动创建预置主题."""
+        for t in _DEFAULT_TOPICS:
+            try:
+                self.ensure_topic(t["topic_id"], name=t["name"], description=t["description"])
+            except Exception:
+                _log.exception("bootstrap topic failed: %s", t["topic_id"])
+
+    def close(self) -> None:
+        """关闭所有资源."""
+        try:
+            self._factory.close_all()
+        except Exception:
+            pass
+        try:
+            self._store.close()
+        except Exception:
+            pass
+        self._pipelines.clear()

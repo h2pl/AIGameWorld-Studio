@@ -30,6 +30,8 @@ dependencies = [
     "tldextract>=5.3.1",
     "rarfile>=4.4",
     "curl-cffi>=0.15.0",
+    "pypdf>=6.14.2",
+    "llama-index-readers-file>=0.6.0",
 ]
 
 [dependency-groups]
@@ -58,5 +60,26 @@ line-length = 120
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "UP", "W"]
 
+[tool.ruff.lint.per-file-ignores]
+# scripts/ 经常需要先设置 sys.path / reactor，再导入项目模块；含 HTML 模板字符串
+"scripts/**" = ["E402", "E501"]
+# e2e 测试脚本需要先初始化环境再导入
+"e2e_kb_test.py" = ["E402", "E501"]
+# 一次性工具脚本
+"remove_gen.py" = ["E501"]
+# Scrapy 子系统：reactor/asyncio 预装 + 延迟导入 + 命名风格
+"src/services/crawler/scrapy_app/**" = ["E402", "N806", "N814"]
+# Crawler 搜索模块：延迟导入 DDGS / SQLiteStore 等
+"src/services/crawler/search.py" = ["N806"]
+# 向量存储：底部延迟导入
+"src/services/knowledge/vector_store.py" = ["E402"]
+# SQLiteStore：顶部 UUID 导入
+"src/utils/sqlite_store.py" = ["E402"]
+# serve.py / cli.py：函数级常量命名（_KB_HTML_PATH 等是故意大写）
+"src/serve.py" = ["N806"]
+"src/cli.py" = ["N806"]
+
 [tool.ruff.format]
 quote-style = "double"
+
+# pyright 配置见 pyrightconfig.json

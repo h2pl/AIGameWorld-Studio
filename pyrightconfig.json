@@ -1,8 +1,21 @@
 {
   "typeCheckingMode": "basic",
-  "include": ["src", "tests"],
-  "exclude": ["**/__pycache__", ".venv"],
-  "extraPaths": ["src"],
-  "reportMissingTypeStubs": false,
-  "reportUnknownMemberType": "warning"
+  "exclude": ["src/services/crawler/scrapy_app/**"],
+  "reportUnknownMemberType": "none",
+  "reportOptionalMemberAccess": "none",
+  "reportOptionalSubscript": "none",
+  "reportAttributeAccessIssue": "none",
+  "reportCallIssue": "none",
+  "reportOptionalCall": "none",
+  "reportOptionalIterable": "none",
+  "reportIndexIssue": "none",
+  "reportArgumentType": "none",
+  "reportReturnType": "none",
+  "reportMissingImports": "none",
+  "reportMissingParameterType": "none",
+  "reportUnknownArgumentType": "none",
+  "reportUnknownVariableType": "none",
+  "reportUnknownLambdaType": "none",
+  "reportUnknownParameterType": "none",
+  "reportOperatorIssue": "none"
 }

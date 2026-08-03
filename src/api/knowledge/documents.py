@@ -51,7 +51,9 @@ def list_documents(
     "/{topic_id}/documents/{doc_id}",
     response_model=schemas.DocumentDeleteResponse,
     summary="软删单个文档",
-    description="1) kb_document.status='deleted' + SQLite 级联删 kb_chunk/kb_document_tag；2) Chroma 按 chunk_id 批量删。",
+    description=(
+        "1) kb_document.status='deleted' + SQLite 级联删 kb_chunk/kb_document_tag；2) Chroma 按 chunk_id 批量删。"
+    ),
 )
 def delete_document(
     doc_id: str,

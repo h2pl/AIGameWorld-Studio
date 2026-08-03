@@ -49,3 +49,7 @@ e2e-result.json
 # Scrapy debug / min standalone scripts
 scripts/_debug_*.py
 scripts/_scrapy_standalone_min.py
+
+# External binary tools (not part of source)
+unrar.exe
+license.txt

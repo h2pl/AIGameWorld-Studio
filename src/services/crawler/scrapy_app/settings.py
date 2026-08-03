@@ -79,7 +79,11 @@ USER_AGENT = (
 )
 # 请求头默认值（更像真实 Chrome 浏览器，减少被百度百科/站点 WAF 拦截为 403 的概率）
 DEFAULT_REQUEST_HEADERS = {
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+    "Accept": (
+        "text/html,application/xhtml+xml,application/xml;q=0.9,"
+        "image/avif,image/webp,image/apng,*/*;q=0.8,"
+        "application/signed-exchange;v=b3;q=0.7"
+    ),
     "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
     "Accept-Encoding": "gzip, deflate, br",  # 注意：Scrapy 会自动处理编码，这个头用于假装浏览器
     "Cache-Control": "max-age=0",

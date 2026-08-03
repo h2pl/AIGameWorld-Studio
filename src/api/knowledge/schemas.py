@@ -225,6 +225,8 @@ class IndexResponse(BaseModel):
     chunks: int = 0
     # 关联任务ID（可选）
     job_id: str | None = None
+    # 任务状态（异步索引：pending/running/done/failed）
+    status: str | None = None
     # 错误信息（失败时填充）
     error: str | None = None
 
@@ -350,3 +352,37 @@ class ClearResponse(BaseModel):
 
 
 # === Stats 分组结束 ===
+
+
+# === Ingest Files / 直接导入本地文件（一步到位） ===
+
+
+class IngestFilesRequest(BaseModel):
+    """直接导入本地文件请求 — 传本地路径，一步完成读取+切块+嵌入+写入."""
+
+    # 本地文件绝对路径列表
+    file_paths: list[str] = Field(..., min_length=1, description="本地文件绝对路径列表（支持 pdf/md/txt）")
+    # 每块字符数，默认 800
+    chunk_size: int = Field(default=800, ge=100, le=4000, description="每块字符数")
+    # 重叠字符数，默认 120
+    chunk_overlap: int = Field(default=120, ge=0, le=1000, description="重叠字符数")
+
+
+class IngestFilesResponse(BaseModel):
+    """直接导入文件响应."""
+
+    # 操作是否成功
+    ok: bool
+    # 所属主题ID
+    topic_id: str
+    # 导入的文档ID列表
+    doc_ids: list[str] = Field(default_factory=list)
+    # 新增分块总数
+    chunks: int = 0
+    # 耗时（秒）
+    elapsed: float = 0.0
+    # 错误信息
+    error: str | None = None
+
+
+# === Ingest Files 分组结束 ===

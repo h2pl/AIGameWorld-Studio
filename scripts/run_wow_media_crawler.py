@@ -247,7 +247,7 @@ def step2_submit_and_wait(urls: list[str]) -> str | None:
     for p in promoted[:10]:
         fp = p.get("file_path") or ""
         sz = p.get("file_size") or 0
-        print(f"      [{p.get('content_type', '?'):4s}] {sz:8d} B  {Path(fp).name if fp else '-':50s}")
+        print(f"      [{p.get('content_type', '?'):4s}] {sz:8d} B  {pathlib.Path(fp).name if fp else '-':50s}")
     print(f"    fetched(未p) : {len(fetched)}")
     print(f"    failed       : {len(failed)}")
     for f in failed[:10]:

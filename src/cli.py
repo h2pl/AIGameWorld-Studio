@@ -403,23 +403,16 @@ async def _validate(args) -> int:
 # ═══════════════════════════════════════════════════════════════
 
 
-# 构造统一的 KnowledgeManager：初始化 Chroma PersistentClient + 路径解析
 def _make_kb_manager(args):
-    """构造 KnowledgeManager（统一 PersistentClient 初始化）."""
-    import chromadb
-
+    """构造 KnowledgeManager（新版：组合 Pipeline + Factory + Store）."""
     from src.services.knowledge import KnowledgeManager
 
-    chroma_path = Path(args.chroma_path).expanduser().resolve()
-    chroma_path.mkdir(parents=True, exist_ok=True)
-    client = chromadb.PersistentClient(path=str(chroma_path))
-
-    base_dir = getattr(args, "dir", None)
+    topic_id = getattr(args, "topic_id", None) or getattr(args, "world_id", "default")
     return KnowledgeManager(
-        world_id=args.world_id,
-        chroma_client=client,
-        base_dir=base_dir,
-    )
+        project_root=Path.cwd(),
+        auto_run_migrations=True,
+        created_by="cli",
+    ), topic_id
 
 
 # kb index handler：增量/全量索引 knowledge/ 目录并输出统计
@@ -428,30 +421,28 @@ async def _kb_index(args) -> int:
 
     --force: 清空 collection + 索引表后再全量重建；默认增量 SHA256。
     """
-    kb = _make_kb_manager(args)
+    kb, topic_id = _make_kb_manager(args)
     if args.force:
-        print(f"[kb] force reindex world={args.world_id}")
+        print(f"[kb] force reindex topic={topic_id}")
     else:
-        print(f"[kb] incremental index world={args.world_id}")
-    print(f"     base_dir={kb.base_dir}")
-    print(f"     knowledge_dir={kb.knowledge_dir}")
+        print(f"[kb] incremental index topic={topic_id}")
 
-    result = await kb.index(force=bool(args.force))
+    result = kb.index(topic_id, force=bool(args.force))
     if not result.get("ok"):
         err = result.get("error", "unknown error")
         print(f"[FAIL] {err}", file=sys.stderr)
-        print(f"       将写入文件到: {kb.knowledge_dir}", file=sys.stderr)
         return 1
 
     info = result.get("indexed", {})
     files = info.get("files", 0)
     chunks = info.get("chunks", 0)
-    skipped = info.get("skipped", False)
+    skipped = info.get("skipped_files", 0) > 0 and info.get("new_files", 0) == 0
     total_chunks = result.get("total_chunks", 0)
     if skipped:
         print(f"[OK] 无变更，跳过（所有文件 SHA256 未变）。当前 chunks = {total_chunks}")
     else:
         print(f"[OK] 索引文件 {files} 个 → {chunks} chunks。当前总数 = {total_chunks}")
+    kb.close()
     return 0
 
 
@@ -463,8 +454,7 @@ async def _kb_search(args) -> int:
     """
     import json as _json
 
-    kb = _make_kb_manager(args)
-    # 系统生成的 metadata 太长（_node_content / document_id...），CLI 输出时过滤掉，只保留用户自定义的
+    kb, topic_id = _make_kb_manager(args)
     _SYS_META_KEYS = {
         "_node_content",
         "_node_type",
@@ -476,46 +466,40 @@ async def _kb_search(args) -> int:
     def _clean_meta(m: dict) -> dict:
         return {k: v for k, v in (m or {}).items() if k not in _SYS_META_KEYS}
 
-    if args.meta:
-        hits = kb.search_with_meta(
-            args.query,
-            top_k=args.top_k,
-            min_score=args.min_score,
-        )
-        if not hits:
-            print("(no hits)")
-            return 0
-        for i, h in enumerate(hits, 1):
-            score = f"{h['score_cosine_sim']:.3f}"
-            dist = f"{h['distance']:.4f}"
-            meta = _clean_meta(h.get("metadata") or {})
-            title = meta.get("title") or meta.get("file_name") or meta.get("file_path") or "-"
-            source_type = meta.get("source_type", "-")
-            print(f"[{i}] score={score} dist={dist} type={source_type}  {title}")
-            print(f"    {h['text'][:300]}{'...' if len(h['text']) > 300 else ''}")
-            if meta:
-                print(f"    meta: {_json.dumps(meta, ensure_ascii=False, default=str)}")
-            print()
-    else:
-        hits = kb.search(args.query, top_k=args.top_k, min_score=args.min_score)
-        if not hits:
-            print("(no hits)")
-            return 0
-        for i, h in enumerate(hits, 1):
-            # 去掉开头的 BOM（如果有），避免输出乱码
-            display = h[1:] if h and h[0] == "\ufeff" else h
-            print(f"[{i}] {display}")
+    hits = kb.search_with_meta(
+        topic_id,
+        args.query,
+        top_k=args.top_k,
+        min_score=args.min_score,
+    )
+    if not hits:
+        print("(no hits)")
+        kb.close()
+        return 0
+    for i, h in enumerate(hits, 1):
+        score = f"{h['score_cosine_sim']:.3f}"
+        dist = f"{h['distance']:.4f}"
+        meta = _clean_meta(h.get("metadata") or {})
+        title = meta.get("title") or meta.get("file_name") or meta.get("file_path") or "-"
+        source_type = meta.get("source_type", "-")
+        print(f"[{i}] score={score} dist={dist} type={source_type}  {title}")
+        print(f"    {h['text'][:300]}{'...' if len(h['text']) > 300 else ''}")
+        if args.meta and meta:
+            print(f"    meta: {_json.dumps(meta, ensure_ascii=False, default=str)}")
+        print()
+    kb.close()
     return 0
 
 
-# kb clear handler：清空指定 world 的向量 collection（不删除源文件）
+# kb clear handler：清空指定 topic 的向量 collection（不删除源文件）
 async def _kb_clear(args) -> int:
     """清空知识库 collection（不删文件）."""
-    kb = _make_kb_manager(args)
-    stats_before = kb.stats()
+    kb, topic_id = _make_kb_manager(args)
+    stats_before = kb.stats(topic_id)
     print(f"[kb] clear collection={stats_before['collection']}")
-    result = kb.clear()
+    result = kb.clear(topic_id)
     print(f"[OK] {result}")
+    kb.close()
     return 0
 
 
@@ -524,9 +508,10 @@ async def _kb_stats(args) -> int:
     """打印知识库统计."""
     import json as _json
 
-    kb = _make_kb_manager(args)
-    stats = kb.stats()
+    kb, topic_id = _make_kb_manager(args)
+    stats = kb.stats(topic_id)
     print(_json.dumps(stats, ensure_ascii=False, indent=2))
+    kb.close()
     return 0
 
 

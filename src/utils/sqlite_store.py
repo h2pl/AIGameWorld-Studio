@@ -11,7 +11,8 @@ from __future__ import annotations
 import logging
 import sqlite3
 import threading
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Iterator, Sequence
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -294,6 +295,31 @@ class SQLiteStore:
 
     # 兼容 store.py 的 fetch_all（带下划线）调用方式
     fetch_all = fetchall
+
+    # ------------------------------------------------------------------
+    # 批量事务
+    # ------------------------------------------------------------------
+
+    @contextmanager
+    def transaction(self) -> Iterator[None]:
+        """上下文管理器：在同一事务里执行多条写 SQL，失败自动回滚。
+
+        相比 execute 每次都单独 commit 的好处：
+          - 批量写入性能大幅提升；
+          - 保证多条写操作的原子性（要么都成功要么都失败）。
+        """
+        with self._lock:
+            # BEGIN EXCLUSIVE：加写锁，避免多线程/多进程中途插入导致的部分写入
+            self._conn.execute("BEGIN EXCLUSIVE TRANSACTION;")
+            try:
+                yield
+                self._conn.commit()
+            except Exception:
+                try:
+                    self._conn.rollback()
+                except Exception:
+                    pass
+                raise
 
     # 关闭 SQLite 连接（幂等）
     # 返回 None

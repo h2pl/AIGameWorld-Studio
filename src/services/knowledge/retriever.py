@@ -179,8 +179,7 @@ class KnowledgeRetriever:
                 # 支持 list / tuple 结构：(chunk_id, score, text, meta)
                 # 兼容各种实现，按位置取
                 try:
-                    # 第一个：chunk_id
-                    cid = row[0] if len(row) > 0 else ""
+                    # 第一个：chunk_id（忽略，用 chunk_id 字段从 meta 取）
                     # 第二个：score
                     score = float(row[1]) if len(row) > 1 else 0.0
                     # 第三个：text

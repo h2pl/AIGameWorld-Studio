@@ -298,3 +298,262 @@ class SQLiteVectorStore:
                     pass
                 # 置 None 防止重复关
                 self._conn = None
+
+
+# ============================================================================
+# LlamaIndex VectorStore 协议适配层：把各种后端（SQLite/Qdrant/Chroma）统一成
+# LlamaIndex IngestionPipeline 能用的 VectorStore 接口。
+# ============================================================================
+
+import os
+from dataclasses import dataclass, field
+
+
+class _SQLiteLlamaStoreAdapter:
+    """把自定义 SQLiteVectorStore 适配成 LlamaIndex VectorStore 最小接口.
+
+    只实现 IngestionPipeline / Retriever 实际用到的三个方法：add / delete / query。
+    """
+
+    stores_text: bool = True
+
+    def __init__(self, store: SQLiteVectorStore, collection_name: str):
+        self._store = store
+        self._collection_name = collection_name
+        self.client = store
+
+    @property
+    def collection_name(self) -> str:
+        return self._collection_name
+
+    def add(self, nodes: Sequence[Any]) -> list[str]:
+        ids: list[str] = []
+        for n in nodes:
+            node_id = getattr(n, "id_", None) or getattr(n, "node_id", None) or ""
+            if not node_id:
+                continue
+            embedding = getattr(n, "embedding", None) or None
+            if embedding is None:
+                continue
+            text = getattr(n, "text", "") or ""
+            meta_raw: Any = getattr(n, "metadata", None) or {}
+            if isinstance(meta_raw, dict):
+                meta = dict(meta_raw)
+            else:
+                meta = {"_raw": str(meta_raw)}
+            meta["node_id"] = node_id
+            meta["collection"] = self._collection_name
+            self._store.upsert(str(node_id), list(embedding), text, meta)
+            ids.append(str(node_id))
+        return ids
+
+    def delete(self, ref_doc_id: str | None = None, delete_all: bool = False, **kwargs: Any) -> None:
+        if delete_all:
+            self._store.clear_all()
+            return
+        if ref_doc_id:
+            # 简单实现：按 ref_doc_id 前缀/元数据匹配删除
+            # 我们的主键是 chunk_id，没有 ref_doc_id 维度索引，这里兜底 clear_all
+            # 如果需要精确删除，建议直接删 collection 重建
+            self._store.clear_all()
+
+    def query(self, query: Any, **kwargs: Any) -> Any:
+        qvec = getattr(query, "query_embedding", None) or None
+        if qvec is None:
+            qvec = kwargs.get("query_embedding") or []
+        k = int(getattr(query, "similarity_top_k", 5) or 5)
+        hits = self._store.search(list(qvec), k=k)
+        ids = [h[0] for h in hits]
+        scores = [1.0 / (1.0 + h[1]) for h in hits]  # 距离 → 相似度归一化
+        texts = [h[2] for h in hits]
+        metas = [h[3] for h in hits]
+        try:
+            from llama_index.core.schema import TextNode
+            from llama_index.core.vector_stores import VectorStoreQueryResult
+
+            nodes = []
+            for rid, txt, m in zip(ids, texts, metas):
+                try:
+                    nodes.append(TextNode(id_=rid, text=txt, metadata=m or {}))
+                except Exception:
+                    pass
+            return VectorStoreQueryResult(nodes=nodes, similarities=scores, ids=ids)
+        except Exception:
+            # LlamaIndex 不可用时，返回最小可消费的 tuple
+            return {"ids": ids, "scores": scores, "texts": texts, "metas": metas}
+
+
+@dataclass
+class KBVectorStoreFactory:
+    """可插拔向量库工厂：支持 sqlite / qdrant / chroma 三种后端.
+
+    用法::
+
+        factory = KBVectorStoreFactory.get_default(project_root=Path(...))
+        vs = factory.get_vector_store("wow_worldview")
+        factory.delete_collection("wow_worldview")
+    """
+
+    backend: str = "qdrant"  # "sqlite" | "qdrant" | "chroma"  （Studio 默认用 Qdrant Docker，不再用 SQLite 向量库）
+    project_root: Path = field(default_factory=lambda: Path.cwd())
+    chroma_path: Path | None = None
+    qdrant_url: str = "http://127.0.0.1:6333"
+    qdrant_api_key: str | None = None
+    # 单例缓存
+    _default_singleton: KBVectorStoreFactory | None = None
+    _per_topic: dict[tuple[str, str], Any] = field(default_factory=dict)
+    _per_topic_sqlite: dict[str, SQLiteVectorStore] = field(default_factory=dict)
+
+    @classmethod
+    def get_default(
+        cls,
+        *,
+        project_root: Path | None = None,
+        vector_store_backend: str | None = None,
+        chroma_path: Path | None = None,
+        qdrant_url: str | None = None,
+        qdrant_api_key: str | None = None,
+    ) -> KBVectorStoreFactory:
+        if cls._default_singleton is not None and vector_store_backend is None:
+            return cls._default_singleton
+        backend = (
+            (vector_store_backend or "").strip().lower()
+            or os.environ.get("KB_VECTOR_STORE", "").strip().lower()
+            or "qdrant"
+        )
+        if backend not in {"sqlite", "qdrant", "chroma"}:
+            # 非法值用默认 qdrant，不再默默降级 sqlite
+            backend = "qdrant"
+        root = Path(project_root or Path.cwd()).resolve()
+        inst = cls(
+            backend=backend,
+            project_root=root,
+            chroma_path=Path(chroma_path or root / "data" / "chroma"),
+            qdrant_url=(qdrant_url or os.environ.get("QDRANT_URL") or "http://127.0.0.1:6333").rstrip("/"),
+            qdrant_api_key=qdrant_api_key or os.environ.get("QDRANT_API_KEY") or None,
+        )
+        cls._default_singleton = inst
+        return inst
+
+    # ------------------------------------------------------------------
+    # get_vector_store：按 topic_id 返回 LlamaIndex VectorStore
+    # ------------------------------------------------------------------
+    def get_vector_store(self, topic_id: str):
+        collection = f"kb_{topic_id}"
+        cache_key = (self.backend, collection)
+        if cache_key in self._per_topic:
+            return self._per_topic[cache_key]
+
+        if self.backend == "sqlite":
+            db_path = self.project_root / "data" / "kb_vectors" / f"{collection}.db"
+            store = SQLiteVectorStore(db_path)
+            self._per_topic_sqlite[collection] = store
+            vs = _SQLiteLlamaStoreAdapter(store, collection)
+            self._per_topic[cache_key] = vs
+            return vs
+
+        if self.backend == "qdrant":
+            try:
+                from llama_index.vector_stores.qdrant import QdrantVectorStore
+                from qdrant_client import QdrantClient
+
+                client = QdrantClient(url=self.qdrant_url, api_key=self.qdrant_api_key)
+                vs = QdrantVectorStore(client=client, collection_name=collection)
+                self._per_topic[cache_key] = vs
+                return vs
+            except Exception as e:
+                raise RuntimeError(
+                    f"Qdrant（{self.qdrant_url}）连接失败，kb collection={collection} 无法创建。"
+                    f"请先启动容器：scripts/start_qdrant.py start 。错误：{type(e).__name__}: {e}"
+                ) from e
+
+        if self.backend == "chroma":
+            try:
+                import chromadb
+                from llama_index.vector_stores.chroma import ChromaVectorStore
+
+                self.chroma_path = Path(self.chroma_path or (self.project_root / "data" / "chroma"))
+                self.chroma_path.parent.mkdir(parents=True, exist_ok=True)
+                settings = chromadb.get_settings()
+                chroma_client = chromadb.PersistentClient(path=str(self.chroma_path), settings=settings)
+                chroma_collection = chroma_client.get_or_create_collection(name=collection)
+                vs = ChromaVectorStore(chroma_collection=chroma_collection)
+                self._per_topic[cache_key] = vs
+                return vs
+            except Exception as e:
+                raise RuntimeError(
+                    f"Chroma 连接失败，kb collection={collection} 无法创建。错误：{type(e).__name__}: {e}"
+                ) from e
+
+        return self._fallback_to_sqlite(collection)
+
+    def _fallback_to_sqlite(self, collection: str):
+        db_path = self.project_root / "data" / "kb_vectors" / f"{collection}.db"
+        store = SQLiteVectorStore(db_path)
+        self._per_topic_sqlite[collection] = store
+        vs = _SQLiteLlamaStoreAdapter(store, collection)
+        self._per_topic[("sqlite", collection)] = vs
+        return vs
+
+    # ------------------------------------------------------------------
+    # delete_collection：删除一个 topic 的向量集合（幂等）
+    # ------------------------------------------------------------------
+    def delete_collection(self, topic_id: str) -> bool:
+        collection = f"kb_{topic_id}"
+        cache_key = (self.backend, collection)
+        self._per_topic.pop(cache_key, None)
+
+        try:
+            if self.backend == "sqlite":
+                store = self._per_topic_sqlite.pop(collection, None)
+                if store is None:
+                    db_path = self.project_root / "data" / "kb_vectors" / f"{collection}.db"
+                    store = SQLiteVectorStore(db_path)
+                store.clear_all()
+                # 删整个 db 文件，真·清空
+                try:
+                    db_path = self.project_root / "data" / "kb_vectors" / f"{collection}.db"
+                    for suffix in ("", "-wal", "-shm", "-journal"):
+                        p = Path(str(db_path) + suffix)
+                        if p.exists():
+                            p.unlink()
+                except Exception:
+                    pass
+                return True
+
+            if self.backend == "qdrant":
+                try:
+                    from qdrant_client import QdrantClient
+
+                    client = QdrantClient(url=self.qdrant_url, api_key=self.qdrant_api_key)
+                    client.delete_collection(collection_name=collection)
+                    return True
+                except Exception:
+                    return False
+
+            if self.backend == "chroma":
+                try:
+                    import chromadb
+
+                    self.chroma_path = Path(self.chroma_path or (self.project_root / "data" / "chroma"))
+                    settings = chromadb.get_settings()
+                    chroma_client = chromadb.PersistentClient(path=str(self.chroma_path), settings=settings)
+                    try:
+                        chroma_client.delete_collection(name=collection)
+                        return True
+                    except Exception:
+                        return False
+                except Exception:
+                    return False
+        except Exception:
+            return False
+        return False
+
+    def close_all(self) -> None:
+        for s in list(self._per_topic_sqlite.values()):
+            try:
+                s.close()
+            except Exception:
+                pass
+        self._per_topic_sqlite.clear()
+        self._per_topic.clear()

@@ -296,13 +296,6 @@ class GenericCrawlSpider(scrapy.Spider):
         # --- HTTP 状态码判断：403/429/451/5xx 等 Scrapy TLS 指纹常被挡的情况，一律降级 httpx 直连 ---
         # 之前只针对 PDF 降级，但百度百科/灰机 Wiki/NGA 论坛等对 Scrapy TLS 指纹一律 403，
         # 用 httpx + http2 + Chrome  UA headers 基本都能正常拿到 HTML。
-        url_lower = url.lower()
-        looks_like_pdf_url = (
-            url_lower.endswith(".pdf")
-            or "filetype=pdf" in url_lower
-            or "/pdf/" in url_lower
-            or "download_pdf" in url_lower
-        )
         bad_status = response.status >= 400
         # 值得降级的状态码：403(禁)/404(有时 Cloudflare 错挂)/429(限流)/451(法律) + 5xx
         _should_fallback_status = response.status in {403, 404, 429, 451, 500, 502, 503, 504}

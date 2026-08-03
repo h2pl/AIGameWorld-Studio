@@ -6,9 +6,10 @@
 # ---- 导入依赖 ----
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
 
 from ...services.knowledge.manager import KnowledgeManager
@@ -32,6 +33,55 @@ kb_router.include_router(_search_router)
 # ---- 常量定义 ----
 # 允许上传的 source_type 枚举集合
 SOURCE_TYPES = {"lore", "documents", "images", "videos"}
+
+
+# ---- 路由: 直接导入本地文件（一步到位） ----
+@kb_router.post(
+    "/{topic_id}/ingest-files",
+    response_model=schemas.IngestFilesResponse,
+    status_code=202,
+    summary="直接导入本地文件（一步到位）",
+    description=(
+        "传入本地文件路径列表，后台异步执行：读取 → 切块 → BGE-M3 嵌入 → SQLite+Qdrant 双写。\n"
+        "立刻返回 202，前端轮询 GET /{topic_id}/jobs 查看进度。\n"
+        "这是本地应用的主流程，不需要先 upload 再 index 的两步操作。"
+    ),
+)
+async def ingest_files(
+    body: schemas.IngestFilesRequest,
+    background_tasks: BackgroundTasks,
+    topic_id: str = Depends(require_topic_id),
+    kb: KnowledgeManager = Depends(get_knowledge_manager),
+) -> schemas.IngestFilesResponse:
+    # 1. 校验：所有文件必须存在
+    missing = [p for p in body.file_paths if not Path(p).exists()]
+    if missing:
+        raise HTTPException(400, detail=f"文件不存在: {missing[:3]}")
+
+    file_paths = [Path(p) for p in body.file_paths]
+
+    # 2. 创建异步任务记录
+    r = kb.index_async(topic_id, force=False)
+    job_id = r.get("job_id") or ""
+
+    # 3. 注册后台执行（调 ingest_files，一步到位）
+    background_tasks.add_task(
+        kb._run_ingest_files_job,
+        topic_id,
+        job_id,
+        file_paths,
+        chunk_size=body.chunk_size,
+        chunk_overlap=body.chunk_overlap,
+    )
+
+    return schemas.IngestFilesResponse(
+        ok=True,
+        topic_id=topic_id,
+        doc_ids=[],
+        chunks=0,
+        elapsed=0.0,
+        error=None,
+    )
 
 
 # ---- 路由: 上传文件 ----
@@ -104,7 +154,7 @@ async def soft_delete_document(
     document_id: str,
     topic_id: str = Depends(require_topic_id),
     kb: KnowledgeManager = Depends(get_knowledge_manager),
-) -> dict[str, Any]:
+) -> Any:
     # 1. 参数校验：检查 document_id 是否为空
     if not document_id.strip():
         raise HTTPException(400, detail="document_id 不能为空")

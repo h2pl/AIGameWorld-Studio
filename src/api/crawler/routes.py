@@ -236,7 +236,10 @@ def list_job_items(
     "/jobs/{job_id}/promote",
     response_model=schemas.PromoteResponse,
     summary="批准 → 移到 knowledge/{source_type}/",
-    description="把暂存区文件移动到 knowledge/documents/（或指定 source_type）。**不触发索引**，需另行调 /api/kb/{topic}/index。",
+    description=(
+        "把暂存区文件移动到 knowledge/documents/（或指定 source_type）。"
+        "**不触发索引**，需另行调 /api/kb/{topic}/index。"
+    ),
 )
 def promote_job(
     job_id: str,

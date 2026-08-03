@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import re
 from pathlib import Path
 
@@ -310,3 +311,121 @@ class KnowledgeReader:
         except Exception:
             pass
         return None
+
+    # ------------------------------------------------------------------
+    # 显式文件加载（供 CLI / API 直接指定文件路径使用）
+    # ------------------------------------------------------------------
+
+    # 支持的文件后缀 → Reader 工厂
+    _EXT_TO_READER: dict[str, type] = {}
+
+    @classmethod
+    def _get_reader_for_ext(cls, ext: str):
+        """延迟导入 reader 类（避免启动时触发不存在的包）."""
+        if ext in (".pdf",):
+            from llama_index.readers.file import PDFReader
+
+            return PDFReader()
+        if ext in (".md", ".markdown"):
+            from llama_index.readers.file import MarkdownReader
+
+            return MarkdownReader()
+        if ext in (".txt",):
+            from llama_index.readers.file import FlatReader
+
+            return FlatReader()
+        return None
+
+    @staticmethod
+    def infer_chronicle_volume(file_name: str) -> str | None:
+        """从文件名识别编年史卷数，支持中英文混合命名.
+
+        例：
+          01_魔兽世界编年史·第一卷（Chronicle Vol.1）.pdf → "Chronicle Vol.1 / 第一卷"
+          魔兽世界编年史·第二卷.pdf                        → "第二卷"
+          Chronicle_Vol_3.pdf                              → "Chronicle Vol.3"
+        """
+        if not file_name:
+            return None
+        # 1) 优先匹配 "Vol" + 数字
+        m = re.search(r"Vol[\.\s_\-]*(\d+)", file_name, flags=re.IGNORECASE)
+        vol_en = f"Chronicle Vol.{m.group(1)}" if m else None
+        # 2) 匹配中文 "第X卷"
+        m2 = re.search(r"第\s*([一二三四五六七八九十百千0-9]+)\s*卷", file_name)
+        vol_cn = f"第{m2.group(1)}卷" if m2 else None
+        if vol_en and vol_cn:
+            return f"{vol_en} / {vol_cn}"
+        return vol_en or vol_cn
+
+    def load_documents(self, files: list[Path]) -> list[Document]:
+        """加载指定的文件列表，按后缀选择 reader，附带标准元数据.
+
+        Parameters
+        ----------
+        files : list[Path]
+            要加载的文件路径列表（支持 pdf / md / txt）。
+
+        Returns
+        -------
+        list[Document]
+            每个文件的每页/每段生成一个 Document，metadata 含
+            file_path / file_name / file_size / sha256 / content_type /
+            source_type / title / page_number / tags / chronicle_volume 等。
+        """
+        import logging
+
+        _log = logging.getLogger(__name__)
+
+        out: list[Document] = []
+        for fp in files:
+            if not fp.exists():
+                _log.warning("文件不存在: %s", fp)
+                continue
+            ext = fp.suffix.lower()
+            reader = self._get_reader_for_ext(ext)
+            if reader is None:
+                _log.warning("暂不支持的文件类型 %s: %s", ext, fp.name)
+                continue
+            try:
+                sub_docs = reader.load_data(file=fp)
+            except Exception as e:
+                _log.error("reader 加载失败 %s: %s: %s", fp.name, type(e).__name__, e)
+                continue
+
+            file_size = fp.stat().st_size
+            sha256 = hashlib.sha256(fp.read_bytes()).hexdigest()
+            chronicle_vol = self.infer_chronicle_volume(fp.name)
+
+            for idx, d in enumerate(sub_docs):
+                meta = dict(d.metadata or {})
+                page_num = int(meta.get("page_label") or (idx + 1))
+                meta.update(
+                    {
+                        "file_path": str(fp),
+                        "file_name": fp.name,
+                        "file_size": file_size,
+                        "sha256": sha256,
+                        "content_type": ext.lstrip("."),
+                        "source_type": "documents",
+                        "title": f"{fp.stem} p{page_num}" if ext == ".pdf" else fp.stem,
+                        "page_number": page_num,
+                        "tags": [f"ext_{ext.lstrip('.')}"],
+                        "related_packs": [],
+                    }
+                )
+                if chronicle_vol:
+                    meta["chronicle_volume"] = chronicle_vol
+                d.metadata = meta
+                d.excluded_llm_metadata_keys = []
+                d.excluded_embed_metadata_keys = []
+                out.append(d)
+
+            _log.info(
+                "加载完成: %s%s → %d segments  %.2fMB  sha256=%s…",
+                fp.name,
+                f" [{chronicle_vol}]" if chronicle_vol else "",
+                len(sub_docs),
+                file_size / 1024 / 1024,
+                sha256[:12],
+            )
+        return out

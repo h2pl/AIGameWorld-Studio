@@ -49,6 +49,9 @@ class KnowledgePipeline:
         topic_id: str,
         factory: KBVectorStoreFactory | None = None,
         store: SQLiteStore | None = None,
+        *,
+        chunk_size: int = 800,
+        chunk_overlap: int = 120,
     ):
         self.topic_id = topic_id
         self.collection_name = f"kb_{topic_id}"
@@ -61,7 +64,7 @@ class KnowledgePipeline:
 
         _bge_path = os.path.expanduser("~/.cache/huggingface/hub/models/BAAI--bge-m3/snapshots/master")
 
-        splitter = SentenceSplitter(chunk_size=500, chunk_overlap=50)
+        splitter = SentenceSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
         splitter.include_metadata = True
         splitter.include_prev_next_rel = True
         try:
@@ -70,13 +73,22 @@ class KnowledgePipeline:
         except Exception:
             pass
 
+        self._embedding_model = HuggingFaceEmbedding(model_name=_bge_path, trust_remote_code=True)
+
+        # IMPORTANT：IngestionPipeline **不传 vector_store 参数**。
+        # 原因：LlamaIndex IngestionPipeline 的 pydantic schema 要求 vector_store 必须是
+        # BasePydanticVectorStore 子类，但是我们自定义的 _SQLiteLlamaStoreAdapter 不是；
+        # 同时 QdrantVectorStore 的版本兼容也会有校验风险。
+        # 因此我们在这里只让它执行 transformations = [splitter, embedding]，
+        # 生成完 nodes + embedding 后手动 vs.add(nodes) 写向量库（两步走）。
         self._pipeline = IngestionPipeline(
             transformations=[
                 splitter,
-                HuggingFaceEmbedding(model_name=_bge_path, trust_remote_code=True),
+                self._embedding_model,
             ],
-            vector_store=self._factory.get_vector_store(topic_id),
         )
+        # 独立拿 LlamaIndex VectorStore 对象（KBVectorStoreFactory 负责后端路由）
+        self._vector_store = self._factory.get_vector_store(topic_id)
 
     # ------------------------------------------------------------------
     # Public API
@@ -106,7 +118,9 @@ class KnowledgePipeline:
                 pass
             doc_ids.append(doc_id)
 
-        # 第二步：确保向量库 collection 就绪，然后跑 LlamaIndex IngestionPipeline（切 chunk + embedding + 入库）
+        # 第二步：确保向量库 collection 就绪，然后跑 LlamaIndex IngestionPipeline（切 chunk + embedding）
+        #   注意：因为 IngestionPipeline 不再传 vector_store，所以这里只拿到 nodes+embedding，
+        #   挂完 chunk_id + 业务 metadata + 写 kb_chunk 后再写向量库（保证 payload 完整）。
         self._ensure_vector_store_collection()
         nodes = self._pipeline.run(documents=documents)
 
@@ -120,9 +134,9 @@ class KnowledgePipeline:
             by_doc[ref].append((i, n))
 
         # 第四步：遍历每个 doc 的 chunks，计算 chunk 元数据并组装 SQLite 行
+        #   关键：这里直接修改 node.metadata + node.id_，让后续 vs.add(nodes) 拿到完整 payload
         all_chunk_rows: list[tuple] = []
         for doc_id, items in by_doc.items():
-            # 每个 doc 内的 chunk 总数，用于给 chunk_index / chunk_count 赋值
             chunk_count = len(items)
             for idx_in_doc, (_global_idx, node) in enumerate(items):
                 chunk_id = SQLiteStore.new_id()
@@ -163,7 +177,6 @@ class KnowledgePipeline:
         # 第五步：事务批量写 SQLite — 先写所有 kb_chunk 行，再更新 kb_document 状态为 done
         if self._store is not None:
             with self._store.transaction():
-                # SQL: 批量 INSERT OR REPLACE 写 kb_chunk（10 列：id / doc_id / topic 等）
                 self._store.executemany(
                     """
                     INSERT OR REPLACE INTO kb_chunk
@@ -173,7 +186,6 @@ class KnowledgePipeline:
                     """,
                     all_chunk_rows,
                 )
-                # SQL: 批量 UPDATE kb_document 状态为 done（跳过已软删的记录）
                 self._store.executemany(
                     """
                     UPDATE kb_document
@@ -186,6 +198,11 @@ class KnowledgePipeline:
                     [(doc_id,) for doc_id in doc_ids],
                 )
 
+        # 第六步（顺序修复后）：node 已挂完 chunk_id + 完整 metadata，现在写向量库
+        #   （256 条一批，避免 Qdrant gRPC/HTTP 包过大超时）
+        for i in range(0, len(nodes), 256):
+            self._vector_store.add(nodes[i : i + 256])
+
         return {"chunks": len(nodes), "doc_ids": doc_ids, "chunk_ids": chunk_ids}
 
     # clear：清空当前 topic 的知识库 — 先删向量 collection，再软删 kb_document，写审计
@@ -193,15 +210,16 @@ class KnowledgePipeline:
         """清空当前主题知识库：向量库删 collection + kb_document 软删."""
         # 先删底层向量 collection（通过 Factory 路由到底层实现）
         self._factory.delete_collection(self.topic_id)
-        # 再刷新 pipeline.vector_store 引用（拿新的 collection）
-        self._pipeline.vector_store = self._factory.get_vector_store(self.topic_id)
+        # 删除旧 collection 后重拿新的 vector_store（因为 backend 可能是 per-topic 缓存了旧对象）
+        self._vector_store = self._factory.get_vector_store(self.topic_id)
         self._ensure_vector_store_collection()
 
         count_docs = 0
         if self._store is not None:
             now_ms = int(time.time() * 1000)
             # SQL: 软删 kb_document（status = deleted，填 updated_at / deleted_at）
-            cur = self._store.execute(
+            # 注意：SQLiteStore.execute 返回 int = rowcount，不是 cursor 对象
+            count_docs = self._store.execute(
                 """
                 UPDATE kb_document
                    SET status     = 'deleted',
@@ -212,7 +230,11 @@ class KnowledgePipeline:
                 """,
                 (now_ms, now_ms, self.topic_id),
             )
-            count_docs = cur.rowcount
+            # 软删 document 不会触发 ON DELETE CASCADE（因为只是 UPDATE），所以要真删 chunk
+            self._store.execute(
+                "DELETE FROM kb_chunk WHERE topic_id = ?",
+                (self.topic_id,),
+            )
             self._audit("clear_collection", created_by=created_by)
 
         return {
@@ -560,29 +582,26 @@ class KnowledgePipeline:
     # Internals
     # ------------------------------------------------------------------
     def _ensure_vector_store_collection(self):
-        """刷新 pipeline.vector_store 对底层 collection 的引用（clear 删完 collection 后要调用）。
+        """保证 self._vector_store 指向最新、可写的 collection。
 
-        - Chroma 模式：必须刷新 `_collection` / `_chroma_collection` 属性（否则还指向旧 collection id）
-        - Qdrant 模式：不用做特殊处理（QdrantVectorStore 通过 collection_name 寻址，自动指向最新）
+        - Qdrant：collection 被 factory.delete_collection 删除后，重新拿新的
+          QdrantVectorStore 即可（它按 collection_name 寻址）；
+        - Chroma：之前的旧实现，保留兼容。
         """
         try:
-            vector_store = getattr(self._pipeline, "vector_store", None)
-            if vector_store is None:
-                return
+            if self._vector_store is None:
+                self._vector_store = self._factory.get_vector_store(self.topic_id)
 
-            # Qdrant：无需刷新，直接返回
-            vs_class = type(vector_store).__name__
+            # Qdrant：无需额外刷新，直接返回（保证 vs 是新的就行）
+            vs_class = type(self._vector_store).__name__
             if vs_class == "QdrantVectorStore":
                 return
 
-            # Chroma（兼容旧模式）：重新拿最新 collection 并刷属性
+            # 其它后端（SQLite/Chroma）：尝试重新拿一份覆盖
             try:
                 new_store = self._factory.get_vector_store(self.topic_id)
-                for attr in ("_collection", "_chroma_collection"):
-                    if hasattr(new_store, attr) and hasattr(vector_store, attr):
-                        object.__setattr__(vector_store, attr, getattr(new_store, attr))
+                self._vector_store = new_store
             except Exception:
-                # 实在刷不了就直接换整个 vector_store 引用
-                self._pipeline.vector_store = self._factory.get_vector_store(self.topic_id)
+                pass
         except Exception:
             pass

@@ -1,6 +1,6 @@
 -- =====================================================================
 -- AIGameWorld Studio — 知识库系统表 (Knowledge Base Schema · 主题中心版)
--- 组织维度: **topic_id (主题/IP/游戏作品)**，例如 genshin / wow_worldview / xianjian
+-- 组织维度: **topic (主题/IP/游戏作品)**，例如 genshin / world_of_warcraft / xianjian
 --   不再按 world / pack 切库！每个主题一个独立 Qdrant collection (kb_{topic_id})，
 --   干净隔离，互不影响。world/pack 只是运行时引用关系，通过 world_topic_binding
 --   表做绑定（N:1，预留 N:N），GameWorld RAG 侧按 world_id 查对应 topic_id 即可。
@@ -16,31 +16,36 @@ PRAGMA synchronous = NORMAL;
 -- ---------------------------------------------------------------------
 -- knowledge_topic: 主题知识库注册表
 --   每个「原神世界观」「魔兽世界设定集」「仙剑奇侠传编年史」都占一行，
---   Chroma 里对应 collection 名 = `kb_' || topic_id || '`
+--   Qdrant 里对应 collection 名 = `kb_' || topic || '`
 -- ---------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS knowledge_topic (
-    topic_id        TEXT PRIMARY KEY,            -- 短 ID (genshin / wow_worldview / xianjian)，UI 展示
+    id              TEXT PRIMARY KEY,            -- UUID v4 (应用层生成)
+    topic           TEXT NOT NULL UNIQUE,         -- 短 ID (genshin / world_of_warcraft / xianjian)，UI 展示
     name            TEXT NOT NULL,               -- 中文/友好名：原神世界观
     description     TEXT,                        -- 简介，UI 展示
     tags_json       TEXT,                        -- 标签 JSON 数组
     status          TEXT NOT NULL DEFAULT 'active', -- active | archived | building
     created_by      TEXT NOT NULL DEFAULT 'system',
     created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S','now')),
-    updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S','now'))
+    updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S','now')),
+    ext_json        TEXT NOT NULL DEFAULT '{}'   -- 扩展字段（任意 JSON）
 ) STRICT;
 
 -- ---------------------------------------------------------------------
 -- world_topic_binding: 运行时 world → 主题知识库 的绑定关系
---   例: world_id='my_world_based_on_wow' → topic_id='wow_worldview'
+--   例: world_id='my_world_based_on_wow' → topic_id='world_of_warcraft'
 --   GameWorld RAG 侧先查这张表拿到 topic_id，再去 kb_{topic_id} 检索
 --   一个 world 当前只绑一个 topic (UNIQUE(world_id))，未来若要 N:N 去掉唯一约束即可
 -- ---------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS world_topic_binding (
+    id              TEXT PRIMARY KEY,            -- UUID v4 (应用层生成)
     world_id        TEXT NOT NULL,
-    topic_id        TEXT NOT NULL REFERENCES knowledge_topic(topic_id) ON DELETE CASCADE,
+    topic_id        TEXT NOT NULL REFERENCES knowledge_topic(topic) ON DELETE CASCADE,
     priority        INTEGER NOT NULL DEFAULT 0, -- 预留 N:N 时的排序
     created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S','now')),
-    PRIMARY KEY (world_id, topic_id),
+    updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S','now')),
+    ext_json        TEXT NOT NULL DEFAULT '{}',
+    UNIQUE(world_id, topic_id),
     UNIQUE(world_id)
 ) STRICT;
 
@@ -51,7 +56,7 @@ CREATE INDEX IF NOT EXISTS idx_world_topic_binding_topic ON world_topic_binding(
 -- ---------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS kb_document (
     id              TEXT PRIMARY KEY,                -- UUID v4 (应用层生成)
-    topic_id         TEXT NOT NULL REFERENCES knowledge_topic(topic_id) ON DELETE CASCADE,
+    topic_id         TEXT NOT NULL REFERENCES knowledge_topic(topic) ON DELETE CASCADE,
     title           TEXT NOT NULL,                   -- 文档标题
     source_type     TEXT NOT NULL DEFAULT 'documents', -- lore | documents | images | videos
     file_name       TEXT NOT NULL,                   -- 原始文件名
@@ -69,7 +74,8 @@ CREATE TABLE IF NOT EXISTS kb_document (
     -- 运行时引用：这个文档被哪些 pack 用到（仅参考，非主键维度；JSON 数组字符串，默认 '[]'）
     related_packs   TEXT NOT NULL DEFAULT '[]',
     -- 冗余存所有 tag（JSON 数组），UI 展示不用 JOIN
-    tags_json       TEXT
+    tags_json       TEXT,
+    ext_json        TEXT NOT NULL DEFAULT '{}'       -- 扩展字段（任意 JSON）
 ) STRICT;
 
 CREATE INDEX IF NOT EXISTS idx_kb_document_topic   ON kb_document(topic_id, status);
@@ -81,16 +87,18 @@ CREATE INDEX IF NOT EXISTS idx_kb_document_deleted ON kb_document(topic_id, dele
 -- kb_chunk: chunk 级元数据
 -- ---------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS kb_chunk (
-    id              TEXT PRIMARY KEY,                -- UUID v4 = Chroma documents.id
+    id              TEXT PRIMARY KEY,                -- UUID v4 = Qdrant documents.id
     document_id     TEXT NOT NULL REFERENCES kb_document(id) ON DELETE CASCADE,
-    topic_id         TEXT NOT NULL REFERENCES knowledge_topic(topic_id) ON DELETE CASCADE,
+    topic_id         TEXT NOT NULL REFERENCES knowledge_topic(topic) ON DELETE CASCADE,
     chunk_index     INTEGER NOT NULL,                -- 文档内 chunk 序号(从 0)
     chunk_count     INTEGER NOT NULL DEFAULT 1,
     text_hash       TEXT NOT NULL,                   -- chunk 文本 SHA256
     text_preview    TEXT NOT NULL,                   -- 正文前 200 字
     token_count     INTEGER NOT NULL DEFAULT 0,
     meta_json       TEXT,                            -- 冗余写回 Qdrant metadata 的 JSON
-    created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S','now'))
+    created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S','now')),
+    updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S','now')),
+    ext_json        TEXT NOT NULL DEFAULT '{}'       -- 扩展字段（任意 JSON）
 ) STRICT;
 
 CREATE INDEX IF NOT EXISTS idx_kb_chunk_doc    ON kb_chunk(document_id, chunk_index);
@@ -101,7 +109,7 @@ CREATE INDEX IF NOT EXISTS idx_kb_chunk_topic  ON kb_chunk(topic_id);
 -- ---------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS kb_index_job (
     id              TEXT PRIMARY KEY,
-    topic_id         TEXT NOT NULL REFERENCES knowledge_topic(topic_id) ON DELETE CASCADE,
+    topic_id         TEXT NOT NULL REFERENCES knowledge_topic(topic) ON DELETE CASCADE,
     document_id     TEXT REFERENCES kb_document(id) ON DELETE SET NULL,  -- NULL = 整个 topic 全量重建
     mode            TEXT NOT NULL DEFAULT 'incremental', -- incremental | force | per_file
     status          TEXT NOT NULL DEFAULT 'pending',
@@ -113,7 +121,9 @@ CREATE TABLE IF NOT EXISTS kb_index_job (
     started_at      TEXT,
     finished_at     TEXT,
     created_by      TEXT NOT NULL DEFAULT 'system',
-    created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S','now'))
+    created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S','now')),
+    updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S','now')),
+    ext_json        TEXT NOT NULL DEFAULT '{}'       -- 扩展字段（任意 JSON）
 ) STRICT;
 
 CREATE INDEX IF NOT EXISTS idx_kb_index_job_topic  ON kb_index_job(topic_id, status);
@@ -124,19 +134,24 @@ CREATE INDEX IF NOT EXISTS idx_kb_index_job_latest ON kb_index_job(topic_id, cre
 -- ---------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS kb_tag (
     id              TEXT PRIMARY KEY,
-    topic_id         TEXT NOT NULL REFERENCES knowledge_topic(topic_id) ON DELETE CASCADE,
+    topic_id         TEXT NOT NULL REFERENCES knowledge_topic(topic) ON DELETE CASCADE,
     name            TEXT NOT NULL,
     display_name    TEXT,
     color           TEXT,
     created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S','now')),
+    updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S','now')),
+    ext_json        TEXT NOT NULL DEFAULT '{}',
     UNIQUE(topic_id, name)
 ) STRICT;
 
 CREATE TABLE IF NOT EXISTS kb_document_tag (
+    id          TEXT PRIMARY KEY,                -- UUID v4 (应用层生成)
     document_id TEXT NOT NULL REFERENCES kb_document(id) ON DELETE CASCADE,
     tag_id      TEXT NOT NULL REFERENCES kb_tag(id) ON DELETE CASCADE,
     created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S','now')),
-    PRIMARY KEY (document_id, tag_id)
+    updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S','now')),
+    ext_json    TEXT NOT NULL DEFAULT '{}',
+    UNIQUE(document_id, tag_id)
 ) STRICT;
 
 CREATE INDEX IF NOT EXISTS idx_kb_document_tag_tag ON kb_document_tag(tag_id);
@@ -157,7 +172,9 @@ CREATE TABLE IF NOT EXISTS kb_audit (
     filters_json    TEXT,
     result_json     TEXT,
     error_msg       TEXT,
-    created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S','now'))
+    created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S','now')),
+    updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S','now')),
+    ext_json        TEXT NOT NULL DEFAULT '{}'
 ) STRICT;
 
 CREATE INDEX IF NOT EXISTS idx_kb_audit_op      ON kb_audit(op, created_at DESC);

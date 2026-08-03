@@ -103,7 +103,6 @@ class ChronicleVolumeEnricher:
 # 已注册的主题增强器：topic_id → list[MetadataEnricher]
 # 新增主题时在此注册，或通过 KnowledgeManager.register_enrichers() 动态注册
 _TOPIC_ENRICHERS: dict[str, list[MetadataEnricher]] = {
-    "wow_worldview": [ChronicleVolumeEnricher()],
     "world_of_warcraft": [ChronicleVolumeEnricher()],
 }
 
@@ -114,7 +113,7 @@ def get_enrichers_for_topic(topic_id: str) -> list[MetadataEnricher]:
     Parameters
     ----------
     topic_id : str
-        主题 ID（如 wow_worldview / genshin / xianjian）。
+        主题 ID（如 world_of_warcraft / genshin / xianjian）。
 
     Returns
     -------

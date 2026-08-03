@@ -17,9 +17,11 @@ CREATE TABLE IF NOT EXISTS crawler_job (
     staging_dir  TEXT NOT NULL,               -- 暂存目录相对项目根的路径
     created_by   TEXT NOT NULL DEFAULT 'system',
     created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S','now')),
+    updated_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S','now')),
     started_at   TEXT,
     finished_at  TEXT,
-    error_msg    TEXT
+    error_msg    TEXT,
+    ext_json     TEXT NOT NULL DEFAULT '{}'   -- 扩展字段（任意 JSON）
 ) STRICT;
 
 CREATE TABLE IF NOT EXISTS crawler_item (
@@ -34,7 +36,9 @@ CREATE TABLE IF NOT EXISTS crawler_item (
     status       TEXT NOT NULL,               -- 'pending' | 'fetched' | 'failed' | 'promoted' | 'discarded'
     error_msg    TEXT,
     fetched_at   TEXT,                     -- 抓取完成时间
-    promoted_at  TEXT                      -- promote 到 knowledge/ 的时间
+    promoted_at  TEXT,                      -- promote 到 knowledge/ 的时间
+    updated_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S','now')),
+    ext_json     TEXT NOT NULL DEFAULT '{}'   -- 扩展字段（任意 JSON）
 ) STRICT;
 
 CREATE INDEX IF NOT EXISTS idx_crawler_item_job ON crawler_item(job_id);

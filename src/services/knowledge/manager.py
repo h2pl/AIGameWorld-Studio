@@ -30,8 +30,8 @@ _KB_DATA_DIR = "knowledge-bases"
 
 # 预置主题（deps.py bootstrap_default_topics=True 时自动创建）
 _DEFAULT_TOPICS = [
-    {"topic_id": "genshin", "name": "原神", "description": "原神世界观与设定集"},
-    {"topic_id": "wow_worldview", "name": "魔兽世界", "description": "魔兽世界编年史与官方设定集"},
+    {"topic": "genshin", "name": "原神", "description": "原神世界观与设定集"},
+    {"topic": "world_of_warcraft", "name": "魔兽世界", "description": "魔兽世界编年史与官方设定集"},
 ]
 
 
@@ -69,34 +69,34 @@ class KnowledgeManager:
     # 辅助方法
     # ------------------------------------------------------------------
 
-    def _get_reader(self, topic_id: str) -> KnowledgeReader:
+    def _get_reader(self, topic_slug: str) -> KnowledgeReader:
         """获取/缓存指定 topic 的 KnowledgeReader（带主题特定的 enrichers）."""
-        if topic_id not in self._readers:
+        if topic_slug not in self._readers:
             from .enrichers import get_enrichers_for_topic
 
-            self._readers[topic_id] = KnowledgeReader(enrichers=get_enrichers_for_topic(topic_id))
-        return self._readers[topic_id]
+            self._readers[topic_slug] = KnowledgeReader(enrichers=get_enrichers_for_topic(topic_slug))
+        return self._readers[topic_slug]
 
-    def _get_pipeline(self, topic_id: str) -> KnowledgePipeline:
+    def _get_pipeline(self, topic_slug: str) -> KnowledgePipeline:
         """获取/缓存指定 topic 的 KnowledgePipeline 实例."""
-        if topic_id not in self._pipelines:
-            self._pipelines[topic_id] = KnowledgePipeline(
-                topic_id,
+        if topic_slug not in self._pipelines:
+            self._pipelines[topic_slug] = KnowledgePipeline(
+                topic_slug,
                 factory=self._factory,
                 store=self._store,
                 chunk_size=self._chunk_size,
                 chunk_overlap=self._chunk_overlap,
-                enrichers=self._get_reader(topic_id)._enrichers,
+                enrichers=self._get_reader(topic_slug)._enrichers,
             )
-        return self._pipelines[topic_id]
+        return self._pipelines[topic_slug]
 
-    def _knowledge_dir(self, topic_id: str) -> Path:
-        """返回知识库文件目录: project_root/knowledge-bases/{topic_id}/knowledge."""
-        return self._project_root / _KB_DATA_DIR / topic_id / "knowledge"
+    def _knowledge_dir(self, topic_slug: str) -> Path:
+        """返回知识库文件目录: project_root/knowledge-bases/{topic_slug}/knowledge."""
+        return self._project_root / _KB_DATA_DIR / topic_slug / "knowledge"
 
-    def _ensure_knowledge_dir(self, topic_id: str) -> Path:
+    def _ensure_knowledge_dir(self, topic_slug: str) -> Path:
         """确保知识库目录骨架存在 (lore/documents/images/videos)."""
-        kdir = self._knowledge_dir(topic_id)
+        kdir = self._knowledge_dir(topic_slug)
         for sub in ("lore", "documents", "images", "videos"):
             (kdir / sub).mkdir(parents=True, exist_ok=True)
         return kdir
@@ -105,7 +105,7 @@ class KnowledgeManager:
         self,
         op: str,
         *,
-        topic_id: str | None = None,
+        topic_slug: str | None = None,
         document_id: str | None = None,
         job_id: str | None = None,
         query_text: str | None = None,
@@ -131,7 +131,7 @@ class KnowledgeManager:
                     audit_id,
                     op,
                     self._created_by,
-                    topic_id,
+                    topic_slug,
                     document_id,
                     job_id,
                     query_text,
@@ -189,7 +189,7 @@ class KnowledgeManager:
 
     def save_uploaded_bytes(
         self,
-        topic_id: str,
+        topic_slug: str,
         data: bytes,
         source_type: str,
         filename: str,
@@ -197,7 +197,7 @@ class KnowledgeManager:
         prefix: str = "",
     ) -> dict[str, Any]:
         """保存上传的文件字节流到 knowledge 目录 + 登记 kb_document."""
-        kdir = self._ensure_knowledge_dir(topic_id)
+        kdir = self._ensure_knowledge_dir(topic_slug)
         dest_dir = kdir / source_type
         if prefix:
             dest_dir = dest_dir / prefix
@@ -233,7 +233,7 @@ class KnowledgeManager:
                 """,
                 (
                     doc_id,
-                    topic_id,
+                    topic_slug,
                     Path(filename).stem,
                     source_type,
                     safe_name,
@@ -251,7 +251,7 @@ class KnowledgeManager:
 
     def save_uploaded_text(
         self,
-        topic_id: str,
+        topic_slug: str,
         text: str,
         source_type: str,
         *,
@@ -260,7 +260,7 @@ class KnowledgeManager:
     ) -> dict[str, Any]:
         """保存粘贴的文本到 knowledge 目录 + 登记 kb_document."""
         data = text.encode("utf-8")
-        return self.save_uploaded_bytes(topic_id, data, source_type, file_name, prefix=prefix)
+        return self.save_uploaded_bytes(topic_slug, data, source_type, file_name, prefix=prefix)
 
     # ------------------------------------------------------------------
     # 文档 CRUD
@@ -268,7 +268,7 @@ class KnowledgeManager:
 
     def document_list(
         self,
-        topic_id: str,
+        topic_slug: str,
         *,
         limit: int = 200,
         offset: int = 0,
@@ -276,15 +276,15 @@ class KnowledgeManager:
     ) -> list[dict]:
         """分页返回 kb_document 列表（含每个文档的 chunk_count）."""
         where = "WHERE topic_id = ?"
-        params: list[Any] = [topic_id]
+        params: list[Any] = [topic_slug]
         if not include_deleted:
             where += " AND status != 'deleted'"
 
         rows = self._store.fetch_all(
             f"""
-            SELECT d.id, d.topic_id, d.title, d.source_type, d.content_type,
+            SELECT d.id, d.topic_id AS topic, d.title, d.source_type, d.content_type,
                    d.file_name, d.file_path, d.file_size, d.version, d.status,
-                   d.tags_json, d.created_at, d.updated_at,
+                   d.tags_json, d.created_at, d.updated_at, d.ext_json,
                    (SELECT COUNT(*) FROM kb_chunk c WHERE c.document_id = d.id) AS chunk_count
               FROM kb_document d
              {where}
@@ -303,15 +303,19 @@ class KnowledgeManager:
             except Exception:
                 d["tags"] = []
             d.pop("tags_json", None)
+            try:
+                d["ext_json"] = json.loads(d.get("ext_json") or "{}")
+            except Exception:
+                d["ext_json"] = {}
             result.append(d)
         return result
 
-    def document_delete(self, topic_id: str, doc_id: str) -> dict[str, Any]:
+    def document_delete(self, topic_slug: str, doc_id: str) -> dict[str, Any]:
         """软删文档：kb_document.status='deleted' + 真删 kb_chunk + Qdrant 删 points."""
         # 查出该文档的所有 chunk_id
         rows = self._store.fetch_all(
             "SELECT id FROM kb_chunk WHERE document_id = ? AND topic_id = ?",
-            (doc_id, topic_id),
+            (doc_id, topic_slug),
         )
         chunk_ids = [r["id"] for r in rows]
 
@@ -323,7 +327,7 @@ class KnowledgeManager:
                    SET status = 'deleted', updated_at = ?, deleted_at = ?
                  WHERE id = ? AND topic_id = ?
                 """,
-                (now_str, now_str, doc_id, topic_id),
+                (now_str, now_str, doc_id, topic_slug),
             )
             self._store.execute(
                 "DELETE FROM kb_chunk WHERE document_id = ?",
@@ -331,10 +335,10 @@ class KnowledgeManager:
             )
 
         # Qdrant 删 points
-        collection = f"kb_{topic_id}"
+        collection = f"kb_{topic_slug}"
         self._qdrant_delete_points(collection, chunk_ids)
 
-        self._audit("doc_delete", topic_id=topic_id, document_id=doc_id)
+        self._audit("doc_delete", topic_slug=topic_slug, document_id=doc_id)
         return {"ok": True, "soft_deleted": 1, "deleted_chunk_ids_count": len(chunk_ids)}
 
     # ------------------------------------------------------------------
@@ -343,7 +347,7 @@ class KnowledgeManager:
 
     def search_with_meta(
         self,
-        topic_id: str,
+        topic_slug: str,
         query: str,
         *,
         top_k: int = 5,
@@ -351,13 +355,13 @@ class KnowledgeManager:
         filters: dict | None = None,
     ) -> list[dict]:
         """语义检索：BGE-M3 embedding → Qdrant dense search → 补 text → 审计."""
-        pipeline = self._get_pipeline(topic_id)
+        pipeline = self._get_pipeline(topic_slug)
 
         # 生成 query embedding
         qvec = pipeline._embedding_model.get_query_embedding(query)
 
         # Qdrant HTTP search
-        collection = f"kb_{topic_id}"
+        collection = f"kb_{topic_slug}"
         url = f"{self._factory.qdrant_url}/collections/{collection}/points/search"
         body = json.dumps(
             {
@@ -424,7 +428,7 @@ class KnowledgeManager:
 
         self._audit(
             "retrieve",
-            topic_id=topic_id,
+            topic_slug=topic_slug,
             query_text=query,
             top_k=top_k,
             filters=filters,
@@ -436,35 +440,35 @@ class KnowledgeManager:
     # 索引
     # ------------------------------------------------------------------
 
-    def index(self, topic_id: str, *, force: bool = False) -> dict[str, Any]:
+    def index(self, topic_slug: str, *, force: bool = False) -> dict[str, Any]:
         """同步触发索引（阻塞）— 直接调 pipeline.index_directory."""
-        pipeline = self._get_pipeline(topic_id)
-        knowledge_dir = self._knowledge_dir(topic_id)
+        pipeline = self._get_pipeline(topic_slug)
+        knowledge_dir = self._knowledge_dir(topic_slug)
         if not knowledge_dir.exists():
-            self._ensure_knowledge_dir(topic_id)
+            self._ensure_knowledge_dir(topic_slug)
 
         mode = "force" if force else "incremental"
         try:
             result = pipeline.index_directory(knowledge_dir, mode=mode, created_by=self._created_by)
         except Exception as exc:
             error = f"{type(exc).__name__}: {exc}"
-            self._audit("index_done", topic_id=topic_id, error=error)
+            self._audit("index_done", topic_slug=topic_slug, error=error)
             return {"ok": False, "error": error, "total_chunks": 0}
 
         total_chunks = result.get("chunks", 0)
         self._audit(
             "index_done",
-            topic_id=topic_id,
+            topic_slug=topic_slug,
             job_id=result.get("job_id"),
             result_summary=result,
         )
         return {"ok": True, "total_chunks": total_chunks, "indexed": result}
 
-    def index_async(self, topic_id: str, *, force: bool = False) -> dict[str, Any]:
+    def index_async(self, topic_slug: str, *, force: bool = False) -> dict[str, Any]:
         """创建索引任务记录并返回 job_id（不执行，由 BackgroundTasks 调 _run_index_job）."""
         mode = "force" if force else "incremental"
         # 先确保 knowledge 目录存在
-        self._ensure_knowledge_dir(topic_id)
+        self._ensure_knowledge_dir(topic_slug)
         # 创建 job 记录（pipeline 内部的 _create_job 需要 store）
         job_id = ""
         try:
@@ -476,15 +480,15 @@ class KnowledgeManager:
                     (id, topic_id, document_id, mode, status, progress, created_by, created_at)
                 VALUES (?, ?, NULL, ?, 'pending', 0, ?, ?)
                 """,
-                (job_id, topic_id, mode, self._created_by, now_str),
+                (job_id, topic_slug, mode, self._created_by, now_str),
             )
-            self._audit("index_start", topic_id=topic_id, job_id=job_id)
+            self._audit("index_start", topic_slug=topic_slug, job_id=job_id)
         except Exception:
             _log.exception("index_async: create job failed")
 
-        return {"ok": True, "topic_id": topic_id, "job_id": job_id, "status": "pending"}
+        return {"ok": True, "topic": topic_slug, "job_id": job_id, "status": "pending"}
 
-    def _run_index_job(self, topic_id: str, job_id: str, *, force: bool = False) -> None:
+    def _run_index_job(self, topic_slug: str, job_id: str, *, force: bool = False) -> None:
         """后台线程执行索引（由 FastAPI BackgroundTasks 调度）."""
         try:
             # 更新 job 状态为 running
@@ -498,8 +502,8 @@ class KnowledgeManager:
                 (now_str, job_id),
             )
 
-            pipeline = self._get_pipeline(topic_id)
-            knowledge_dir = self._knowledge_dir(topic_id)
+            pipeline = self._get_pipeline(topic_slug)
+            knowledge_dir = self._knowledge_dir(topic_slug)
             mode = "force" if force else "incremental"
             result = pipeline.index_directory(knowledge_dir, mode=mode, created_by=self._created_by)
 
@@ -519,7 +523,7 @@ class KnowledgeManager:
                 """,
                 (files, files, chunks, job_id),
             )
-            self._audit("index_done", topic_id=topic_id, job_id=job_id, result_summary=result)
+            self._audit("index_done", topic_slug=topic_slug, job_id=job_id, result_summary=result)
         except Exception as exc:
             error = f"{type(exc).__name__}: {exc}"
             _log.exception("_run_index_job failed: job_id=%s", job_id)
@@ -536,11 +540,11 @@ class KnowledgeManager:
                 )
             except Exception:
                 pass
-            self._audit("index_done", topic_id=topic_id, job_id=job_id, error=error)
+            self._audit("index_done", topic_slug=topic_slug, job_id=job_id, error=error)
 
     def _run_ingest_files_job(
         self,
-        topic_id: str,
+        topic_slug: str,
         job_id: str,
         file_paths: list[Path],
         *,
@@ -561,7 +565,7 @@ class KnowledgeManager:
             )
 
             result = self.ingest_files(
-                topic_id,
+                topic_slug,
                 file_paths,
                 chunk_size=chunk_size,
                 chunk_overlap=chunk_overlap,
@@ -585,7 +589,7 @@ class KnowledgeManager:
             )
             self._audit(
                 "ingest_files_done",
-                topic_id=topic_id,
+                topic_slug=topic_slug,
                 job_id=job_id,
                 result_summary={"doc_count": doc_count, "chunks": chunks},
             )
@@ -605,18 +609,18 @@ class KnowledgeManager:
                 )
             except Exception:
                 pass
-            self._audit("ingest_files_done", topic_id=topic_id, job_id=job_id, error=error)
+            self._audit("ingest_files_done", topic_slug=topic_slug, job_id=job_id, error=error)
 
     # ------------------------------------------------------------------
     # 统计 / 清空
     # ------------------------------------------------------------------
 
-    def stats(self, topic_id: str) -> dict[str, Any]:
+    def stats(self, topic_slug: str) -> dict[str, Any]:
         """知识库统计."""
-        total_chunks = self._store.fetch_one("SELECT COUNT(*) c FROM kb_chunk WHERE topic_id = ?", (topic_id,))["c"]
+        total_chunks = self._store.fetch_one("SELECT COUNT(*) c FROM kb_chunk WHERE topic_id = ?", (topic_slug,))["c"]
         doc_count = self._store.fetch_one(
             "SELECT COUNT(*) c FROM kb_document WHERE topic_id = ? AND status != 'deleted'",
-            (topic_id,),
+            (topic_slug,),
         )["c"]
         by_type_rows = self._store.fetch_all(
             """
@@ -626,21 +630,21 @@ class KnowledgeManager:
              WHERE c.topic_id = ?
              GROUP BY d.source_type
             """,
-            (topic_id,),
+            (topic_slug,),
         )
         by_source_type = {r["source_type"] or "unknown": r["c"] for r in by_type_rows}
         successful_jobs = self._store.fetch_one(
             "SELECT COUNT(*) c FROM kb_index_job WHERE topic_id = ? AND status = 'done'",
-            (topic_id,),
+            (topic_slug,),
         )["c"]
-        kdir = self._knowledge_dir(topic_id)
-        collection = f"kb_{topic_id}"
+        kdir = self._knowledge_dir(topic_slug)
+        collection = f"kb_{topic_slug}"
         points_count = self._qdrant_points_count(collection)
 
         return {
-            "topic_id": topic_id,
+            "topic": topic_slug,
             "collection": collection,
-            "topic_dir": str(self._project_root / _KB_DATA_DIR / topic_id),
+            "topic_dir": str(self._project_root / _KB_DATA_DIR / topic_slug),
             "topic_knowledge_dir": str(kdir),
             "topic_knowledge_dir_exists": kdir.exists(),
             "total_chunks": total_chunks,
@@ -650,15 +654,15 @@ class KnowledgeManager:
             "successful_jobs": successful_jobs,
         }
 
-    def clear(self, topic_id: str) -> dict[str, Any]:
+    def clear(self, topic_slug: str) -> dict[str, Any]:
         """清空知识库：Qdrant 删 collection + kb_document 软删."""
-        pipeline = self._get_pipeline(topic_id)
+        pipeline = self._get_pipeline(topic_slug)
         r = pipeline.clear(created_by=self._created_by)
-        collection = f"kb_{topic_id}"
-        total_chunks = self._store.fetch_one("SELECT COUNT(*) c FROM kb_chunk WHERE topic_id = ?", (topic_id,))["c"]
+        collection = f"kb_{topic_slug}"
+        total_chunks = self._store.fetch_one("SELECT COUNT(*) c FROM kb_chunk WHERE topic_id = ?", (topic_slug,))["c"]
         return {
             "ok": r.get("ok", True),
-            "topic_id": topic_id,
+            "topic": topic_slug,
             "collection": collection,
             "cleared": True,
             "soft_deleted_documents": r.get("soft_deleted_documents", 0),
@@ -671,7 +675,7 @@ class KnowledgeManager:
 
     def ingest_files(
         self,
-        topic_id: str,
+        topic_slug: str,
         files: list[Path],
         *,
         chunk_size: int | None = None,
@@ -681,7 +685,7 @@ class KnowledgeManager:
 
         Parameters
         ----------
-        topic_id : str
+        topic_slug : str
             目标主题 ID。
         files : list[Path]
             文件路径列表（支持 pdf / md / txt）。
@@ -693,10 +697,10 @@ class KnowledgeManager:
         dict
             含 doc_ids / chunks / elapsed 等信息。
         """
-        self.ensure_topic(topic_id)
+        self.ensure_topic(topic_slug)
 
         # 加载文档（用带主题 enrichers 的 reader）
-        reader = self._get_reader(topic_id)
+        reader = self._get_reader(topic_slug)
         docs = reader.load_documents(files)
         if not docs:
             return {"ok": False, "error": "没有读到任何文件", "doc_ids": [], "chunks": 0}
@@ -704,11 +708,11 @@ class KnowledgeManager:
         # 走 pipeline ingest
         cs = chunk_size or self._chunk_size
         co = chunk_overlap or self._chunk_overlap
-        pipeline = self._get_pipeline(topic_id)
+        pipeline = self._get_pipeline(topic_slug)
         # 如果 chunk_size / chunk_overlap 与 pipeline 不同，临时创建新 pipeline
         if cs != self._chunk_size or co != self._chunk_overlap:
             pipeline = KnowledgePipeline(
-                topic_id,
+                topic_slug,
                 factory=self._factory,
                 store=self._store,
                 chunk_size=cs,
@@ -730,27 +734,27 @@ class KnowledgeManager:
     # 状态详情（供 CLI 的 status 子命令使用）
     # ------------------------------------------------------------------
 
-    def status_detail(self, topic_id: str) -> dict[str, Any]:
+    def status_detail(self, topic_slug: str) -> dict[str, Any]:
         """返回 CLI status 所需的详细信息（比 stats() 更丰富）."""
-        self.ensure_topic(topic_id)
+        self.ensure_topic(topic_slug)
 
         done = self._store.fetch_one(
             "SELECT COUNT(*) c FROM kb_document WHERE topic_id = ? AND status = 'done'",
-            (topic_id,),
+            (topic_slug,),
         )["c"]
         deleted = self._store.fetch_one(
             "SELECT COUNT(*) c FROM kb_document WHERE topic_id = ? AND status = 'deleted'",
-            (topic_id,),
+            (topic_slug,),
         )["c"]
         parsing = self._store.fetch_one(
             "SELECT COUNT(*) c FROM kb_document WHERE topic_id = ? AND status NOT IN ('done','deleted')",
-            (topic_id,),
+            (topic_slug,),
         )["c"]
         chunks = self._store.fetch_one(
             "SELECT COUNT(*) c FROM kb_chunk WHERE topic_id = ?",
-            (topic_id,),
+            (topic_slug,),
         )["c"]
-        collection = f"kb_{topic_id}"
+        collection = f"kb_{topic_slug}"
         points_count = self._qdrant_points_count(collection)
 
         # 最近 10 条文档
@@ -764,7 +768,7 @@ class KnowledgeManager:
                  ORDER BY updated_at DESC
                  LIMIT 10
                 """,
-                (topic_id,),
+                (topic_slug,),
             )
             for r in rows:
                 recent_docs.append(
@@ -778,7 +782,7 @@ class KnowledgeManager:
                 )
 
         return {
-            "topic_id": topic_id,
+            "topic": topic_slug,
             "collection": collection,
             "backend": self._factory.backend,
             "qdrant_url": self._factory.qdrant_url,
@@ -796,7 +800,7 @@ class KnowledgeManager:
 
     def ensure_topic(
         self,
-        topic_id: str,
+        topic_slug: str,
         *,
         name: str | None = None,
         description: str | None = None,
@@ -804,13 +808,13 @@ class KnowledgeManager:
         status: str | None = None,
     ) -> dict[str, Any]:
         """创建或更新主题（幂等）."""
-        display_name = name or topic_id
+        display_name = name or topic_slug
         tags_json = json.dumps(tags or [], ensure_ascii=False)
         now_str = SQLiteStore.now_str()
 
         existing = self._store.fetch_one(
-            "SELECT topic_id FROM knowledge_topic WHERE topic_id = ?",
-            (topic_id,),
+            "SELECT topic FROM knowledge_topic WHERE topic = ?",
+            (topic_slug,),
         )
         if existing:
             # 更新
@@ -831,9 +835,9 @@ class KnowledgeManager:
             if set_parts:
                 set_parts.append("updated_at = ?")
                 params.append(now_str)
-                params.append(topic_id)
+                params.append(topic_slug)
                 self._store.execute(
-                    f"UPDATE knowledge_topic SET {', '.join(set_parts)} WHERE topic_id = ?",
+                    f"UPDATE knowledge_topic SET {', '.join(set_parts)} WHERE topic = ?",
                     tuple(params),
                 )
         else:
@@ -841,11 +845,12 @@ class KnowledgeManager:
             self._store.execute(
                 """
                 INSERT INTO knowledge_topic
-                    (topic_id, name, description, tags_json, status, created_by, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    (id, topic, name, description, tags_json, status, created_by, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
-                    topic_id,
+                    SQLiteStore.new_id(),
+                    topic_slug,
                     display_name,
                     description or "",
                     tags_json,
@@ -856,18 +861,18 @@ class KnowledgeManager:
                 ),
             )
             # 同时创建 knowledge 目录骨架
-            self._ensure_knowledge_dir(topic_id)
+            self._ensure_knowledge_dir(topic_slug)
 
-        return self.get_topic(topic_id) or {"topic_id": topic_id, "name": display_name}
+        return self.get_topic(topic_slug) or {"topic": topic_slug, "name": display_name}
 
     def list_topics(self, *, include_archived: bool = False) -> list[dict]:
         """返回所有主题列表."""
         where = "" if include_archived else "WHERE status != 'archived'"
         rows = self._store.fetch_all(
             f"""
-            SELECT t.topic_id, t.name, t.description, t.tags_json, t.status,
-                   t.created_at, t.updated_at,
-                   (SELECT COUNT(*) FROM kb_chunk c WHERE c.topic_id = t.topic_id) AS chunks_in_collection
+            SELECT t.id, t.topic, t.name, t.description, t.tags_json, t.status,
+                   t.created_at, t.updated_at, t.ext_json,
+                   (SELECT COUNT(*) FROM kb_chunk c WHERE c.topic_id = t.topic) AS chunks_in_collection
               FROM knowledge_topic t
              {where}
              ORDER BY t.updated_at DESC
@@ -881,20 +886,24 @@ class KnowledgeManager:
             except Exception:
                 d["tags"] = []
             d.pop("tags_json", None)
+            try:
+                d["ext_json"] = json.loads(d.get("ext_json") or "{}")
+            except Exception:
+                d["ext_json"] = {}
             result.append(d)
         return result
 
-    def get_topic(self, topic_id: str) -> dict[str, Any] | None:
+    def get_topic(self, topic_slug: str) -> dict[str, Any] | None:
         """获取单个主题详情."""
         row = self._store.fetch_one(
             """
-            SELECT t.topic_id, t.name, t.description, t.tags_json, t.status,
-                   t.created_at, t.updated_at,
-                   (SELECT COUNT(*) FROM kb_chunk c WHERE c.topic_id = t.topic_id) AS chunks_in_collection
+            SELECT t.id, t.topic, t.name, t.description, t.tags_json, t.status,
+                   t.created_at, t.updated_at, t.ext_json,
+                   (SELECT COUNT(*) FROM kb_chunk c WHERE c.topic_id = t.topic) AS chunks_in_collection
               FROM knowledge_topic t
-             WHERE t.topic_id = ?
+             WHERE t.topic = ?
             """,
-            (topic_id,),
+            (topic_slug,),
         )
         if row is None:
             return None
@@ -904,13 +913,17 @@ class KnowledgeManager:
         except Exception:
             d["tags"] = []
         d.pop("tags_json", None)
+        try:
+            d["ext_json"] = json.loads(d.get("ext_json") or "{}")
+        except Exception:
+            d["ext_json"] = {}
         return d
 
-    def delete_topic(self, topic_id: str) -> dict[str, Any]:
+    def delete_topic(self, topic_slug: str) -> dict[str, Any]:
         """删除主题记录."""
         count = self._store.execute(
-            "DELETE FROM knowledge_topic WHERE topic_id = ?",
-            (topic_id,),
+            "DELETE FROM knowledge_topic WHERE topic = ?",
+            (topic_slug,),
         )
         return {"removed_rows": count}
 
@@ -918,26 +931,26 @@ class KnowledgeManager:
     # World-Topic 绑定
     # ------------------------------------------------------------------
 
-    def list_bindings(self, *, topic_id: str | None = None) -> list[dict]:
+    def list_bindings(self, *, topic_slug: str | None = None) -> list[dict]:
         """查询绑定列表."""
-        if topic_id:
+        if topic_slug:
             return self._store.fetch_all(
-                "SELECT world_id, topic_id, priority FROM world_topic_binding"
+                "SELECT world_id, topic_id AS topic, priority FROM world_topic_binding"
                 " WHERE topic_id = ? ORDER BY priority DESC",
-                (topic_id,),
+                (topic_slug,),
             )
         return self._store.fetch_all(
-            "SELECT world_id, topic_id, priority FROM world_topic_binding ORDER BY priority DESC"
+            "SELECT world_id, topic_id AS topic, priority FROM world_topic_binding ORDER BY priority DESC"
         )
 
     def get_world_binding(self, world_id: str) -> dict[str, Any] | None:
         """查询单个 world 的绑定."""
         return self._store.fetch_one(
-            "SELECT world_id, topic_id, priority FROM world_topic_binding WHERE world_id = ?",
+            "SELECT world_id, topic_id AS topic, priority FROM world_topic_binding WHERE world_id = ?",
             (world_id,),
         )
 
-    def bind_world_topic(self, world_id: str, topic_id: str, *, priority: int = 0) -> dict[str, Any]:
+    def bind_world_topic(self, world_id: str, topic_slug: str, *, priority: int = 0) -> dict[str, Any]:
         """绑定 world 到主题."""
         removed = 0
         # 先删旧绑定（同一 world_id）
@@ -947,10 +960,10 @@ class KnowledgeManager:
         )
         self._store.execute(
             """
-            INSERT INTO world_topic_binding (world_id, topic_id, priority)
-            VALUES (?, ?, ?)
+            INSERT INTO world_topic_binding (id, world_id, topic_id, priority)
+            VALUES (?, ?, ?, ?)
             """,
-            (world_id, topic_id, priority),
+            (SQLiteStore.new_id(), world_id, topic_slug, priority),
         )
         return {"ok": True, "removed_rows": removed}
 
@@ -966,7 +979,7 @@ class KnowledgeManager:
     # 索引任务 + 审计
     # ------------------------------------------------------------------
 
-    def job_list(self, topic_id: str, *, limit: int = 50) -> list[dict]:
+    def job_list(self, topic_slug: str, *, limit: int = 50) -> list[dict]:
         """索引任务列表."""
         return self._store.fetch_all(
             """
@@ -978,10 +991,10 @@ class KnowledgeManager:
              ORDER BY created_at DESC
              LIMIT ?
             """,
-            (topic_id, limit),
+            (topic_slug, limit),
         )
 
-    def audit_list(self, topic_id: str, *, limit: int = 100) -> list[dict]:
+    def audit_list(self, topic_slug: str, *, limit: int = 100) -> list[dict]:
         """审计日志列表."""
         return self._store.fetch_all(
             """
@@ -992,7 +1005,7 @@ class KnowledgeManager:
              ORDER BY created_at DESC
              LIMIT ?
             """,
-            (topic_id, limit),
+            (topic_slug, limit),
         )
 
     # ------------------------------------------------------------------
@@ -1003,9 +1016,9 @@ class KnowledgeManager:
         """自动创建预置主题."""
         for t in _DEFAULT_TOPICS:
             try:
-                self.ensure_topic(t["topic_id"], name=t["name"], description=t["description"])
+                self.ensure_topic(t["topic"], name=t["name"], description=t["description"])
             except Exception:
-                _log.exception("bootstrap topic failed: %s", t["topic_id"])
+                _log.exception("bootstrap topic failed: %s", t["topic"])
 
     def close(self) -> None:
         """关闭所有资源."""

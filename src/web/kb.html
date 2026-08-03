@@ -154,7 +154,7 @@ select#topic_select {
   <div class="brand">
     <div>
       <h1>📚 AIGameWorld Studio · 知识库（Topic 版）</h1>
-      <div class="sub">主题中心 · 知识管理 + 语义检索 · Chroma + BGE-M3</div>
+      <div class="sub">主题中心 · 知识管理 + 语义检索 · Qdrant + BGE-M3</div>
     </div>
     <div class="header-links">
       <a href="/crawler">🕷️ 爬虫</a>
@@ -201,7 +201,7 @@ select#topic_select {
       <!-- Tab 2：新建主题 -->
       <div class="tab-pane" id="tab_new">
         <div class="form-row">
-          <label>topic_id（短 slug）</label>
+          <label>topic（短 slug）</label>
           <input id="nt_id" type="text" placeholder="如 mordor_lore">
         </div>
         <div class="form-row">
@@ -248,7 +248,7 @@ select#topic_select {
 
   <!-- 页面：搜索 -->
   <div class="page-pane active" id="page_search">
-    <div class="section-title">🔍 语义检索 <span class="badge">BGE-M3 + Chroma</span></div>
+    <div class="section-title">🔍 语义检索 <span class="badge">BGE-M3 + Qdrant</span></div>
 
     <div class="card mb-2">
       <div class="form-row-inline">
@@ -426,13 +426,13 @@ async function refreshTopicList(){
     cachedTopics = r.topics || [];
     const cur = KB.getTopic();
     topicSel.innerHTML = cachedTopics.length
-      ? cachedTopics.map(t=>`<option value="${KB.escape(t.topic_id)}">${KB.escape(t.name)} (${KB.escape(t.topic_id)})</option>`).join('')
+      ? cachedTopics.map(t=>`<option value="${KB.escape(t.topic)}">${KB.escape(t.name)} (${KB.escape(t.topic)})</option>`).join('')
       : '<option value="">（暂无主题，请先新建）</option>';
-    if (cur && cachedTopics.some(t=>t.topic_id===cur)){
+    if (cur && cachedTopics.some(t=>t.topic===cur)){
       topicSel.value = cur;
     } else if (cachedTopics[0]) {
-      KB.setTopic(cachedTopics[0].topic_id);
-      topicSel.value = cachedTopics[0].topic_id;
+      KB.setTopic(cachedTopics[0].topic);
+      topicSel.value = cachedTopics[0].topic;
     }
     updateTopicInfo();
   } catch(e) {
@@ -443,8 +443,8 @@ async function refreshTopicList(){
 function updateTopicInfo(){
   const tid = topicSel.value;
   if (!tid){ topicInfo.innerHTML = '未选择主题'; return; }
-  const t = cachedTopics.find(x=>x.topic_id===tid);
-  if (!t){ topicInfo.innerHTML = `topic_id: <b>${KB.escape(tid)}</b>`; return; }
+  const t = cachedTopics.find(x=>x.topic===tid);
+  if (!t){ topicInfo.innerHTML = `topic: <b>${KB.escape(tid)}</b>`; return; }
   topicInfo.innerHTML = `
     <div>name: <b>${KB.escape(t.name)}</b></div>
     <div>chunks: <b>${t.chunks_in_collection||0}</b> · status: ${KB.statusTag(t.status)}</div>
@@ -478,13 +478,13 @@ document.getElementById('nt_create').onclick = async ()=>{
   const name = document.getElementById('nt_name').value.trim();
   const desc = document.getElementById('nt_desc').value.trim();
   const tagsRaw = document.getElementById('nt_tags').value.trim();
-  if (!id){ alert('topic_id 必填'); return; }
+  if (!id){ alert('topic 必填'); return; }
   const tags = tagsRaw ? tagsRaw.split(/[,，]/).map(s=>s.trim()).filter(Boolean) : [];
   try {
     await KB.json('/api/kb/topics', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ topic_id:id, name:name||id, description:desc||null, tags, status:'active' })
+      body: JSON.stringify({ topic:id, name:name||id, description:desc||null, tags, status:'active' })
     });
     alert('✅ 主题创建成功');
     document.getElementById('nt_clear').click();
@@ -515,7 +515,7 @@ document.getElementById('bw_check').onclick = async ()=>{
       <div>当前绑定：</div>
       <div class="binding-result">
         world_id: <b>${KB.escape(b.world_id)}</b><br>
-        topic_id: <b>${KB.escape(b.topic_id)}</b><br>
+        topic: <b>${KB.escape(b.topic)}</b><br>
         priority: <b>${b.priority||0}</b>
       </div>
     `, 'info');
@@ -533,9 +533,9 @@ document.getElementById('bw_bind').onclick = async ()=>{
     const r = await KB.json('/api/kb/bindings', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ world_id:wid, topic_id:tid, priority:0 })
+      body: JSON.stringify({ world_id:wid, topic:tid, priority:0 })
     });
-    showBindingMsg(`✅ 绑定成功：world <b>${KB.escape(r.world_id)}</b> → topic <b>${KB.escape(r.topic_id)}</b>`, 'success');
+    showBindingMsg(`✅ 绑定成功：world <b>${KB.escape(r.world_id)}</b> → topic <b>${KB.escape(r.topic)}</b>`, 'success');
   } catch(e) {
     showBindingMsg(`绑定失败：${KB.escape(e.message)}`, 'error');
   }
@@ -586,7 +586,7 @@ async function refreshStats(){
     const bySrc = Object.entries(s.by_source_type||{}).map(([k,v])=>`<span class="tag">${k}:${v}</span>`).join(' ');
     statsArea.innerHTML = `
       <div class="alert alert-info" style="display:flex; flex-wrap:wrap; gap:1rem;">
-        <div>🎯 <b>${s.topic_id}</b> · collection: <code>${s.collection}</code></div>
+        <div>🎯 <b>${s.topic}</b> · collection: <code>${s.collection}</code></div>
         <div>📄 docs：<b>${s.documents||0}</b>　🧩 chunks (meta): <b>${s.chunks_in_meta||0}</b> / vector: <b>${s.total_chunks||0}</b></div>
         <div>✅ 完成任务: <b>${s.successful_jobs||0}</b></div>
         <div>${bySrc||'<span class="text-muted small">暂无按 source_type 统计</span>'}</div>
@@ -684,7 +684,7 @@ async function doReindex(force){
 clearBtn.onclick = async ()=>{
   const tid = topicSel.value;
   if (!tid){ alert('请先选择主题'); return; }
-  if (!confirm(`⚠️ 确认清空主题 ${tid} 的所有知识库数据？（Chroma + SQLite 文档都会被清理）`)) return;
+  if (!confirm(`⚠️ 确认清空主题 ${tid} 的所有知识库数据？（Qdrant + SQLite 文档都会被清理）`)) return;
   try {
     const r = await KB.json(`/api/kb/${tid}`, { method:'DELETE' });
     alert(`✅ 已清空：soft_deleted=${r.soft_deleted_documents} docs，total_chunks 现为 ${r.total_chunks}`);
@@ -818,7 +818,7 @@ async function refreshDocs(){
     docsBadge.textContent = docs.total;
     const by = Object.entries(stats.by_source_type||{}).map(([k,v])=>`<span class="tag">${k}: ${v}</span>`).join(' ');
     docsStats.innerHTML = `<div class="alert alert-info">
-      🎯 <b>${stats.topic_id}</b> · docs <b>${stats.documents||0}</b> · chunks meta/vector <b>${stats.chunks_in_meta||0}</b>/<b>${stats.total_chunks||0}</b>
+      🎯 <b>${stats.topic}</b> · docs <b>${stats.documents||0}</b> · chunks meta/vector <b>${stats.chunks_in_meta||0}</b>/<b>${stats.total_chunks||0}</b>
       ${by? ' · '+by:''}
     </div>`;
     renderDocsTable(docs.documents);
@@ -861,12 +861,12 @@ function renderDocsTable(rows){
 }
 
 window.softDelDoc = async function(docId, btn){
-  if (!confirm('软删此文档？(SQLite 级联清理 kb_chunk + 同时删除 Chroma 中相关 chunk)')) return;
+  if (!confirm('软删此文档？(SQLite 级联清理 kb_chunk + 同时删除 Qdrant 中相关 chunk)')) return;
   btn.disabled = true;
   const tid = topicSel.value;
   try {
     const r = await KB.json(`/api/kb/${tid}/documents/${docId}`, { method:'DELETE' });
-    alert(`已软删 ${r.soft_deleted} 条文档，同步删了 Chroma ${r.deleted_chunk_ids_count} 个 chunk`);
+    alert(`已软删 ${r.soft_deleted} 条文档，同步删了 Qdrant ${r.deleted_chunk_ids_count} 个 chunk`);
     refreshDocs();
     refreshTopicList();
   } catch(e){ alert('删除失败: '+e.message); btn.disabled = false; }

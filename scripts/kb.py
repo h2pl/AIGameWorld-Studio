@@ -58,7 +58,7 @@ def cmd_status(args) -> int:
     kb = _make_manager()
     try:
         info = kb.status_detail(args.topic)
-        print(f"topic              = {info['topic_id']}")
+        print(f"topic              = {info['topic']}")
         print(f"vector backend     = {info['backend']} ({info.get('qdrant_url') or '—'})")
         print(f"kb_document  done  = {info['documents_done']}")
         print(f"kb_document  other = {info['documents_other']}")

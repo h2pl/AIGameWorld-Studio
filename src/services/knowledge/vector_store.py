@@ -390,8 +390,8 @@ class KBVectorStoreFactory:
     用法::
 
         factory = KBVectorStoreFactory.get_default(project_root=Path(...))
-        vs = factory.get_vector_store("wow_worldview")
-        factory.delete_collection("wow_worldview")
+        vs = factory.get_vector_store("world_of_warcraft")
+        factory.delete_collection("world_of_warcraft")
     """
 
     backend: str = "qdrant"  # "sqlite" | "qdrant" | "chroma"  （Studio 默认用 Qdrant Docker，不再用 SQLite 向量库）

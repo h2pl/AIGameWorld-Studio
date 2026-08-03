@@ -19,9 +19,9 @@ class TopicCreateRequest(BaseModel):
     """创建/更新主题请求."""
 
     # 主题唯一标识（短 slug），必填，不能为空
-    topic_id: str = Field(..., min_length=1, description="主题唯一标识（短 slug）")
-    # 选填：主题显示名称，默认用 topic_id
-    name: str | None = Field(default=None, description="主题显示名称（默认用 topic_id）")
+    topic: str = Field(..., min_length=1, description="主题唯一标识（短 slug）")
+    # 选填：主题显示名称，默认用 topic
+    name: str | None = Field(default=None, description="主题显示名称（默认用 topic）")
     # 选填：主题文字描述
     description: str | None = Field(default=None, description="主题描述")
     # 标签列表，默认空数组
@@ -33,8 +33,10 @@ class TopicCreateRequest(BaseModel):
 class TopicResponse(BaseModel):
     """主题详情响应."""
 
+    # 主题记录 UUID
+    id: str = Field(..., description="主题记录 UUID")
     # 主题唯一ID
-    topic_id: str = Field(..., description="主题唯一标识")
+    topic: str = Field(..., description="主题唯一标识")
     # 主题展示名
     name: str = Field(..., description="主题显示名称")
     # 主题描述文本
@@ -49,6 +51,8 @@ class TopicResponse(BaseModel):
     created_at: str | None = Field(default=None, description="创建时间（yyyy-MM-dd HH:mm:ss）")
     # 更新时间（yyyy-MM-dd HH:mm:ss 格式字符串）
     updated_at: str | None = Field(default=None, description="更新时间（yyyy-MM-dd HH:mm:ss）")
+    # 扩展字段（任意 JSON）
+    ext_json: dict[str, Any] = Field(default_factory=dict, description="扩展字段（任意 JSON）")
 
 
 class TopicListResponse(BaseModel):
@@ -72,7 +76,7 @@ class BindingRequest(BaseModel):
     # 必填：World包ID（如 mordor）
     world_id: str = Field(..., description="world pack id，如 mordor")
     # 必填：目标主题ID
-    topic_id: str = Field(..., description="主题 id")
+    topic: str = Field(..., description="主题 id")
     # 绑定优先级，数字越大优先级越高
     priority: int = Field(default=0, description="绑定优先级（数值越大越优先）")
 
@@ -85,7 +89,7 @@ class BindingResponse(BaseModel):
     # 操作涉及的World包ID
     world_id: str
     # 操作涉及的主题ID
-    topic_id: str
+    topic: str
     # 当前绑定优先级，默认0
     priority: int = 0
     # 解绑场景下删除的行数
@@ -125,13 +129,13 @@ class SearchRequest(BaseModel):
     top_k: int = Field(default=5, ge=1, le=100)
     # 最小相似度阈值，默认0，范围0-1
     min_score: float = Field(default=0.0, ge=0.0, le=1.0)
-    # 元数据过滤条件（ChromaDB where 条件）
-    filters: dict[str, Any] | None = Field(default=None, description="ChromaDB where 条件")
+    # 元数据过滤条件（Qdrant where 条件）
+    filters: dict[str, Any] | None = Field(default=None, description="Qdrant where 条件")
 
 
 class SearchResponse(BaseModel):
     # 查询所属的主题ID
-    topic_id: str
+    topic: str
     # 用户原始查询文本
     query: str
     # 请求的返回条数
@@ -152,7 +156,7 @@ class DocumentListItem(BaseModel):
     # 文档唯一ID
     id: str
     # 文档所属主题ID
-    topic_id: str
+    topic: str
     # 文档标题
     title: str
     # 来源类型（如 documents、web 等）
@@ -177,11 +181,13 @@ class DocumentListItem(BaseModel):
     created_at: str | None = None
     # 更新时间戳
     updated_at: str | None = None
+    # 扩展字段（任意 JSON）
+    ext_json: dict[str, Any] = Field(default_factory=dict, description="扩展字段（任意 JSON）")
 
 
 class DocumentListResponse(BaseModel):
     # 所属主题ID
-    topic_id: str
+    topic: str
     # 文档总数
     total: int
     # 文档列表
@@ -212,7 +218,7 @@ class IndexResponse(BaseModel):
     # 索引操作是否成功
     ok: bool
     # 所属主题ID
-    topic_id: str
+    topic: str
     # 索引完成后分块总数
     total_chunks: int
     # 本次处理的文件数，默认0
@@ -260,11 +266,13 @@ class JobItem(BaseModel):
     finished_at: str | None = None
     # 任务创建时间戳
     created_at: str | None = None
+    # 扩展字段（任意 JSON）
+    ext_json: dict[str, Any] = Field(default_factory=dict, description="扩展字段（任意 JSON）")
 
 
 class JobListResponse(BaseModel):
     # 所属主题ID
-    topic_id: str
+    topic: str
     # 任务列表
     jobs: list[JobItem]
 
@@ -284,7 +292,7 @@ class AuditItem(BaseModel):
     op: str = ""
     # 操作者标识
     actor: str = ""
-    # 涉及的主题ID
+    # 涉及的主题ID（DB 列名，存储 slug）
     topic_id: str = ""
     # 关联任务ID
     job_id: str | None = None
@@ -302,7 +310,7 @@ class AuditItem(BaseModel):
 
 class AuditListResponse(BaseModel):
     # 所属主题ID
-    topic_id: str
+    topic: str
     # 审计记录列表
     audit: list[AuditItem]
 
@@ -315,8 +323,8 @@ class AuditListResponse(BaseModel):
 
 class StatsResponse(BaseModel):
     # 主题ID
-    topic_id: str
-    # Chroma collection 名称
+    topic: str
+    # Qdrant collection 名称
     collection: str
     # 主题目录路径
     topic_dir: str
@@ -340,8 +348,8 @@ class ClearResponse(BaseModel):
     # 清空操作是否成功
     ok: bool
     # 主题ID
-    topic_id: str
-    # Chroma collection 名称
+    topic: str
+    # Qdrant collection 名称
     collection: str
     # collection 是否已清空
     cleared: bool
@@ -374,7 +382,7 @@ class IngestFilesResponse(BaseModel):
     # 操作是否成功
     ok: bool
     # 所属主题ID
-    topic_id: str
+    topic: str
     # 导入的文档ID列表
     doc_ids: list[str] = Field(default_factory=list)
     # 新增分块总数

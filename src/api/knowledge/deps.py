@@ -62,7 +62,7 @@ def get_knowledge_manager(
     - 向量库：通过 KBVectorStoreFactory.get_default() 按 KB_VECTOR_STORE 环境变量选择 Qdrant/Chroma
       （默认：qdrant，Docker 容器暴露 http://127.0.0.1:6333；设 KB_VECTOR_STORE=chroma 切回旧模式）
     - SQLite：project_root/data/studio.db，每次请求前确保 schema 已初始化（store.init_schema 幂等）
-    - 自动 ensure 默认主题（genshin / wow_worldview），打开 UI 直接可见
+    - 自动 ensure 默认主题（genshin / world_of_warcraft），打开 UI 直接可见
     - 请求结束后自动 close
     """
     # 1. 目录解析：获取项目根目录、data 目录、migrations 目录
@@ -93,7 +93,7 @@ def get_knowledge_manager(
         # 上面 store.init_schema 已经跑过一次，避免重复
         created_by="ui",
         bootstrap_default_topics=True,
-        # 首启自动建 genshin / wow_worldview 两个默认主题占位
+        # 首启自动建 genshin / world_of_warcraft 两个默认主题占位
     )
     try:
         yield kb
@@ -102,15 +102,15 @@ def get_knowledge_manager(
         kb.close()
 
 
-# ---- 依赖: topic_id 参数校验 ----
-def require_topic_id(
-    topic_id: str = FPath(..., description="主题 topic_id，如 mordor_lore"),
+# ---- 依赖: topic 参数校验 ----
+def require_topic(
+    topic: str = FPath(..., description="主题 topic，如 mordor_lore"),
 ) -> str:
-    """校验并返回 strip 后的 topic_id（轻量级，不查数据库）."""
+    """校验并返回 strip 后的 topic（轻量级，不查数据库）."""
     # 这里只做最基本的非空校验；涉及表存在性校验由 service 层在执行前查 kb_topic 表
-    if not topic_id or not topic_id.strip():
-        raise HTTPException(400, detail="topic_id 不能为空")
-    return topic_id.strip()
+    if not topic or not topic.strip():
+        raise HTTPException(400, detail="topic 不能为空")
+    return topic.strip()
 
 
 # ---- 启动时一次性迁移（带缓存） ----

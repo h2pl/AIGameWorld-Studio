@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+from collections.abc import Callable
 from pathlib import Path
 
 import yaml
@@ -369,13 +370,21 @@ class KnowledgeReader:
         enricher.enrich(Path(file_name), meta)
         return meta.get("chronicle_volume")
 
-    def load_documents(self, files: list[Path]) -> list[Document]:
-        """加载指定的文件列表，按后缀选择 reader，附带标准元数据.
+    def load_documents(
+        self,
+        files: list[Path],
+        *,
+        on_progress: Callable[[int, int], None] | None = None,
+    ) -> list[Document]:
+        """加载指定的文件列表（串行读取），按后缀选择 reader，附带标准元数据.
 
         Parameters
         ----------
         files : list[Path]
             要加载的文件路径列表（支持 pdf / md / txt）。
+        on_progress : callable, optional
+            每完成一个文件后回调 ``on_progress(done_count, total_count)``，
+            供上层实时更新 ``kb_index_job.file_done``。
 
         Returns
         -------
@@ -389,55 +398,156 @@ class KnowledgeReader:
 
         _log = logging.getLogger(__name__)
 
+        # 过滤不存在的文件
+        valid_files = [fp for fp in files if fp.exists()]
+        total = len(valid_files)
+        if total == 0:
+            return []
+
         out: list[Document] = []
-        for fp in files:
-            if not fp.exists():
-                _log.warning("文件不存在: %s", fp)
-                continue
-            ext = fp.suffix.lower()
-            reader = self._get_reader_for_ext(ext)
-            if reader is None:
-                _log.warning("暂不支持的文件类型 %s: %s", ext, fp.name)
-                continue
+        done = 0
+
+        # 串行读取：文件读取不是性能瓶颈（BGE-M3 embedding 才是，占 ~95% 耗时），
+        # 无需并行化。并行只在 pipeline._embed_nodes_parallel 处针对 embedding 瓶颈使用。
+        for fp in valid_files:
             try:
-                sub_docs = reader.load_data(file=fp)
-            except Exception as e:
-                _log.error("reader 加载失败 %s: %s: %s", fp.name, type(e).__name__, e)
+                docs = self._load_one_file(fp)
+                out.extend(docs)
+            # pypdf 可能抛 KeyboardInterrupt（BaseException 而非 Exception），必须捕获，
+            # 否则一个文件读取失败会让整个多文件 ingest 中断。
+            except (Exception, KeyboardInterrupt) as e:
+                _log.error("加载失败 %s: %s: %s", fp.name, type(e).__name__, e)
+            done += 1
+            if on_progress:
+                on_progress(done, total)
+        return out
+
+    def _load_pdf_page_by_page(self, fp: Path) -> list[Document]:
+        """逐页安全提取 PDF 文本（兜底方案）.
+
+        当 ``PDFReader.load_data`` 整本失败时调用。用 pypdf 逐页提取，
+        单个坏页（损坏/异常 font 资源）记录警告并跳过，保证整本不丢失。
+        返回 LlamaIndex ``Document`` 列表，每页一个，metadata 含 page_label。
+        """
+        import logging
+
+        _log = logging.getLogger(__name__)
+        try:
+            from pypdf import PdfReader
+        except Exception as e:  # pragma: no cover
+            _log.error("pypdf 不可用，无法逐页兜底 %s: %s", fp.name, e)
+            return []
+
+        try:
+            reader = PdfReader(str(fp))
+        except Exception as e:
+            _log.error("pypdf 打开失败 %s: %s: %s", fp.name, type(e).__name__, e)
+            return []
+
+        docs: list[Document] = []
+        for i, page in enumerate(reader.pages, start=1):
+            try:
+                text = page.extract_text() or ""
+            # 注意：pypdf 对某些 malformed PDF 会在 extract_text 内部误触发
+            # KeyboardInterrupt（继承 BaseException 而非 Exception），必须显式捕获，
+            # 否则会把单个坏页变成整本提取崩溃。
+            except (Exception, KeyboardInterrupt) as e:
+                _log.warning("跳过坏页 %s p%d: %s: %s", fp.name, i, type(e).__name__, e)
                 continue
+            if not text.strip():
+                continue
+            docs.append(Document(text=text, metadata={"page_label": str(i), "file_path": str(fp)}))
+        _log.info(
+            "逐页兜底提取完成: %s → %d 页有效（共 %d 页）",
+            fp.name,
+            len(docs),
+            len(reader.pages),
+        )
+        return docs
 
-            file_size = fp.stat().st_size
-            sha256 = hashlib.sha256(fp.read_bytes()).hexdigest()
+    def _load_one_file(self, fp: Path) -> list[Document]:
+        """加载单个文件 → 返回 Document 列表.
 
-            for idx, d in enumerate(sub_docs):
-                meta = dict(d.metadata or {})
-                page_num = int(meta.get("page_label") or (idx + 1))
-                meta.update(
-                    {
-                        "file_path": str(fp),
-                        "file_name": fp.name,
-                        "file_size": file_size,
-                        "sha256": sha256,
-                        "content_type": ext.lstrip("."),
-                        "source_type": "documents",
-                        "title": f"{fp.stem} p{page_num}" if ext == ".pdf" else fp.stem,
-                        "page_number": page_num,
-                        "tags": [f"ext_{ext.lstrip('.')}"],
-                        "related_packs": [],
-                    }
-                )
-                # 主题特定的业务元数据增强（编年史卷数 / 地区分类 / 世代等）
-                for enricher in self._enrichers:
-                    meta = enricher.enrich(fp, meta)
-                d.metadata = meta
-                d.excluded_llm_metadata_keys = []
-                d.excluded_embed_metadata_keys = []
-                out.append(d)
+        提取自 ``load_documents`` 供串行逐文件调用，逻辑独立无共享可变状态。
+        """
+        import logging
 
-            _log.info(
-                "加载完成: %s → %d segments  %.2fMB  sha256=%s…",
+        _log = logging.getLogger(__name__)
+
+        if not fp.exists():
+            _log.warning("文件不存在: %s", fp)
+            return []
+
+        ext = fp.suffix.lower()
+        reader = self._get_reader_for_ext(ext)
+        if reader is None:
+            _log.warning("暂不支持的文件类型 %s: %s", ext, fp.name)
+            return []
+
+        try:
+            # 给整本读取加超时保护：pypdf 遇到异常 font 资源时可能卡死不返回，
+            # 超时（120s）或抛异常都降级到逐页安全提取兜底（坏页跳过，整本不丢）。
+            import concurrent.futures as _cf
+
+            with _cf.ThreadPoolExecutor(max_workers=1) as _ex:
+                _fut = _ex.submit(reader.load_data, file=fp)
+                try:
+                    sub_docs = _fut.result(timeout=120)
+                except _cf.TimeoutError:
+                    _fut.cancel()
+                    _log.warning("reader 整本加载超时 %s，降级逐页提取兜底", fp.name)
+                    sub_docs = self._load_pdf_page_by_page(fp)
+                except (Exception, KeyboardInterrupt) as e:
+                    _log.warning(
+                        "reader 整本加载失败 %s: %s: %s，降级逐页提取兜底",
+                        fp.name,
+                        type(e).__name__,
+                        e,
+                    )
+                    sub_docs = self._load_pdf_page_by_page(fp)
+        except (Exception, KeyboardInterrupt) as e:
+            _log.warning(
+                "reader 加载异常 %s: %s: %s，降级逐页提取兜底",
                 fp.name,
-                len(sub_docs),
-                file_size / 1024 / 1024,
-                sha256[:12],
+                type(e).__name__,
+                e,
             )
+            sub_docs = self._load_pdf_page_by_page(fp)
+
+        file_size = fp.stat().st_size
+        sha256 = hashlib.sha256(fp.read_bytes()).hexdigest()
+
+        out: list[Document] = []
+        for idx, d in enumerate(sub_docs):
+            meta = dict(d.metadata or {})
+            page_num = int(meta.get("page_label") or (idx + 1))
+            meta.update(
+                {
+                    "file_path": str(fp),
+                    "file_name": fp.name,
+                    "file_size": file_size,
+                    "sha256": sha256,
+                    "content_type": ext.lstrip("."),
+                    "source_type": "documents",
+                    "title": f"{fp.stem} p{page_num}" if ext == ".pdf" else fp.stem,
+                    "page_number": page_num,
+                    "tags": [f"ext_{ext.lstrip('.')}"],
+                    "related_packs": [],
+                }
+            )
+            # 主题特定的业务元数据增强（编年史卷数 / 地区分类 / 世代等）
+            for enricher in self._enrichers:
+                meta = enricher.enrich(fp, meta)
+            d.metadata = meta
+            d.excluded_llm_metadata_keys = []
+            d.excluded_embed_metadata_keys = []
+            out.append(d)
+
+        _log.info(
+            "加载完成: %s → %d segments  %.2fMB  sha256=%s…",
+            fp.name,
+            len(sub_docs),
+            file_size / 1024 / 1024,
+            sha256[:12],
+        )
         return out

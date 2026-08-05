@@ -24,6 +24,7 @@ import hashlib
 import json
 import logging
 import os
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -32,6 +33,13 @@ from llama_index.core import Document
 from llama_index.core.ingestion import IngestionPipeline
 from llama_index.core.node_parser import SentenceSplitter
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+
+# TEI 嵌入后端（可选）：仅当启用 TEI 时才需要。
+# 懒导入，避免未安装该依赖时影响默认的本地 HuggingFaceEmbedding 链路。
+try:  # pragma: no cover - 可选依赖
+    from llama_index.embeddings.text_embeddings_inference import TextEmbeddingsInference
+except Exception:  # noqa: BLE001
+    TextEmbeddingsInference = None  # type: ignore[assignment]
 
 from ...utils.sqlite_store import SQLiteStore  # noqa: F401  (对外暴露类型)
 
@@ -66,6 +74,31 @@ def _resolve_bge_m3_model_name() -> str:
     return "BAAI/bge-m3"
 
 
+def _resolve_tei_url() -> str | None:
+    """解析 TEI embedding 服务地址 / Resolve TEI embedding server URL.
+
+    仅在显式配置时返回地址，否则返回 None（走默认本地 HuggingFaceEmbedding）：
+      - 优先读环境变量 ``TEI_URL``（如 http://localhost:8080）；
+      - 其次读 ``config.yaml`` 的 ``embedding.tei_url``。
+    返回 None 表示未启用 TEI，保持原有本地链路不变。
+    """
+    env_url = os.environ.get("TEI_URL")
+    if env_url:
+        return env_url.rstrip("/")
+    try:
+        import yaml as _yaml
+
+        _cfg_path = Path(__file__).resolve().parents[3] / "config.yaml"
+        if _cfg_path.exists():
+            _cfg = _yaml.safe_load(_cfg_path.read_text(encoding="utf-8")) or {}
+            _tei = (_cfg.get("embedding") or {}).get("tei_url")
+            if _tei:
+                return str(_tei).rstrip("/")
+    except Exception:  # noqa: BLE001 - 配置缺失不影响本地默认链路
+        pass
+    return None
+
+
 # 知识库文档处理流水线类：双写 SQLite 元数据 + 可插拔向量存储
 class KnowledgePipeline:
     """知识库文档处理流水线（双写 SQLite 元数据 + 可插拔向量存储）."""
@@ -86,6 +119,9 @@ class KnowledgePipeline:
         self._factory = factory or KBVectorStoreFactory.get_default()
         self._store = store
         self._reader = KnowledgeReader(enrichers=enrichers)
+        # 保存切分参数，供 ingest 里手动切 chunk + 逐条 embed 使用
+        self._chunk_size = chunk_size
+        self._chunk_overlap = chunk_overlap
 
         # BGE-M3 本地路径（ModelScope / HuggingFace 下载缓存）
         # 不硬编码 snapshot 目录名，离线优先探测本地缓存，避免：
@@ -104,23 +140,67 @@ class KnowledgePipeline:
             pass
 
         # 离线优先：本地缓存命中时不走网络解析 revision
-        # embed_batch_size=64：CPU 环境下利用 BLAS 向量化计算，相比默认 10 提升 2-3 倍
-        _embed_kwargs: dict[str, Any] = {"trust_remote_code": True, "embed_batch_size": 64}
+        # ⚠️ embed_batch_size 不能设太大：崩溃由"单批 encode 总 token 量"决定（机器相关阈值）。
+        #   实测本机 batch=8×(chunk 800字符)=6400 字符稳定，batch=12 即崩 KeyboardInterrupt。
+        #   设为 8 保证 llama-index 内部批量调用也远小于机器可承受量。（曾用 64 导致必崩）
+        _embed_kwargs: dict[str, Any] = {"trust_remote_code": True, "embed_batch_size": 8}
         if _bge_path != "BAAI/bge-m3":
             _embed_kwargs["local_files_only"] = True
 
-        try:
-            self._embedding_model = HuggingFaceEmbedding(model_name=_bge_path, **_embed_kwargs)
-            logger.info("[kb] BGE-M3 embedding model loaded (model=%s, embed_batch_size=64)", _bge_path)
-        except Exception as e:
+        def _build_local_model() -> HuggingFaceEmbedding:
+            """构建本地 HuggingFaceEmbedding，带 KeyboardInterrupt 重试.
+
+            pypdf 在 Python 3.14+Windows 上解析 PDF 后会污染进程信号状态，
+            导致后续 tokenizer 加载偶发抛 KeyboardInterrupt（本质是 C 扩展崩溃）。
+            这里加重试（最多 3 次），通常第 2 次即可成功。
+            """
+            last_err: BaseException | None = None
+            for attempt in range(3):
+                try:
+                    return HuggingFaceEmbedding(model_name=_bge_path, **_embed_kwargs)
+                except KeyboardInterrupt:
+                    last_err = KeyboardInterrupt()
+                    if attempt < 2:
+                        logger.warning(
+                            "[kb] BGE-M3 加载被 KeyboardInterrupt 中断（第%d次），重试...",
+                            attempt + 1,
+                        )
+                        continue
+                    raise
+                except Exception as e:
+                    last_err = e
+                    break  # Exception 类错误不重试，直接 fallback
+            # 重试 3 次仍失败（KeyboardInterrupt）或遇到 Exception → fallback 联网下载
             logger.warning(
                 "[kb] BGE-M3 本地加载失败 (%s)，回退联网下载模式（需可访问 HuggingFace）",
-                e,
+                last_err,
             )
-            # 回退：用标准模型名让库自动联网解析（本地无缓存时）
-            self._embedding_model = HuggingFaceEmbedding(
-                model_name="BAAI/bge-m3", trust_remote_code=True, embed_batch_size=64
-            )
+            return HuggingFaceEmbedding(model_name="BAAI/bge-m3", trust_remote_code=True, embed_batch_size=64)
+
+        # TEI 可选后端：仅当显式配置 TEI_URL / config.yaml embedding.tei_url 时启用。
+        # 默认（未配置）走本地模型，行为与原 develop 版本完全一致。
+        # 注意：当前 TEI 容器多为 CPU + candle backend（强制 batch≤8），单条往返比本地慢
+        # 约 10 倍；仅当 TEI 跑在 GPU（如 RTX 50 系 Blackwell 镜像）时才建议启用。
+        _tei_url = _resolve_tei_url()
+        if _tei_url and TextEmbeddingsInference is not None:
+            try:
+                self._embedding_model = TextEmbeddingsInference(model_name="BAAI/bge-m3", base_url=_tei_url)
+                logger.info("[kb] TEI embedding 已连接 (base_url=%s, model=BAAI/bge-m3)", _tei_url)
+            except Exception as e:
+                logger.warning("[kb] TEI 连接失败 (%s)，回退本地 HuggingFaceEmbedding", e)
+                self._embedding_model = _build_local_model()
+        else:
+            self._embedding_model = _build_local_model()
+            if _bge_path != "BAAI/bge-m3":
+                logger.info(
+                    "[kb] BGE-M3 本地 embedding 模型加载 (path=%s, embed_batch_size=64, offline)",
+                    _bge_path,
+                )
+            else:
+                logger.info(
+                    "[kb] BGE-M3 本地 embedding 模型加载 (model=%s, embed_batch_size=64)",
+                    _bge_path,
+                )
 
         # IMPORTANT：IngestionPipeline **不传 vector_store 参数**。
         # 原因：LlamaIndex IngestionPipeline 的 pydantic schema 要求 vector_store 必须是
@@ -142,14 +222,33 @@ class KnowledgePipeline:
     # ------------------------------------------------------------------
 
     # ingest：主入口 — 对 documents 依次执行 upsert_meta → pipeline.run → 写 kb_chunk 批量入库
-    def ingest(self, documents: list[Document]) -> dict:
+    def ingest(
+        self,
+        documents: list[Document],
+        on_embed_progress: Callable[[int, int], None] | None = None,
+    ) -> dict:
         """执行流水线：切 chunk → embedding → 双写.
+
+        Parameters
+        ----------
+        documents : list[Document]
+            待入库文档。
+        on_embed_progress : callable, optional
+            嵌入进度回调 ``on_embed_progress(done_batches, total_batches)``。
+            兼容 manager.ingest_files 的调用约定；当前实现为单进程批量推理，
+            会在开始前/结束后各回调一次（done=0/total 与 done=total/total）。
 
         Returns
         -------
         dict
             ``{"chunks": int, "doc_ids": [uuid...], "chunk_ids": [uuid...]}``
         """
+        if on_embed_progress is not None:
+            # 单进程批量推理：无中间批次，开始即标记进度
+            try:
+                on_embed_progress(0, 1)
+            except Exception:
+                pass
         if not documents:
             return {"chunks": 0, "doc_ids": [], "chunk_ids": []}
 
@@ -165,11 +264,44 @@ class KnowledgePipeline:
                 pass
             doc_ids.append(doc_id)
 
-        # 第二步：确保向量库 collection 就绪，然后跑 LlamaIndex IngestionPipeline（切 chunk + embedding）
-        #   注意：因为 IngestionPipeline 不再传 vector_store，所以这里只拿到 nodes+embedding，
+        # 第二步：确保向量库 collection 就绪，然后切 chunk + embedding 生成 nodes。
+        #   使用 sentence-transformers 原生的 encode() 批量推理，而非 LlamaIndex 封装的
+        #   get_text_embedding()（其内部 tenacity 重试 + 子线程在 Windows 上不稳定）。
         #   挂完 chunk_id + 业务 metadata + 写 kb_chunk 后再写向量库（保证 payload 完整）。
         self._ensure_vector_store_collection()
-        nodes = self._pipeline.run(documents=documents)
+        splitter = SentenceSplitter(chunk_size=self._chunk_size, chunk_overlap=self._chunk_overlap)
+        splitter.include_metadata = True
+        splitter.include_prev_next_rel = True
+        nodes = splitter.get_nodes_from_documents(documents)
+        _texts = [n.get_content() for n in nodes]
+        # 分批 batch encode（主线程，绕开 llama-index tenacity 子线程）+ KeyboardInterrupt 重试。
+        #   ⚠️ 关键：崩溃由"单批 encode 的总 token 量"决定，而非 batch 条数本身。
+        #     实测本机（12 核 / torch 6 线程）单批 ~8000 字符正常、~9600 字符即崩 KeyboardInterrupt。
+        #     chunk_size=800 时 batch=8 → 单批 6400 字符，稳定（batch=64 单批 51200 必崩）。
+        #     不同机器阈值不同：应保证 单批条数 × 每条字符数 远小于机器可承受量。
+        embed_batch = min(self._embedding_model.embed_batch_size or 64, 8)
+        _embeddings: list = []
+        for chunk_start in range(0, len(_texts), embed_batch):
+            chunk_texts = _texts[chunk_start : chunk_start + embed_batch]
+            for encode_attempt in range(3):
+                try:
+                    emb_array = self._embedding_model._model.encode(
+                        chunk_texts, batch_size=embed_batch, show_progress_bar=False
+                    )
+                    _embeddings.extend(emb_array.tolist())
+                    break
+                except KeyboardInterrupt:
+                    if encode_attempt == 2:
+                        raise
+                    logger.warning(
+                        "[kb] batch encode 被 KeyboardInterrupt 中断（第%d次），重试...",
+                        encode_attempt + 1,
+                    )
+        for n, e in zip(nodes, _embeddings):
+            try:
+                object.__setattr__(n, "embedding", e)
+            except Exception:
+                pass
 
         # 第三步：按 doc_id 分组 nodes，为每个 chunk 生成 UUID + 元数据 + text_hash，准备批量写 kb_chunk
         chunk_ids: list[str] = []
@@ -187,6 +319,9 @@ class KnowledgePipeline:
             chunk_count = len(items)
             for idx_in_doc, (_global_idx, node) in enumerate(items):
                 chunk_id = SQLiteStore.new_id()
+                # Qdrant 要求 point ID 为标准 UUID 格式（带 - 分隔符），否则 400 Bad Request。
+                # SQLiteStore.new_id() 返回 32 位 hex（无 -），需要转成 xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx。
+                chunk_uuid = f"{chunk_id[:8]}-{chunk_id[8:12]}-{chunk_id[12:16]}-{chunk_id[16:20]}-{chunk_id[20:]}"
                 text = getattr(node, "text", "") or ""
                 text_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()
                 preview = text[:200]
@@ -202,7 +337,7 @@ class KnowledgePipeline:
                     pass
                 meta_json = json.dumps(node_meta, ensure_ascii=False)
                 try:
-                    object.__setattr__(node, "id_", chunk_id)
+                    object.__setattr__(node, "id_", chunk_uuid)
                 except Exception:
                     pass
                 all_chunk_rows.append(
@@ -249,6 +384,12 @@ class KnowledgePipeline:
         #   （256 条一批，避免 Qdrant gRPC/HTTP 包过大超时）
         for i in range(0, len(nodes), 256):
             self._vector_store.add(nodes[i : i + 256])
+
+        if on_embed_progress is not None:
+            try:
+                on_embed_progress(1, 1)
+            except Exception:
+                pass
 
         return {"chunks": len(nodes), "doc_ids": doc_ids, "chunk_ids": chunk_ids}
 

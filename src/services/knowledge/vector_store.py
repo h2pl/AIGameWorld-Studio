@@ -308,25 +308,71 @@ class SQLiteVectorStore:
 import os
 from dataclasses import dataclass, field
 
+from llama_index.core.schema import TextNode
+from llama_index.core.vector_stores.types import (
+    BasePydanticVectorStore,
+    VectorStoreQuery,
+    VectorStoreQueryResult,
+)
 
-class _SQLiteLlamaStoreAdapter:
-    """把自定义 SQLiteVectorStore 适配成 LlamaIndex VectorStore 最小接口.
 
-    只实现 IngestionPipeline / Retriever 实际用到的三个方法：add / delete / query。
+class _SQLiteLlamaStoreAdapter(BasePydanticVectorStore):
+    """把自定义 SQLiteVectorStore 适配成 LlamaIndex 原生 ``BasePydanticVectorStore``.
+
+    这样 ``IngestionPipeline(transformations=[...], vector_store=self)`` 可以直接原生接管：
+    split → embed（pydantic 声明） → ``add(nodes)`` 自动双写（向量库 + kb_chunk 业务表）。
+
+    ``kb_chunk`` 业务表双写通过 ``kb_writer`` 回调完成：LlamaIndex 在 ``pipeline.run()``
+    时自动调用 ``add()``，回调把 node 映射成业务行写入 SQLite——不再是手写并行循环。
     """
 
     stores_text: bool = True
 
-    def __init__(self, store: SQLiteVectorStore, collection_name: str):
+    def __init__(
+        self,
+        store: SQLiteVectorStore,
+        collection_name: str,
+        *,
+        kb_writer: Any | None = None,
+        topic_id: str | None = None,
+    ):
+        """初始化.
+
+        Parameters
+        ----------
+        store : SQLiteVectorStore
+            底层向量存储（BLOB 向量）。
+        collection_name : str
+            collection 名（``kb_{topic_id}``）。
+        kb_writer : callable | None
+            业务双写回调 ``kb_writer(nodes) -> None``，在 add() 内被 LlamaIndex 触发，
+            负责把 node 写进 kb_chunk 业务表。不传则只写向量库。
+        topic_id : str | None
+            主题 ID，透传给 kb_writer 使用。
+        """
         self._store = store
         self._collection_name = collection_name
-        self.client = store
+        self._kb_writer = kb_writer
+        self._topic_id = topic_id
 
     @property
     def collection_name(self) -> str:
         return self._collection_name
 
-    def add(self, nodes: Sequence[Any]) -> list[str]:
+    @property
+    def client(self) -> Any:
+        """返回底层向量存储客户端（BasePydanticVectorStore 抽象要求）."""
+        return self._store
+
+    def _set_kb_writer(self, kb_writer: Any) -> None:
+        """注入 kb_chunk 业务表双写回调（由 KnowledgePipeline 调用）."""
+        self._kb_writer = kb_writer
+
+    def _set_topic_id(self, topic_id: str) -> None:
+        """设置 topic_id（透传给 kb_writer 使用）."""
+        self._topic_id = topic_id
+
+    def add(self, nodes: Sequence[Any], **kwargs: Any) -> list[str]:
         ids: list[str] = []
         for n in nodes:
             node_id = getattr(n, "id_", None) or getattr(n, "node_id", None) or ""
@@ -345,6 +391,17 @@ class _SQLiteLlamaStoreAdapter:
             meta["collection"] = self._collection_name
             self._store.upsert(str(node_id), list(embedding), text, meta)
             ids.append(str(node_id))
+
+        # LlamaIndex 原生回调：把 node 双写到 kb_chunk 业务表（不阻塞向量写入）
+        if self._kb_writer is not None and ids:
+            try:
+                self._kb_writer(nodes)
+            except Exception:
+                import logging
+
+                logging.getLogger(__name__).exception(
+                    "[kb] kb_chunk 双写失败（向量已写入 collection=%s）", self._collection_name
+                )
         return ids
 
     def delete(self, ref_doc_id: str | None = None, delete_all: bool = False, **kwargs: Any) -> None:
@@ -357,30 +414,21 @@ class _SQLiteLlamaStoreAdapter:
             # 如果需要精确删除，建议直接删 collection 重建
             self._store.clear_all()
 
-    def query(self, query: Any, **kwargs: Any) -> Any:
-        qvec = getattr(query, "query_embedding", None) or None
-        if qvec is None:
-            qvec = kwargs.get("query_embedding") or []
+    def query(self, query: VectorStoreQuery, **kwargs: Any) -> VectorStoreQueryResult:
+        qvec = getattr(query, "query_embedding", None) or kwargs.get("query_embedding") or []
         k = int(getattr(query, "similarity_top_k", 5) or 5)
         hits = self._store.search(list(qvec), k=k)
         ids = [h[0] for h in hits]
         scores = [1.0 / (1.0 + h[1]) for h in hits]  # 距离 → 相似度归一化
         texts = [h[2] for h in hits]
         metas = [h[3] for h in hits]
-        try:
-            from llama_index.core.schema import TextNode
-            from llama_index.core.vector_stores import VectorStoreQueryResult
-
-            nodes = []
-            for rid, txt, m in zip(ids, texts, metas):
-                try:
-                    nodes.append(TextNode(id_=rid, text=txt, metadata=m or {}))
-                except Exception:
-                    pass
-            return VectorStoreQueryResult(nodes=nodes, similarities=scores, ids=ids)
-        except Exception:
-            # LlamaIndex 不可用时，返回最小可消费的 tuple
-            return {"ids": ids, "scores": scores, "texts": texts, "metas": metas}
+        nodes = []
+        for rid, txt, m in zip(ids, texts, metas):
+            try:
+                nodes.append(TextNode(id_=rid, text=txt, metadata=m or {}))
+            except Exception:
+                pass
+        return VectorStoreQueryResult(nodes=nodes, similarities=scores, ids=ids)
 
 
 @dataclass

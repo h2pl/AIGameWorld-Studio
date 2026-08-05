@@ -28,3 +28,15 @@ llm:
     temperature: 0.8
     timeout: 60
     retries: 3
+
+# === Embedding 配置 / Embedding backend ===
+# 默认用本地 HuggingFaceEmbedding(BAAI/bge-m3)，进程内批量推理（embed_batch_size=64），速度快。
+# TEI 链路作为可切换模式保留（已验证通）：常驻 docker 跑 Text-Embeddings-Inference 加载 BGE-M3。
+# 启用方式二选一（启用后自动优先走 TEI，失败回退本地）：
+#   1) 环境变量 TEI_URL=http://localhost:8080 再启动服务；
+#   2) 或取消下面 tei_url 注释（指向已启动的 TEI 容器）。
+# 注意：当前 TEI 容器为 CPU 模式 + candle backend 强制 batch≤8，单条往返比本地慢约 10 倍；
+#       仅当 TEI 跑在 GPU 上（如 RTX 50 系 Blackwell 镜像）才建议启用。
+embedding:
+  # tei_url: "http://localhost:8080"   # 备选：启用 TEI 服务时取消注释或设 TEI_URL 环境变量
+  model_name: "BAAI/bge-m3"

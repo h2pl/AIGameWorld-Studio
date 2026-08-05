@@ -15,6 +15,7 @@ import hashlib
 import json
 import logging
 import time
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -464,8 +465,26 @@ class KnowledgeManager:
         )
         return {"ok": True, "total_chunks": total_chunks, "indexed": result}
 
+    def _has_running_job(self, topic_slug: str) -> str | None:
+        """检查该 topic 是否有未完成的索引任务（pending 或 running），返回 job_id 或 None."""
+        row = self._store.fetch_one(
+            "SELECT id FROM kb_index_job WHERE topic_id = ? AND status IN ('pending', 'running') LIMIT 1",
+            (topic_slug,),
+        )
+        return row["id"] if row else None
+
     def index_async(self, topic_slug: str, *, force: bool = False) -> dict[str, Any]:
-        """创建索引任务记录并返回 job_id（不执行，由 BackgroundTasks 调 _run_index_job）."""
+        """创建索引任务记录并返回 job_id（不执行，由 BackgroundTasks 调 _run_index_job）.
+
+        Raises HTTPException(409) 如果该 topic 已有索引任务运行中。
+        """
+        # 防并发：同一 topic 同时只允许一个索引任务
+        running = self._has_running_job(topic_slug)
+        if running:
+            from fastapi import HTTPException
+
+            raise HTTPException(409, detail=f"主题 {topic_slug} 已有索引任务运行中 (job_id={running})")
+
         mode = "force" if force else "incremental"
         # 先确保 knowledge 目录存在
         self._ensure_knowledge_dir(topic_slug)
@@ -564,11 +583,45 @@ class KnowledgeManager:
                 (now_str, len(file_paths), job_id),
             )
 
+            # 进度回调：每读完一个文件就更新 kb_index_job.file_done / progress
+            # progress 按实际耗时权重分配：文件读取占 0-5%，embedding 占 5-100%
+            # （embedding 是瓶颈，占 ~95% 耗时，进度条应主要反映 embedding 进度）
+            def _on_file_done(done: int, total: int) -> None:
+                pct = int(done / total * 5) if total > 0 else 5
+                try:
+                    self._store.execute(
+                        """
+                        UPDATE kb_index_job
+                           SET file_done = ?, progress = ?, updated_at = ?
+                         WHERE id = ?
+                        """,
+                        (done, pct, SQLiteStore.now_str(), job_id),
+                    )
+                except Exception:
+                    pass
+
+            # embedding 进度回调：每个 batch 完成后更新 progress（5% → 100%）
+            def _on_embed_done(done: int, total: int) -> None:
+                pct = 5 + int(done / total * 95) if total > 0 else 100
+                try:
+                    self._store.execute(
+                        """
+                        UPDATE kb_index_job
+                           SET progress = ?, updated_at = ?
+                         WHERE id = ?
+                        """,
+                        (pct, SQLiteStore.now_str(), job_id),
+                    )
+                except Exception:
+                    pass
+
             result = self.ingest_files(
                 topic_slug,
                 file_paths,
                 chunk_size=chunk_size,
                 chunk_overlap=chunk_overlap,
+                on_progress=_on_file_done,
+                on_embed_progress=_on_embed_done,
             )
 
             # 更新 job 状态为 done
@@ -680,6 +733,8 @@ class KnowledgeManager:
         *,
         chunk_size: int | None = None,
         chunk_overlap: int | None = None,
+        on_progress: Callable[[int, int], None] | None = None,
+        on_embed_progress: Callable[[int, int], None] | None = None,
     ) -> dict[str, Any]:
         """直接把指定的文件列表写入知识库（读取 → 切块 → 嵌入 → 双写）.
 
@@ -691,6 +746,10 @@ class KnowledgeManager:
             文件路径列表（支持 pdf / md / txt）。
         chunk_size / chunk_overlap : int | None
             覆盖默认值。
+        on_progress : callable, optional
+            文件读取进度回调 ``on_progress(done, total)``。
+        on_embed_progress : callable, optional
+            embedding 进度回调 ``on_embed_progress(done_batches, total_batches)``。
 
         Returns
         -------
@@ -699,9 +758,9 @@ class KnowledgeManager:
         """
         self.ensure_topic(topic_slug)
 
-        # 加载文档（用带主题 enrichers 的 reader）
+        # 加载文档（用带主题 enrichers 的 reader，串行读取）
         reader = self._get_reader(topic_slug)
-        docs = reader.load_documents(files)
+        docs = reader.load_documents(files, on_progress=on_progress)
         if not docs:
             return {"ok": False, "error": "没有读到任何文件", "doc_ids": [], "chunks": 0}
 
@@ -720,7 +779,7 @@ class KnowledgeManager:
             )
 
         t0 = time.time()
-        result = pipeline.ingest(docs)
+        result = pipeline.ingest(docs, on_embed_progress=on_embed_progress)
         elapsed = time.time() - t0
 
         return {

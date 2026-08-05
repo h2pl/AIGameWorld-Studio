@@ -53,3 +53,20 @@ scripts/_scrapy_standalone_min.py
 # External binary tools (not part of source)
 unrar.exe
 license.txt
+
+# --- 根目录一次性调试脚本 / 日志 / 输出（避免再次堆积）---
+/_[a-zA-Z]*.py
+/_[a-zA-Z]*.txt
+/_[a-zA-Z]*.log
+/_[a-zA-Z]*.out
+/_[a-zA-Z]*.bat
+/_[a-zA-Z]*.json
+/_kb_wip_backup.py
+/_kb_wip_backup/
+/nul
+/bench_result.txt
+/chronicle_run.log
+
+# 工作目录运行数据（不提交）
+/.cache/
+/.workbuddy/

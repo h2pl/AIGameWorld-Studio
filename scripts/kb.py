@@ -115,12 +115,25 @@ def cmd_ingest(args) -> int:
             )
 
         print(f"读取 {len(files)} 个文件…")
-        r = kb.ingest_files(
-            args.topic,
-            files,
-            chunk_size=args.chunk_size,
-            chunk_overlap=args.chunk_overlap,
-        )
+
+        # Python 3.14 + Windows 下 C 扩展（pypdf/tiktoken/tokenizers/torch）会偶发误抛
+        # KeyboardInterrupt。这里用重试兜底：每次失败后重建 Manager（释放资源）再重试。
+        for attempt in range(5):
+            try:
+                r = kb.ingest_files(
+                    args.topic,
+                    files,
+                    chunk_size=args.chunk_size,
+                    chunk_overlap=args.chunk_overlap,
+                )
+                break
+            except KeyboardInterrupt:
+                print(f"  [WARN] KeyboardInterrupt (attempt {attempt + 1}/5), retrying...", file=sys.stderr)
+                if attempt == 4:
+                    raise
+                kb.close()
+                kb = _make_manager()
+                kb.ensure_topic(args.topic)
 
         if not r.get("ok"):
             print(f"[FATAL] {r.get('error', '未知错误')}")

@@ -41,9 +41,22 @@ dependencies = [
     # （LlamaIndex 的 llama-index-postprocessor-huggingface-rerank 集成包已从 PyPI 下架，
     #  其底层即 sentence_transformers.CrossEncoder，故直接用该官方后端，非自研算法）
     "langchain-text-splitters>=0.3.0", # PDF-aware RecursiveCharacter chunking
+    # Unstructured 为「可选」PDF 语义解析后端：partition_pdf 按文档元素（标题/表格/列表）
+    # 切分，比 pypdf 纯文本提取更适合 RAG。reader 层固定 strategy="fast"（纯 pdfminer，不联网
+    # 下载模型，离线稳定），未安装时自动降级到 pypdf 逐页兜底。
+    # 注意：unstructured 0.25+ 把 spacy 等重型依赖塞进主依赖，安装较重（已用镜像安装）；
+    # unstructured-inference 在 Windows 上被 upstream 标记为非 win32 默认排除，但本地 PDF 解析
+    # 必需，故显式声明以保证可复现安装 + 避免 C 级 segfault。
+    "unstructured>=0.16.0",
+    "unstructured-inference>=1.6.0",
 ]
 
 [dependency-groups]
+# 可选：Unstructured 完整功能（含表格/图片/公式解析）。
+#   系统级依赖（部分）：apt-get install libmagic1 libreoffice poppler-utils
+pdf-advanced = [
+    "unstructured[pdf]>=0.16.0",
+]
 dev = [
     "pytest>=8.0",
     "ruff>=0.8",

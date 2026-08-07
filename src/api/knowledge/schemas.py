@@ -118,6 +118,13 @@ class SearchHit(BaseModel):
     score: float = Field(description="cosine similarity 0~1")
     # 向量距离（可选）
     distance: float | None = None
+    # 分块稳定外键（== Qdrant point id == kb_chunk.id），下游可精确回查
+    chunk_id: str = Field(default="", description="chunk 稳定外键，用于溯源/引用")
+    # 规范化出处（幻觉规避：LLM 生成时可精确引用）
+    citation: dict[str, Any] = Field(
+        default_factory=dict,
+        description="出处：document_id/file_name/title/page_number/chunk_index 等",
+    )
     # 分块的附属元数据
     metadata: dict[str, Any] = Field(default_factory=dict)
 
@@ -127,10 +134,12 @@ class SearchRequest(BaseModel):
     query: str = Field(..., min_length=1, description="自然语言查询")
     # 返回结果条数，默认5，范围1-100
     top_k: int = Field(default=5, ge=1, le=100)
-    # 最小相似度阈值，默认0，范围0-1
+    # 最小相似度阈值，默认0，范围0-1（默认0=只取 top_k，不按分数过滤）
     min_score: float = Field(default=0.0, ge=0.0, le=1.0)
     # 元数据过滤条件（Qdrant where 条件）
     filters: dict[str, Any] | None = Field(default=None, description="Qdrant where 条件")
+    # 是否启用 Query 改写（multi_query 扩展召回），默认关闭（零额外 LLM 依赖）
+    query_rewrite: bool = Field(default=False, description="启用 Query 改写提升召回，默认关闭")
 
 
 class SearchResponse(BaseModel):

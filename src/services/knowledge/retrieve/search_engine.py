@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from typing import Any
 
 from llama_index.core import VectorStoreIndex
@@ -125,6 +126,65 @@ def bm25s_tokenize(corpus: list[list[str]]) -> Any:
     return corpus
 
 
+class QueryRewriter:
+    """Query 改写器（multi_query 策略）— 默认不启用，显式开启时调用.
+
+    把用户原始 query 扩展为 N 个同义/不同角度的子 query，分别检索后由
+    :meth:`KnowledgeRetriever.search_with_meta` 做跨 query RRF 融合，提升召回。
+
+    设计原则（对齐 spec-rag-query-rewrite）：
+    - 复用项目现有 LangChain LLM（``src.llm.client.get_model``），不新增 LlamaIndex LLM 依赖。
+    - LLM 调用失败 / 不可用 / 超时 → 降级返回 ``[原 query]``，绝不阻塞检索。
+    - 改写 prompt 要求保留专有名词原文（如「阿尔萨斯」「Burning Legion」不翻译）。
+    """
+
+    _SYSTEM = (
+        "你是一个检索查询改写助手。给定用户的问题，生成若干个不同表述但语义等价的检索子查询，"
+        "用于提升向量库召回率。规则：1) 保留所有专有名词原文（如人名、地名、组织名不翻译）；"
+        "2) 每个子查询独立、简洁；3) 不要解释，只输出子查询。"
+    )
+    _NUM = 3
+
+    def __init__(self, num_queries: int = _NUM):
+        self._num = max(1, num_queries)
+        self._llm = None
+
+    def _ensure_llm(self):
+        if self._llm is not None:
+            return self._llm
+        try:
+            from src.llm.client import get_model
+
+            self._llm = get_model()
+        except Exception as e:  # noqa: BLE001
+            _log.warning("[kb] QueryRewriter 获取 LLM 失败，降级原 query: %s", e)
+            self._llm = False
+        return self._llm if self._llm else None
+
+    def rewrite(self, query: str) -> list[str]:
+        """返回子 query 列表（至少含原 query）。失败时返回 [query]。"""
+        llm = self._ensure_llm()
+        if llm is None or llm is False:
+            return [query]
+        try:
+            from langchain_core.messages import HumanMessage, SystemMessage
+
+            user_prompt = f"原始查询：{query}\n请生成 {self._num} 个检索子查询（每行一个，不要编号）："
+            resp = llm.invoke([SystemMessage(content=self._SYSTEM), HumanMessage(content=user_prompt)])
+            content = getattr(resp, "content", "") or ""
+            sub = [line.strip(" -•\t") for line in content.splitlines() if line.strip()]
+            sub = [s for s in sub if s][: self._num]
+            # 始终保留原 query，且去重
+            out = [query]
+            for s in sub:
+                if s != query and s not in out:
+                    out.append(s)
+            return out[: self._num] if len(out) > self._num else out
+        except Exception as e:  # noqa: BLE001
+            _log.warning("[kb] QueryRewriter LLM 调用失败，降级原 query: %s", e)
+            return [query]
+
+
 class KnowledgeRetriever:
     """知识库检索编排 — dense + BM25(Ensemble) → CrossEncoder rerank.
 
@@ -168,6 +228,7 @@ class KnowledgeRetriever:
         top_k: int = 5,
         min_score: float = 0.0,
         filters: dict | None = None,
+        query_rewrite: bool = False,
     ) -> list[dict]:
         """混合检索：BGE-M3 dense + BM25(Ensemble 融合) → CrossEncoder 重排.
 
@@ -175,36 +236,66 @@ class KnowledgeRetriever:
         - lexical：``_BM25LlamaRetriever``（bm25s 引擎，in-memory nodes，jieba 分词）
         - 融合：``QueryFusionRetriever``（框架原生 RRF 加权融合）
         - 重排：``sentence_transformers.CrossEncoder``（bge-reranker-v2-m3，不可用时跳过降级）
+        - query_rewrite：默认关闭（零额外 LLM 依赖）；开启时把原 query 扩展为多子 query
+          分别检索后 RRF 二次融合，提升召回（LLM 不可用时降级为原 query）。
+
+        返回每个 hit 含规范 ``citation`` 字段（document_id / file_name / page_number 等），
+        供下游 LLM 生成时精确引用出处，规避幻觉。
         """
         pipeline = self._get_pipeline(topic_slug)
+
+        # ── 0) Query 改写（可选，默认关闭） ───────────────────────
+        # 生成子 query 列表（至少含原 query）；关闭或 LLM 不可用时返回 [query]。
+        sub_queries = self._rewrite_query(query) if query_rewrite else [query]
 
         # ── 1) 构建融合检索器（dense + BM25，Ensemble 原生融合） ──
         ensemble = self._get_ensemble(topic_slug, pipeline, top_k=top_k)
 
-        # QueryFusionRetriever.retrieve 返回 NodeWithScore 列表（已融合排序）
+        # 多子 query 时分别检索，再用 RRF 做一次跨 query 融合（避免互相稀释）。
+        fused_nodes: list[NodeWithScore] = []
+        seen_ids: dict[str, NodeWithScore] = {}
         try:
-            nodes: list[NodeWithScore] = ensemble.retrieve(QueryBundle(query_str=query))
+            for sq in sub_queries:
+                try:
+                    sq_nodes = ensemble.retrieve(QueryBundle(query_str=sq))
+                except Exception as e:  # noqa: BLE001
+                    _log.warning("[kb] Ensemble 检索失败(query=%r)，退回纯 dense: %s", sq[:50], e)
+                    try:
+                        sq_nodes = (
+                            self._get_index(topic_slug, pipeline)
+                            .as_retriever(
+                                similarity_top_k=max(top_k * 3, 20),
+                                filters=self.build_qdrant_filter(topic_slug, filters),
+                            )
+                            .retrieve(QueryBundle(query_str=sq))
+                        )
+                    except Exception as e2:  # noqa: BLE001
+                        _log.warning("[kb] 纯 dense 检索也失败 topic=%s: %s", topic_slug, e2)
+                        sq_nodes = []
+                fused_nodes.extend(sq_nodes)
+            # 同 id 节点跨 query 去重：保留最高分（RRF 分数已归一，取较大者）
+            for n in fused_nodes:
+                nid = str(getattr(n, "id_", "") or "")
+                if not nid:
+                    continue
+                if nid not in seen_ids or float(getattr(n, "score", 0.0) or 0.0) > float(
+                    getattr(seen_ids[nid], "score", 0.0) or 0.0
+                ):
+                    seen_ids[nid] = n
+            nodes = list(seen_ids.values())
         except Exception as e:  # noqa: BLE001
-            _log.warning("[kb] Ensemble 检索失败，退回纯 dense: %s", e)
+            # 兜底：直接用原 query 走一次融合，避免整体崩溃
+            _log.warning("[kb] 多 query 融合异常，降级单 query: %s", e)
             try:
-                nodes = (
-                    self._get_index(topic_slug, pipeline)
-                    .as_retriever(
-                        similarity_top_k=max(top_k * 3, 20),
-                        filters=self.build_qdrant_filter(topic_slug, filters),
-                    )
-                    .retrieve(QueryBundle(query_str=query))
-                )
-            except Exception as e2:  # noqa: BLE001
-                # 常见原因：Qdrant collection 不存在（该 topic 尚未建索引/向量未写入）。
-                # 不应让 404 崩溃整个检索请求，优雅返回空结果。
-                _log.warning("[kb] 纯 dense 检索也失败（可能 collection 未建索引）topic=%s: %s", topic_slug, e2)
+                nodes = ensemble.retrieve(QueryBundle(query_str=query))
+            except Exception:
                 nodes = []
 
         # ── 2) Cross-Encoder 重排（bge-reranker-v2-m3，HuggingFaceRerank 已下架，改用 CrossEncoder） ──
+        # 重排用原始 query 做 cross-encoder（query-doc 相关性），多 query 扩展仅用于召回阶段。
         reranked = self._rerank(query, nodes, top_k=top_k)
 
-        # ── 3) 组装返回（兼容现有 API schema） ────────────────────
+        # ── 3) 组装返回（兼容现有 API schema + 规范化 citation） ──
         hits: list[dict] = []
         for n in reranked:
             meta = dict(n.metadata or {})
@@ -212,16 +303,102 @@ class KnowledgeRetriever:
             if min_score > 0 and score < min_score:
                 continue
             chunk_id = str(getattr(n, "id_", "") or meta.get("chunk_id") or "")
-            text = (getattr(n, "text", "") or "") or self.extract_text_from_payload(meta, chunk_id)
+            child_text = (getattr(n, "text", "") or "") or self.extract_text_from_payload(meta, chunk_id)
+            # 父子切分：命中子块时回拉所属父块文本作为上下文（chunk_id 仍保留子块用于精确引用）
+            text = self._expand_parent_context(meta, child_text, chunk_id)
             hits.append(
                 {
                     "text": text,
                     "score_cosine_sim": score,
                     "distance": 1.0 - score if 0.0 <= score <= 1.0 else None,
+                    "chunk_id": chunk_id,
+                    "citation": self._build_citation(meta, chunk_id),
                     "metadata": meta,
                 }
             )
         return hits
+
+    # ------------------------------------------------------------------
+    # Citation 溯源（幻觉规避：让下游 LLM 能精确引用出处）
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _build_citation(meta: dict, chunk_id: str) -> dict:
+        """从 chunk metadata 规整出人类可读的出处结构（不引入新存储）.
+
+        chunk_id 即 Qdrant point id == kb_chunk.id，下游可据此精确回查。
+        page_number 仅 PDF 来源有值，其余为 None。
+        """
+        file_name = meta.get("file_name") or meta.get("file_path") or ""
+        page_number = meta.get("page_number")
+        try:
+            page_number = int(page_number) if page_number is not None else None
+        except TypeError, ValueError:
+            page_number = None
+        chunk_index = meta.get("chunk_index")
+        chunk_count = meta.get("chunk_count")
+        title = meta.get("title") or (f"{Path(file_name).stem} p{page_number}" if page_number else Path(file_name).stem)
+        return {
+            "chunk_id": chunk_id,
+            "document_id": meta.get("document_id") or meta.get("doc_id") or "",
+            "file_name": file_name,
+            "title": title,
+            "page_number": page_number,
+            "chunk_index": chunk_index,
+            "chunk_count": chunk_count,
+            "source_type": meta.get("source_type") or "",
+            "topic": meta.get("topic_id") or "",
+        }
+
+    # ------------------------------------------------------------------
+    # 父子切分上下文回拉（命中子块 → 返回父块文本）
+    # ------------------------------------------------------------------
+
+    def _expand_parent_context(self, meta: dict, child_text: str, chunk_id: str) -> str:
+        """命中子块时，回拉所属父块的完整文本作为返回上下文。
+
+        - 子块（chunk_level == 'child'）metadata 里带 ``parent_id``（父块在 kb_chunk 表的 id）。
+        - 父块只存 SQLite（未嵌入），这里按 parent_id 查父块文本；查不到则降级返回子块原文。
+        - 返回的 ``chunk_id``/citation 仍保留子块，保证下游精确引用到命中片段。
+        """
+        if meta.get("chunk_level") != "child" or not child_text:
+            return child_text
+        parent_id = meta.get("parent_id") or meta.get("parent_chunk_id")
+        if not parent_id or self._store is None:
+            return child_text
+        try:
+            row = self._store.fetch_one("SELECT meta_json, text_preview FROM kb_chunk WHERE id = ?", (str(parent_id),))
+        except Exception:
+            return child_text
+        if not row:
+            return child_text
+        # 优先从 meta_json 取完整文本；没有则回退 text_preview
+        parent_text = ""
+        if row.get("meta_json"):
+            try:
+                import json
+
+                pm = json.loads(row["meta_json"])
+                if isinstance(pm, dict):
+                    for k in ("text", "content", "__text__"):
+                        if isinstance(pm.get(k), str) and pm[k].strip():
+                            parent_text = pm[k]
+                            break
+            except Exception:
+                parent_text = ""
+        if not parent_text and row.get("text_preview"):
+            parent_text = str(row["text_preview"])
+        return parent_text or child_text
+
+    # ------------------------------------------------------------------
+    # Query 改写（可选，默认关闭）
+    # ------------------------------------------------------------------
+
+    def _rewrite_query(self, query: str) -> list[str]:
+        """Query 改写入口：懒加载 :class:`QueryRewriter` 单例，返回子 query 列表。"""
+        if not hasattr(self, "_query_rewriter") or self._query_rewriter is None:
+            self._query_rewriter = QueryRewriter()
+        return self._query_rewriter.rewrite(query)
 
     # ------------------------------------------------------------------
     # QueryFusionRetriever 缓存（dense + BM25，框架原生融合）

@@ -157,6 +157,11 @@ class KnowledgePipeline:
         chunk_size: int = 800,
         chunk_overlap: int = 120,
         enrichers: list | None = None,
+        use_parent_child: bool = True,
+        parent_chunk_size: int = 1200,
+        parent_chunk_overlap: int = 150,
+        child_chunk_size: int = 400,
+        child_chunk_overlap: int = 60,
     ):
         self.topic_id = topic_id
         self.collection_name = f"kb_{topic_id}"
@@ -166,6 +171,13 @@ class KnowledgePipeline:
         # 保存切分参数，供 ingest 里手动切 chunk + 逐条 embed 使用
         self._chunk_size = chunk_size
         self._chunk_overlap = chunk_overlap
+        # 父子切分开关与粒度：父块=语义完整的大块（返回上下文，不嵌入），
+        # 子块=小块（嵌入检索，命中后回拉所属父块）。默认开启。
+        self.use_parent_child = use_parent_child
+        self._parent_chunk_size = parent_chunk_size
+        self._parent_chunk_overlap = parent_chunk_overlap
+        self._child_chunk_size = child_chunk_size
+        self._child_chunk_overlap = child_chunk_overlap
         # 记录被"更新"替换掉的旧版本 doc_id（用于清理其残留 chunks）
         self._obsolete_doc_ids: list[str] = []
 
@@ -254,19 +266,34 @@ class KnowledgePipeline:
                     _bge_path,
                 )
 
-        # IngestionPipeline：切分 + 嵌入两阶段都由 LlamaIndex 原生托管。
-        #   - SentenceSplitter：按语义边界切 chunk，并自动注入 prev/next 关系
-        #     （include_prev_next_rel=True），供检索端做 parent-context 展开时
-        #     直接读 node.relationships，无需手写 SQL 回拉相邻 chunk。
-        #   - embedding：BGE-M3。
+        # 切分器：父块（语义完整大块）+ 子块（小块，供检索嵌入）。
+        #   - 父块：chunk_size=parent_chunk_size，只存 SQLite（不嵌入），作为返回上下文。
+        #   - 子块：chunk_size=child_chunk_size，嵌入 Qdrant，命中后按 parent_id 回拉父块。
+        # 均用 LlamaIndex 原生 SentenceSplitter（按语义边界切 + 注入 prev/next 关系）。
         from llama_index.core.node_parser import SentenceSplitter
 
-        self._text_splitter = SentenceSplitter(
-            chunk_size=chunk_size,
-            chunk_overlap=chunk_overlap,
-            include_metadata=True,
-            include_prev_next_rel=True,
-        )
+        if use_parent_child:
+            self._text_splitter = SentenceSplitter(
+                chunk_size=parent_chunk_size,
+                chunk_overlap=parent_chunk_overlap,
+                include_metadata=True,
+                include_prev_next_rel=True,
+            )
+            self._child_splitter = SentenceSplitter(
+                chunk_size=child_chunk_size,
+                chunk_overlap=child_chunk_overlap,
+                include_metadata=True,
+                include_prev_next_rel=True,
+            )
+        else:
+            # 兼容旧单层模式：父块尺寸 == 单层 chunk 尺寸，无子块
+            self._text_splitter = SentenceSplitter(
+                chunk_size=chunk_size,
+                chunk_overlap=chunk_overlap,
+                include_metadata=True,
+                include_prev_next_rel=True,
+            )
+            self._child_splitter = None
         self._pipeline = IngestionPipeline(
             transformations=[
                 self._text_splitter,
@@ -276,10 +303,20 @@ class KnowledgePipeline:
         # 独立拿 LlamaIndex VectorStore 对象（KBVectorStoreFactory 负责后端路由）
         self._vector_store = self._factory.get_vector_store(topic_id)
 
-        # 幂等确保 kb_chunk 有 page_number 列（PDF 页码感知；SQLite 不支持 IF NOT EXISTS）
+        # 幂等确保 kb_chunk 有 page_number / chunk_level / parent_id 列（SQLite 不支持 IF NOT EXISTS）
         if self._store is not None:
+            for _ddl in (
+                "ALTER TABLE kb_chunk ADD COLUMN page_number INTEGER",
+                "ALTER TABLE kb_chunk ADD COLUMN chunk_level TEXT",
+                "ALTER TABLE kb_chunk ADD COLUMN parent_id TEXT",
+            ):
+                try:
+                    self._store.execute(_ddl)
+                except Exception:
+                    pass
+            # parent_id 索引：子块命中后按父块回拉上下文
             try:
-                self._store.execute("ALTER TABLE kb_chunk ADD COLUMN page_number INTEGER")
+                self._store.execute("CREATE INDEX IF NOT EXISTS idx_kb_chunk_parent ON kb_chunk(parent_id)")
             except Exception:
                 pass
 
@@ -312,15 +349,19 @@ class KnowledgePipeline:
         nodes = self._text_splitter.get_nodes_from_documents(documents)
 
         # 补充业务元数据：page_number 来自 Document.metadata.page_label/page_number；
-        # chunk_index / chunk_count 在同 Document 内重排。
+        # chunk_index / chunk_count 在同 Document 内重排；doc_id 用 ref_doc_id 兜底
+        # （SentenceSplitter 生成的 node 可能不含 metadata.doc_id，只含 ref_doc_id）。
         by_doc: dict[str, list[TextNode]] = {}
         for n in nodes:
-            src = n.metadata.get("doc_id") or n.metadata.get("file_path") or "_"
+            src = n.metadata.get("doc_id") or getattr(n, "ref_doc_id", None) or n.metadata.get("file_path") or "_"
             by_doc.setdefault(src, []).append(n)
         for doc_nodes in by_doc.values():
             chunk_count = len(doc_nodes)
             for idx, n in enumerate(doc_nodes):
                 meta = dict(n.metadata or {})
+                # 统一补真实 doc_id（若缺失则用 ref_doc_id）
+                if not meta.get("doc_id"):
+                    meta["doc_id"] = getattr(n, "ref_doc_id", None) or meta.get("file_path") or "_"
                 # PDF 页码：reader 注入的 page_label/page_number 透传到 chunk
                 page = meta.get("page_number") or meta.get("page_label")
                 try:
@@ -337,6 +378,45 @@ class KnowledgePipeline:
                     pass
 
         return [n for n in nodes if (n.get_content() or "").strip()]
+
+    def _split_parent_child_pdf_aware(self, documents: list[Document]) -> tuple[list[TextNode], list[TextNode] | None]:
+        """父子两级切分：父块（大）→ 子块（小）。
+
+        Returns
+        -------
+        (parent_nodes, child_nodes)
+            - parent_nodes：父块 TextNode 列表（注入 page_number/chunk_index/chunk_count），
+              只存 SQLite，不嵌入。
+            - child_nodes：子块 TextNode 列表（每个挂 parent_id 关联所属父块），嵌入 Qdrant。
+              单层模式（``use_parent_child=False``）返回 ``None``，此时 parent_nodes 即单层块。
+        """
+        parents = self._split_documents_pdf_aware(documents)
+        if self._child_splitter is None:
+            return parents, None
+
+        # 每个父块再切成若干子块，并记录所属父块索引（父块的 document+chunk_index）。
+        # 注意：子块切分只传纯文本，不继承父块 metadata——否则长 metadata 会被 SentenceSplitter
+        # 计入切分窗口，既可能抛 "Metadata length > chunk size"，也会稀释子块检索质量。
+        # 切完后手动挂上需要继承的字段（page_number / doc_id / parent 关联）。
+        children: list[TextNode] = []
+        for p in parents:
+            p_meta = dict(p.metadata or {})
+            sub_nodes = self._child_splitter.get_nodes_from_documents([Document(text=p.get_content() or "")])
+            for c in sub_nodes:
+                c_meta = dict(c.metadata or {})
+                # 继承父块归属字段（不含 file_path/file_name 等长字符串，避免污染元数据）
+                for key in ("page_number", "doc_id", "topic_id"):
+                    if key in p_meta and key not in c_meta:
+                        c_meta[key] = p_meta[key]
+                # 标记子块归属的父块（用父块的 doc_id + 父块序号，待入库后解析成父块 chunk_id）
+                c_meta["parent_doc_id"] = p_meta.get("doc_id") or p_meta.get("file_path") or "_"
+                c_meta["parent_index"] = p_meta.get("chunk_index")
+                try:
+                    object.__setattr__(c, "metadata", c_meta)
+                except Exception:
+                    pass
+                children.append(c)
+        return parents, children
 
     # ingest：主入口 — 对 documents 依次执行 upsert_meta → pipeline.run → 写 kb_chunk 批量入库
     def ingest(
@@ -406,14 +486,17 @@ class KnowledgePipeline:
                 except Exception:
                     logger.warning("[kb] 清理旧 Qdrant points 失败 doc_id=%s", _doc_id)
 
-        # PDF 感知切分：每个 Document（通常对应一页或一个文件）按段落结构切成
-        # TextNode，注入 page_number / chunk_index / chunk_count，不跨页边界。
-        nodes = self._split_documents_pdf_aware(documents)
+        # 切分：父子两级（父块语义完整，子块嵌入检索）或旧单层模式。
+        # 返回 (parent_nodes, child_nodes)；单层模式 child_nodes 为 None。
+        parent_nodes, child_nodes = self._split_parent_child_pdf_aware(documents)
+        nodes = child_nodes if child_nodes is not None else parent_nodes
 
         # 过滤空/极短 chunk：PDF 的封面/版权/空白页会被切成空 node，无检索价值，不应入库。
         #   否则检索会命中这些空 chunk（正文为空），且浪费 embedding。
         min_chunk_chars = 10
         nodes = [n for n in nodes if len((n.get_content() or "").strip()) >= min_chunk_chars]
+        if parent_nodes is not None:
+            parent_nodes = [n for n in parent_nodes if len((n.get_content() or "").strip()) >= min_chunk_chars]
 
         _texts = [n.get_content() for n in nodes]
         # 分批 batch encode（主线程，绕开 llama-index tenacity 子线程）+ KeyboardInterrupt 重试。
@@ -470,18 +553,66 @@ class KnowledgePipeline:
             except Exception:
                 pass
 
-        # 第三步：按 doc_id 分组 nodes，为每个 chunk 生成 UUID + 元数据 + text_hash，准备批量写 kb_chunk
+        # 第三步：为父块/子块分配 UUID + 元数据，准备批量写 kb_chunk。
+        #   - 父块（parent）：只写 SQLite（chunk_level='parent', parent_id=NULL），不嵌入。
+        #   - 子块（child）：写 SQLite（chunk_level='child', parent_id=所属父块 id）+ 嵌入 Qdrant。
+        # 先为父块建 (doc_id, chunk_index) → chunk_id 映射，供子块解析 parent_id。
         chunk_ids: list[str] = []
+        all_chunk_rows: list[tuple] = []
+
+        # ── 父块：分配 id 并入库 ────────────────────────────────
+        parent_id_by_key: dict[tuple[str, int], str] = {}
+        if parent_nodes:
+            for pi, pn in enumerate(parent_nodes):
+                parent_id = SQLiteStore.new_id()
+                pdoc = pn.metadata.get("doc_id") or pn.metadata.get("file_path") or "_"
+                p_idx = int(pn.metadata.get("chunk_index") or pi)
+                parent_id_by_key[(str(pdoc), p_idx)] = parent_id
+                _pn_meta = dict(pn.metadata or {})
+                _pn_meta["chunk_id"] = parent_id
+                _pn_meta["chunk_level"] = "parent"
+                _pn_meta["parent_id"] = None
+                _pn_meta["topic_id"] = self.topic_id
+                # 父块完整文本写入 meta_json，供检索端命中子块时回拉完整上下文
+                _pn_meta["text"] = pn.get_content() or ""
+                try:
+                    object.__setattr__(pn, "metadata", _pn_meta)
+                except Exception:
+                    pass
+                try:
+                    _pp = int(_pn_meta.get("page_number") or 0) or None
+                except TypeError, ValueError:
+                    _pp = None
+                all_chunk_rows.append(
+                    (
+                        parent_id,
+                        pn.metadata.get("doc_id") or "",
+                        self.topic_id,
+                        p_idx,
+                        len(parent_nodes),
+                        hashlib.sha256((pn.get_content() or "").encode("utf-8")).hexdigest(),
+                        (pn.get_content() or "")[:200],
+                        0,
+                        _pp,
+                        json.dumps(_pn_meta, ensure_ascii=False),
+                        SQLiteStore.now_str(),
+                        "parent",
+                        None,
+                    )
+                )
+
+        # ── 子块：分配 id，解析 parent_id，入库（含嵌入向量） ──
+        # 注意：分组优先用 metadata["doc_id"]（父块/子块均已统一注入真实 doc_id），
+        # ref_doc_id 仅作兜底——子块是临时 Document 切出的 node，ref_doc_id 是随机 UUID，
+        # 若优先用它会导致 document_id 违反外键。
         by_doc: dict[str, list[tuple[int, object]]] = {}
         for i, n in enumerate(nodes):
-            ref = getattr(n, "ref_doc_id", None) or (n.metadata.get("doc_id") if n.metadata else None)
+            md = n.metadata or {}
+            ref = md.get("doc_id") or getattr(n, "ref_doc_id", None) or "_"
             if ref not in by_doc:
                 by_doc[ref] = []
             by_doc[ref].append((i, n))
 
-        # 第四步：遍历每个 doc 的 chunks，计算 chunk 元数据并组装 SQLite 行
-        #   关键：这里直接修改 node.metadata + node.id_，让后续 vs.add(nodes) 拿到完整 payload
-        all_chunk_rows: list[tuple] = []
         for doc_id, items in by_doc.items():
             chunk_count = len(items)
             for idx_in_doc, (_global_idx, node) in enumerate(items):
@@ -498,6 +629,19 @@ class KnowledgePipeline:
                 node_meta["chunk_count"] = chunk_count
                 node_meta["text_hash"] = text_hash
                 node_meta["topic_id"] = self.topic_id
+                node_meta["chunk_level"] = "child" if parent_nodes else "parent"
+                # 解析子块所属父块 chunk_id
+                if parent_nodes:
+                    pdoc = node_meta.get("parent_doc_id") or node_meta.get("doc_id") or doc_id or "_"
+                    p_idx = node_meta.get("parent_index")
+                    try:
+                        p_idx = int(p_idx) if p_idx is not None else 0
+                    except TypeError, ValueError:
+                        p_idx = 0
+                    parent_id = parent_id_by_key.get((str(pdoc), p_idx))
+                    node_meta["parent_id"] = parent_id
+                else:
+                    node_meta["parent_id"] = None
                 # 提取 page_number（PDF 感知切分写入的元数据），写入 kb_chunk.page_number 列
                 try:
                     _pn = node_meta.get("page_number")
@@ -526,19 +670,22 @@ class KnowledgePipeline:
                         page_number,
                         meta_json,
                         SQLiteStore.now_str(),
+                        "child" if parent_nodes else "parent",
+                        node_meta.get("parent_id"),
                     )
                 )
                 chunk_ids.append(chunk_id)
 
-        # 第五步：事务批量写 SQLite — 先写所有 kb_chunk 行，再更新 kb_document 状态为 done
+        # 第五步：事务批量写 SQLite — 先写所有 kb_chunk 行（父块 + 子块），再更新 kb_document 状态为 done
         if self._store is not None:
             with self._store.transaction():
                 self._store.executemany(
                     """
                     INSERT OR REPLACE INTO kb_chunk
                         (id, document_id, topic_id, chunk_index, chunk_count,
-                         text_hash, text_preview, token_count, page_number, meta_json, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                         text_hash, text_preview, token_count, page_number, meta_json, created_at,
+                         chunk_level, parent_id)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     all_chunk_rows,
                 )

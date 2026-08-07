@@ -1,6 +1,9 @@
 """KnowledgeReader 单元测试."""
 
 from pathlib import Path
+from unittest import mock
+
+from llama_index.core import Document
 
 from src.services.knowledge.ingest.reader import KnowledgeReader
 
@@ -108,3 +111,66 @@ class TestKnowledgeReaderMixed:
         reader = KnowledgeReader()
         docs = reader.load(tmp_path)
         assert len(docs) == 0
+
+
+class TestKnowledgeReaderPDF:
+    """PDF 加载（Unstructured 优先 + pypdf 兜底）."""
+
+    def _fake_reader(self, docs: list[Document]):
+        """构造一个带 load_data 的假 reader."""
+        r = mock.MagicMock()
+        r.load_data.return_value = docs
+        return r
+
+    def test_unstructured_style_page_number_passthrough(self, tmp_path: Path):
+        """Unstructured 输出的 page_number 元数据被正确透传并装配通用字段."""
+        pdf = tmp_path / "chronicle.pdf"
+        pdf.write_bytes(b"%PDF-1.4 fake")
+
+        sub = [
+            Document(text="第一卷内容", metadata={"page_number": 1, "category": "NarrativeText"}),
+            Document(text="第二卷内容", metadata={"page_number": 2, "category": "Title"}),
+        ]
+        reader = KnowledgeReader()
+        with mock.patch.object(reader, "_get_reader_for_ext", return_value=self._fake_reader(sub)):
+            docs = reader._load_one_file(pdf)
+
+        assert len(docs) == 2
+        assert all(d.metadata["content_type"] == "pdf" for d in docs)
+        assert all(d.metadata["source_type"] == "documents" for d in docs)
+        assert docs[0].metadata["page_number"] == 1
+        assert docs[1].metadata["page_number"] == 2
+        assert "file_path" in docs[0].metadata
+
+    def test_pypdf_style_page_label_compat(self, tmp_path: Path):
+        """pypdf / PDFReader 输出的 page_label 元数据被兼容转为 page_number."""
+        pdf = tmp_path / "lore.pdf"
+        pdf.write_bytes(b"%PDF-1.4 fake")
+
+        sub = [
+            Document(text="p3 text", metadata={"page_label": "3"}),
+        ]
+        reader = KnowledgeReader()
+        with mock.patch.object(reader, "_get_reader_for_ext", return_value=self._fake_reader(sub)):
+            docs = reader._load_one_file(pdf)
+
+        assert len(docs) == 1
+        assert docs[0].metadata["page_number"] == 3
+
+    def test_pdf_unsupported_reader_returns_empty(self, tmp_path: Path):
+        """扩展名无对应 reader（_get_reader_for_ext 返回 None）时不崩溃，返回空列表."""
+        pdf = tmp_path / "real.pdf"
+        pdf.write_bytes(b"%PDF-1.4 fake")
+
+        reader = KnowledgeReader()
+        with mock.patch.object(reader, "_get_reader_for_ext", return_value=None):
+            docs = reader._load_one_file(pdf)
+        assert docs == []
+
+    def test_unstructured_preferred_over_pdfreader(self, tmp_path: Path):
+        """PDF 扩展名优先返回 Unstructured 解析器（若可用），否则降级 PDFReader."""
+        reader = KnowledgeReader()
+        r = reader._get_reader_for_ext(".pdf")
+        assert r is not None
+        # 可用 unstructured 时返回其包装类；不可用（缺 unstructured_inference）时降级 PDFReader
+        assert type(r).__name__ in ("_UnstructuredPDFReader", "PDFReader")

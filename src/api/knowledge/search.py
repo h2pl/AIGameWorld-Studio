@@ -36,6 +36,7 @@ def search(
         top_k=body.top_k,
         min_score=body.min_score,
         filters=body.filters,
+        query_rewrite=body.query_rewrite,
     )
 
     # 3. DTO 转换：dict 列表 → SearchHit 列表
@@ -44,6 +45,8 @@ def search(
             text=h.get("text", ""),
             score=float(h.get("score_cosine_sim", 0.0)),
             distance=h.get("distance"),
+            chunk_id=h.get("chunk_id", ""),
+            citation=dict(h.get("citation") or {}),
             metadata=dict(h.get("metadata") or {}),
         )
         for h in hits

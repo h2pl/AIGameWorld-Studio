@@ -263,12 +263,21 @@ class KnowledgeManager:
         top_k: int = 5,
         min_score: float = 0.0,
         filters: dict | None = None,
+        query_rewrite: bool = False,
     ) -> list[dict]:
         """混合检索：BGE-M3 dense + BM25(RRF 融合) → parent-context 展开 → CrossEncoder 重排.
 
         编排细节委托 :class:`KnowledgeRetriever`（检索边界），本方法只做审计与返回。
+        query_rewrite=True 时启用 Query 改写（multi_query 扩展召回，LLM 不可用时降级）。
         """
-        hits = self._retriever.search_with_meta(topic_slug, query, top_k=top_k, min_score=min_score, filters=filters)
+        hits = self._retriever.search_with_meta(
+            topic_slug,
+            query,
+            top_k=top_k,
+            min_score=min_score,
+            filters=filters,
+            query_rewrite=query_rewrite,
+        )
         self._audit(
             "retrieve",
             topic_slug=topic_slug,

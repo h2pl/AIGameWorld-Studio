@@ -260,8 +260,6 @@ select#topic_select {
         <div class="inline-flex" style="gap:1rem; align-items:center;">
           <input id="top_k" type="range" min="1" max="20" value="5">
           <span id="top_k_label" class="tag tag-score">5</span>
-          <input id="min_score" type="range" min="0" max="100" value="20">
-          <span id="min_label" class="text-muted small">min score 0.20</span>
         </div>
       </div>
       <div style="margin-top: 1rem; display:flex; gap:.75rem; align-items:center; flex-wrap:wrap;">
@@ -557,8 +555,6 @@ document.getElementById('bw_unbind').onclick = async ()=>{
 const queryEl = document.getElementById('query');
 const topKEl = document.getElementById('top_k');
 const topKLabel = document.getElementById('top_k_label');
-const minEl = document.getElementById('min_score');
-const minLabel = document.getElementById('min_label');
 const resultArea = document.getElementById('result_area');
 const statsArea = document.getElementById('stats_area');
 const statusEl = document.getElementById('status');
@@ -568,10 +564,6 @@ const statsBtn = document.getElementById('stats_btn');
 const clearBtn = document.getElementById('clear_btn');
 
 topKEl.addEventListener('input', e=> topKLabel.textContent = e.target.value);
-minEl.addEventListener('input', e=>{
-  const v = (Number(e.target.value)/100).toFixed(2);
-  minLabel.textContent = 'min score ' + v;
-});
 
 function setStatus(s, kind){
   statusEl.textContent = s;
@@ -610,7 +602,6 @@ async function doSearch(){
       body: JSON.stringify({
         query: q,
         top_k: Number(topKEl.value),
-        min_score: Number(minEl.value)/100,
       })
     });
     const t = ((Date.now()-start)/1000).toFixed(2);
@@ -625,7 +616,7 @@ async function doSearch(){
 }
 
 function renderHits(hits){
-  if (!hits.length){ resultArea.innerHTML = `<div class="empty">无结果（可能所有 chunk 的 score 低于 min_score，试试把 min_score 调低）</div>`; return; }
+  if (!hits.length){ resultArea.innerHTML = `<div class="empty">无结果（知识库暂无匹配内容，可尝试更换关键词，或确认是否已索引该文档）</div>`; return; }
   resultArea.innerHTML = hits.map((h,i)=>{
     const m = h.metadata || {};
     const title = KB.escape(m.title||m.file_name||'(无标题)');

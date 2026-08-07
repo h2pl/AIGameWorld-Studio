@@ -339,8 +339,15 @@ class KnowledgeReader:
 
     @classmethod
     def _get_reader_for_ext(cls, ext: str):
-        """延迟导入 reader 类（避免启动时触发不存在的包）."""
+        """延迟导入 reader 类（避免启动时触发不存在的包）.
+
+        PDF 优先用 ``UnstructuredReader``（语义化切分，保留标题/表格/列表结构），
+        未安装 ``unstructured`` 时降级到 LlamaIndex 原生 ``PDFReader``（pypdf 文本提取）。
+        """
         if ext in (".pdf",):
+            reader = cls._try_unstructured_pdf_reader()
+            if reader is not None:
+                return reader
             from llama_index.readers.file import PDFReader
 
             return PDFReader()
@@ -353,6 +360,70 @@ class KnowledgeReader:
 
             return FlatReader()
         return None
+
+    @staticmethod
+    def _try_unstructured_pdf_reader():
+        """尝试构造 Unstructured PDF 解析器（语义化切分，稳定无联网）。
+
+        稳健性约束（踩坑记录）：
+        - LlamaIndex 的 ``UnstructuredReader`` 内部走 ``unstructured.partition.auto``，默认
+          会尝试 ``hi_res`` 策略并**联网下载 detection 模型**；在受限/离线环境下会卡死、
+          甚至触发 C 级 Segmentation fault（Python 层 try/except 无法捕获，直接杀进程，
+          连 pypdf 兜底都走不到）。
+        - 因此这里**不依赖 llama-index 的 UnstructuredReader**，而是直接封装
+          ``unstructured.partition.pdf.partition_pdf`` 并固定 ``strategy="fast"``：纯 pdfminer
+          本地解析，不下载模型、不联网，稳定且仍产出 Title/Header/Table/ListItem 等语义元素。
+        - 探测 ``unstructured_inference`` 是否可导入：该包在 Windows 上被 unstructured 标记为
+          ``sys_platform != 'win32'`` 而默认排除，缺失时本地 PDF 解析会崩溃。不可用则直接
+          返回 ``None``，交给 pypdf 兜底，避免 segfault 拖垮整个索引进程。
+
+        返回的 reader 兼容 ``_load_one_file`` 的 ``reader.load_data(file=fp)`` 调用约定，
+        返回 ``list[LlamaIndex Document]``（每个语义元素一个 Document）。
+        """
+
+        # 探测 unstructured 主包 + 底层推理依赖；任一缺失则降级 pypdf
+        try:
+            import unstructured_inference  # noqa: F401  (本地解析必需，win32 默认被排除)
+            from unstructured.partition.pdf import partition_pdf  # type: ignore
+        except Exception:
+            return None
+
+        from llama_index.core import Document
+
+        class _UnstructuredPDFReader:
+            """轻量 PDF 语义解析器：直接调 partition_pdf(fast)，避免 auto/hi_res 联网崩溃."""
+
+            def load_data(self, file, **_kwargs) -> list[Document]:
+                path = str(file)
+                elements = partition_pdf(
+                    path,
+                    strategy="fast",
+                    pdf_infer_table_structure=False,
+                )
+                docs: list[Document] = []
+                for el in elements:
+                    text = getattr(el, "text", None) or ""
+                    if not text.strip():
+                        continue
+                    # el.metadata 是 ElementMetadata 对象（非 dict），需 to_dict() 后再清洗
+                    raw_meta = getattr(el, "metadata", None)
+                    if hasattr(raw_meta, "to_dict"):
+                        meta = raw_meta.to_dict() or {}
+                    elif isinstance(raw_meta, dict):
+                        meta = raw_meta
+                    else:
+                        meta = {}
+                    page = meta.get("page_number")
+                    meta = {k: v for k, v in meta.items() if isinstance(k, str)}
+                    if page is not None:
+                        try:
+                            meta["page_number"] = int(page)
+                        except TypeError, ValueError:
+                            pass
+                    docs.append(Document(text=text, metadata=meta))
+                return docs
+
+        return _UnstructuredPDFReader()
 
     @staticmethod
     def infer_chronicle_volume(file_name: str) -> str | None:
@@ -520,7 +591,12 @@ class KnowledgeReader:
         out: list[Document] = []
         for idx, d in enumerate(sub_docs):
             meta = dict(d.metadata or {})
-            page_num = int(meta.get("page_label") or (idx + 1))
+            # 兼容多来源 page 字段：Unstructured 用 ``page_number``，pypdf/PDFReader 用 ``page_label``
+            _raw_page = meta.get("page_number") or meta.get("page_label")
+            try:
+                page_num = int(_raw_page) if _raw_page is not None else (idx + 1)
+            except TypeError, ValueError:
+                page_num = idx + 1
             meta.update(
                 {
                     "file_path": str(fp),

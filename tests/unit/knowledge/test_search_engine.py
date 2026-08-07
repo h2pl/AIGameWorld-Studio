@@ -114,3 +114,66 @@ class TestSearchWithMeta:
         f = r.build_qdrant_filter("test_world", {"source_type": ["lore", "documents"]})
         assert isinstance(f, MetadataFilters)
         assert f.filters[0].operator == FilterOperator.IN
+
+
+class TestParentChildExpand:
+    """父子切分：命中子块时回拉父块完整文本作为上下文."""
+
+    def _insert_parent(self, retriever, parent_id: str, parent_text: str) -> None:
+        """插入一条父块记录（meta_json 含完整文本）."""
+        import json
+
+        r = retriever[0]
+        store = r._store
+        store.execute(
+            "INSERT INTO kb_document (id, topic_id, title, source_type, file_name, file_path, "
+            "file_size, sha256, content_type, version, status, created_by, related_packs, tags_json) "
+            "VALUES (?, 'test_world', 'p', 'lore', 'p.md', '/p.md', 0, 'x', 'markdown', 1, 'done', "
+            "'test', '[]', '[]')",
+            (f"doc_{parent_id}",),
+        )
+        store.execute(
+            "INSERT INTO kb_chunk (id, document_id, topic_id, chunk_index, chunk_count, text_hash, "
+            "text_preview, token_count, page_number, meta_json, created_at, chunk_level, parent_id) "
+            "VALUES (?, ?, 'test_world', 0, 1, 'h', ?, 0, NULL, ?, "
+            "strftime('%Y-%m-%d %H:%M:%S','now'), 'parent', NULL)",
+            (
+                parent_id,
+                f"doc_{parent_id}",
+                parent_text[:200],
+                json.dumps({"chunk_level": "parent", "text": parent_text}, ensure_ascii=False),
+            ),
+        )
+
+    def test_child_hit_expands_to_parent(self, retriever):
+        """命中子块（chunk_level=child, 带 parent_id）→ 返回父块完整文本."""
+        r = retriever[0]
+        parent_id = "parent_chunk_001"
+        parent_text = (
+            "完整的父块上下文：蒙德城由西风骑士团守护，是自由之都，风神巴巴托斯眷顾这片土地，居民世代安居乐业。"
+        )
+        self._insert_parent(retriever, parent_id, parent_text)
+
+        child_meta = {
+            "chunk_level": "child",
+            "parent_id": parent_id,
+            "chunk_id": "child_chunk_001",
+        }
+        child_text = "西风骑士团守护蒙德"
+        expanded = r._expand_parent_context(child_meta, child_text, "child_chunk_001")
+        # 返回父块完整文本（含子块未涵盖的上下文）
+        assert "完整的父块上下文" in expanded
+        assert "风神巴巴托斯" in expanded
+        assert len(expanded) > len(child_text)
+
+    def test_non_child_returns_original(self, retriever):
+        """非子块（单层 chunk）返回原文本，不触发回拉."""
+        r = retriever[0]
+        meta = {"chunk_level": "parent", "chunk_id": "p1"}
+        assert r._expand_parent_context(meta, "原文", "p1") == "原文"
+
+    def test_child_missing_parent_falls_back(self, retriever):
+        """子块 parent_id 指向不存在的父块 → 降级返回子块原文."""
+        r = retriever[0]
+        meta = {"chunk_level": "child", "parent_id": "not_exists"}
+        assert r._expand_parent_context(meta, "子块原文", "c1") == "子块原文"

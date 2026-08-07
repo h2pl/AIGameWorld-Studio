@@ -186,14 +186,20 @@ class KnowledgeRetriever:
             nodes: list[NodeWithScore] = ensemble.retrieve(QueryBundle(query_str=query))
         except Exception as e:  # noqa: BLE001
             _log.warning("[kb] Ensemble 检索失败，退回纯 dense: %s", e)
-            nodes = (
-                self._get_index(topic_slug, pipeline)
-                .as_retriever(
-                    similarity_top_k=max(top_k * 3, 20),
-                    filters=self.build_qdrant_filter(topic_slug, filters),
+            try:
+                nodes = (
+                    self._get_index(topic_slug, pipeline)
+                    .as_retriever(
+                        similarity_top_k=max(top_k * 3, 20),
+                        filters=self.build_qdrant_filter(topic_slug, filters),
+                    )
+                    .retrieve(QueryBundle(query_str=query))
                 )
-                .retrieve(QueryBundle(query_str=query))
-            )
+            except Exception as e2:  # noqa: BLE001
+                # 常见原因：Qdrant collection 不存在（该 topic 尚未建索引/向量未写入）。
+                # 不应让 404 崩溃整个检索请求，优雅返回空结果。
+                _log.warning("[kb] 纯 dense 检索也失败（可能 collection 未建索引）topic=%s: %s", topic_slug, e2)
+                nodes = []
 
         # ── 2) Cross-Encoder 重排（bge-reranker-v2-m3，HuggingFaceRerank 已下架，改用 CrossEncoder） ──
         reranked = self._rerank(query, nodes, top_k=top_k)

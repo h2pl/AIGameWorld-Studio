@@ -418,12 +418,29 @@ class KnowledgePipeline:
         _texts = [n.get_content() for n in nodes]
         # 分批 batch encode（主线程，绕开 llama-index tenacity 子线程）+ KeyboardInterrupt 重试。
         # batch=64：用户终端实测键盘中断来自 IDE 环境而非 batch，用大 batch 提升 CPU 吞吐。
-        # 保留 KeyboardInterrupt 重试兜底（最多 3 次）应对 IDE 环境偶发 SIGINT。
+        # 保留 KeyboardInterrupt 重试兜底应对 IDE 环境偶发 SIGINT。
+        # ⚠️ 关键：每完成一个 batch 都打印进度日志。embed 是 CPU 长耗时推理，单批可能要
+        #   几十秒~几分钟，期间"无日志"只是因为正在算，不代表卡死/进程死了——切勿据此 kill 进程。
         embed_batch = min(self._embedding_model.embed_batch_size or 64, 64)
+        _total_texts = len(_texts)
         _embeddings: list = []
-        for chunk_start in range(0, len(_texts), embed_batch):
+        logger.info("[kb] 开始 embedding 共 %d 个 chunk，batch_size=%d", _total_texts, embed_batch)
+        for _batch_no, chunk_start in enumerate(range(0, _total_texts, embed_batch), start=1):
             chunk_texts = _texts[chunk_start : chunk_start + embed_batch]
-            for encode_attempt in range(3):
+            logger.info(
+                "[kb] ▶ 编码 batch %d/%d（chunk %d~%d / 共 %d）...",
+                _batch_no,
+                (max(_total_texts - 1, 0) // embed_batch) + 1,
+                chunk_start,
+                min(chunk_start + embed_batch, _total_texts) - 1,
+                _total_texts,
+            )
+            # IDE 命令环境（Windows）会在 embed 长耗时推理期间向进程组发 SIGINT，
+            # 触发 KeyboardInterrupt，导致整批索引静默中断。这里改为**无限重试**，
+            # 每次中断后短暂停顿再重试同一 batch，直到成功——避免索引半途而废。
+            # （真实错误如 OOM 会抛出非 KeyboardInterrupt 异常，照常上抛。）
+            encode_attempt = 0
+            while True:
                 try:
                     emb_array = self._embedding_model._model.encode(
                         chunk_texts, batch_size=embed_batch, show_progress_bar=False
@@ -431,12 +448,22 @@ class KnowledgePipeline:
                     _embeddings.extend(emb_array.tolist())
                     break
                 except KeyboardInterrupt:
-                    if encode_attempt == 2:
-                        raise
+                    encode_attempt += 1
                     logger.warning(
-                        "[kb] batch encode 被 KeyboardInterrupt 中断（第%d次），重试...",
-                        encode_attempt + 1,
+                        "[kb] ⚠ batch %d encode 被 KeyboardInterrupt 中断（第%d次），重试同一 batch...",
+                        _batch_no,
+                        encode_attempt,
                     )
+                    # 短暂停顿，避免被连续 SIGINT 空转烧 CPU
+                    import time as _t
+
+                    _t.sleep(1.0)
+            logger.info(
+                "[kb] ✅ batch %d 完成，已编码 %d/%d 个 chunk",
+                _batch_no,
+                len(_embeddings),
+                _total_texts,
+            )
         for n, e in zip(nodes, _embeddings):
             try:
                 object.__setattr__(n, "embedding", e)

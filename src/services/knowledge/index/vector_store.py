@@ -21,12 +21,22 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sqlite3
 import struct
 import threading
 from collections.abc import Sequence
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+
+from llama_index.core.schema import TextNode
+from llama_index.core.vector_stores.types import (
+    BasePydanticVectorStore,
+    VectorStoreQuery,
+    VectorStoreQueryResult,
+)
+from pydantic import PrivateAttr
 
 
 # 向量存储实现
@@ -305,16 +315,6 @@ class SQLiteVectorStore:
 # LlamaIndex IngestionPipeline 能用的 VectorStore 接口。
 # ============================================================================
 
-import os
-from dataclasses import dataclass, field
-
-from llama_index.core.schema import TextNode
-from llama_index.core.vector_stores.types import (
-    BasePydanticVectorStore,
-    VectorStoreQuery,
-    VectorStoreQueryResult,
-)
-
 
 class _SQLiteLlamaStoreAdapter(BasePydanticVectorStore):
     """把自定义 SQLiteVectorStore 适配成 LlamaIndex 原生 ``BasePydanticVectorStore``.
@@ -324,9 +324,17 @@ class _SQLiteLlamaStoreAdapter(BasePydanticVectorStore):
 
     ``kb_chunk`` 业务表双写通过 ``kb_writer`` 回调完成：LlamaIndex 在 ``pipeline.run()``
     时自动调用 ``add()``，回调把 node 映射成业务行写入 SQLite——不再是手写并行循环。
+
+    实现要点：用 pydantic ``PrivateAttr`` 声明所有 ``_`` 前缀实例属性（store / collection_name
+    等），并调用 ``super().__init__(stores_text=True)`` 初始化 LlamaIndex 契约字段
+    （``stores_text`` 是 ``BasePydanticVectorStore`` 的字段，框架在
+    ``VectorStoreIndex.from_vector_store`` 时会读取）。这是 pydantic v2 的原生约定写法。
     """
 
-    stores_text: bool = True
+    _store: SQLiteVectorStore = PrivateAttr()
+    _collection_name: str = PrivateAttr()
+    _kb_writer: Any = PrivateAttr(default=None)
+    _topic_id: Any = PrivateAttr(default=None)
 
     def __init__(
         self,
@@ -350,6 +358,9 @@ class _SQLiteLlamaStoreAdapter(BasePydanticVectorStore):
         topic_id : str | None
             主题 ID，透传给 kb_writer 使用。
         """
+        # 先调用 pydantic 基类构造，初始化契约字段（stores_text 等）
+        super().__init__(stores_text=True)
+        # 再用 PrivateAttr 机制赋值（pydantic v2 下 _ 属性必须走 PrivateAttr 才能正常读写）
         self._store = store
         self._collection_name = collection_name
         self._kb_writer = kb_writer
@@ -503,10 +514,11 @@ class KBVectorStoreFactory:
         if self.backend == "qdrant":
             try:
                 from llama_index.vector_stores.qdrant import QdrantVectorStore
-                from qdrant_client import QdrantClient
+                from qdrant_client import AsyncQdrantClient, QdrantClient
 
                 client = QdrantClient(url=self.qdrant_url, api_key=self.qdrant_api_key)
-                vs = QdrantVectorStore(client=client, collection_name=collection)
+                aclient = AsyncQdrantClient(url=self.qdrant_url, api_key=self.qdrant_api_key)
+                vs = QdrantVectorStore(client=client, aclient=aclient, collection_name=collection)
                 self._per_topic[cache_key] = vs
                 return vs
             except Exception as e:

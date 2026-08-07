@@ -10,8 +10,8 @@ from pathlib import Path
 
 import pytest
 
-from src.services.knowledge.pipeline import KnowledgePipeline
-from src.services.knowledge.vector_store import KBVectorStoreFactory
+from src.services.knowledge.index.vector_store import KBVectorStoreFactory
+from src.services.knowledge.ingest.pipeline import KnowledgePipeline
 from src.utils.sqlite_store import SQLiteStore
 
 
@@ -48,7 +48,7 @@ class TestPipelineIngest:
         from llama_index.core import Document
 
         doc = Document(
-            text="蒙德城是自由之都。",
+            text="蒙德城是自由之都，是提瓦特大陆上七座主要城邦之一，由七位神明之一的尘世执政所统治。",
             metadata={"file_path": str(pipeline._factory.project_root / "x.txt"), "title": "x"},
         )
         pipeline.ingest([doc])

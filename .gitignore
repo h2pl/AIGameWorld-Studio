@@ -70,3 +70,16 @@ license.txt
 # 工作目录运行数据（不提交）
 /.cache/
 /.workbuddy/
+
+# Multi-agent skills 工作区目录（IDE/agent 工具数据，不提交）
+/.agents/
+/.claude/
+/.codebuddy/
+/.hermes/
+/.kiro/
+/.qoder/
+/.qwen/
+/.trae/
+/.windsurf/
+/skills/
+/skills-lock.json

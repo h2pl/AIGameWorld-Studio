@@ -13,6 +13,7 @@ dependencies = [
     "python-dotenv>=1.0",
     "pillow>=11.0",
     "openai>=1.0",
+    "mcp>=1.9",                       # 知识库 MCP server（FastMCP，stdio transport）
     "pytiled-parser>=2.2.9",
     "llama-index-core>=0.14.23",
     "llama-index-embeddings-huggingface>=0.7.0",
@@ -34,6 +35,12 @@ dependencies = [
     "curl-cffi>=0.15.0",
     "pypdf>=6.14.2",
     "llama-index-readers-file>=0.6.0",
+    "bm25s>=0.3.10",                      # Pure-Python BM25 engine (LlamaIndex's official BM25 backend; lexical leg of hybrid search)
+    "jieba>=0.42.1",                      # Chinese tokenizer for BM25 (framework-native, no SQLite self-implementation)
+    # Cross-encoder rerank 用 sentence-transformers.CrossEncoder(BAAI/bge-reranker-v2-m3)
+    # （LlamaIndex 的 llama-index-postprocessor-huggingface-rerank 集成包已从 PyPI 下架，
+    #  其底层即 sentence_transformers.CrossEncoder，故直接用该官方后端，非自研算法）
+    "langchain-text-splitters>=0.3.0", # PDF-aware RecursiveCharacter chunking
 ]
 
 [dependency-groups]

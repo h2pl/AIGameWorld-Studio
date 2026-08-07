@@ -16,7 +16,7 @@ sys.path.insert(0, str(ROOT))
 
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding  # noqa: E402
 
-from src.services.knowledge.pipeline import _resolve_bge_m3_model_name  # noqa: E402
+from src.services.knowledge.ingest.pipeline import _resolve_bge_m3_model_name  # noqa: E402
 
 _model_path = _resolve_bge_m3_model_name()
 print(f"[bench] model = {_model_path}")

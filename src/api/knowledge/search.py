@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 
+from ...services.knowledge.jobs import JobConflictError
 from . import schemas
 from .deps import get_knowledge_manager, require_topic
 
@@ -76,12 +77,15 @@ def index_now(
     topic: str = Depends(require_topic),
     kb=Depends(get_knowledge_manager),
 ) -> schemas.IndexResponse:
-    # 1. 创建异步任务记录（返回 job_id 供前端轮询）
-    r = kb.index_async(topic, force=body.force)
+    # 1. 创建异步任务记录（返回 job_id 供前端轮询；冲突则 409）
+    try:
+        r = kb.job_runner.index_async(topic, force=body.force)
+    except JobConflictError as exc:
+        raise HTTPException(409, detail=str(exc))
     job_id = r.get("job_id") or ""
 
-    # 2. 注册后台执行：实际索引逻辑在 _run_index_job 中
-    background_tasks.add_task(kb._run_index_job, topic, job_id, force=body.force)
+    # 2. 注册后台执行：实际索引逻辑在 job_runner.run_index_job 中
+    background_tasks.add_task(kb.job_runner.run_index_job, topic, job_id, force=body.force)
 
     # 3. 立即返回 202（前端用 job_id 轮询 GET /{topic}/jobs）
     return schemas.IndexResponse(

@@ -53,7 +53,7 @@ for f in files:
     _log.info("  - %s (%.2f MB)", f.name, f.stat().st_size / 1024 / 1024)
 
 # ── 诊断：monkey-patch _upsert_document_meta 打印单步耗时，定位瓶颈 ──
-from src.services.knowledge.pipeline import KnowledgePipeline  # noqa: E402
+from src.services.knowledge.ingest.pipeline import KnowledgePipeline  # noqa: E402
 
 _orig_upsert = KnowledgePipeline._upsert_document_meta
 

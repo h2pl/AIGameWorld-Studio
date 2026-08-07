@@ -4,6 +4,7 @@
 # 标准库导入
 import argparse
 import asyncio
+import os
 import sys
 from pathlib import Path
 
@@ -119,6 +120,30 @@ async def _main() -> int:
     )
     srv.add_argument("--port", type=int, default=8888, help="端口 (default: 8888)")
 
+    # === mcp 子命令：知识库 MCP server（stdio，供主项目 AIGameWorld backend 连接）===
+    mcp_cmd = sub.add_parser(
+        "mcp",
+        help="知识库 MCP server（stdio）/ Knowledge-base MCP server (stdio)",
+        epilog=(
+            "示例:\n"
+            "  aw-studio mcp            # 以 stdio 启动 MCP server，被主项目 client 拉起\n"
+            "  python -m src.mcp_server # 等价"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    mcp_cmd.add_argument(
+        "--data-dir",
+        type=Path,
+        default=Path("data"),
+        help="SQLite / 数据根目录 (default: data)",
+    )
+    mcp_cmd.add_argument(
+        "--vector-store",
+        type=str,
+        default=None,
+        help="向量库后端 qdrant|chroma|sqlite（默认读 KB_VECTOR_STORE，否则 qdrant）",
+    )
+
     # ── kb: knowledge base ──────────────────────────────────────────
     kb = sub.add_parser(
         "kb",
@@ -223,6 +248,10 @@ async def _main() -> int:
         args = _interactive_prompt(gen, args)
         if args is None:
             return 0  # 用户取消 / User cancelled
+
+    # mcp 子命令分发：设置环境变量后启动 MCP server（stdio）
+    if args.command == "mcp":
+        return await _mcp(args)
 
     # kb 子命令分发：按 kb_command 映射到对应 handler
     if args.command == "kb":
@@ -379,6 +408,23 @@ async def _serve(args) -> int:
     from src.serve import run
 
     run(args.path, port=args.port)
+    return 0
+
+
+# mcp 命令 handler：设置环境后启动知识库 MCP server（stdio）
+async def _mcp(args) -> int:
+    """启动知识库 MCP server（stdio transport）.
+
+    被主项目 AIGameWorld backend 作为独立进程拉起；通过环境变量把
+    data-dir / vector-store 透传给 src.mcp_server 的构造逻辑。
+    """
+    if args.data_dir:
+        os.environ["STUDIO_DATA_DIR"] = str(Path(args.data_dir).resolve())
+    if getattr(args, "vector_store", None):
+        os.environ["KB_VECTOR_STORE"] = args.vector_store
+    from src.mcp_server import main as mcp_main
+
+    mcp_main()
     return 0
 
 

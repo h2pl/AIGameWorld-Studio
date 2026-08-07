@@ -12,6 +12,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
 
+from ...services.knowledge.jobs import JobConflictError
 from ...services.knowledge.manager import KnowledgeManager
 
 # ---- 子模块导入 ----
@@ -60,13 +61,16 @@ async def ingest_files(
 
     file_paths = [Path(p) for p in body.file_paths]
 
-    # 2. 创建异步任务记录
-    r = kb.index_async(topic, force=False)
+    # 2. 创建异步任务记录（冲突则 409）
+    try:
+        r = kb.job_runner.index_async(topic, force=False)
+    except JobConflictError as exc:
+        raise HTTPException(409, detail=str(exc))
     job_id = r.get("job_id") or ""
 
     # 3. 注册后台执行（调 ingest_files，一步到位）
     background_tasks.add_task(
-        kb._run_ingest_files_job,
+        kb.job_runner.run_ingest_files_job,
         topic,
         job_id,
         file_paths,

@@ -28,10 +28,10 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-# LlamaIndex 生态：Document / Pipeline / Splitter / Embedding
+# LlamaIndex 生态：Document / Pipeline / Node / Embedding
 from llama_index.core import Document
 from llama_index.core.ingestion import IngestionPipeline
-from llama_index.core.node_parser import SentenceSplitter
+from llama_index.core.schema import TextNode
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 
 # TEI 嵌入后端（可选）：仅当启用 TEI 时才需要。
@@ -41,11 +41,11 @@ try:  # pragma: no cover - 可选依赖
 except Exception:  # noqa: BLE001
     TextEmbeddingsInference = None  # type: ignore[assignment]
 
-from ...utils.sqlite_store import SQLiteStore  # noqa: F401  (对外暴露类型)
+from ....utils.sqlite_store import SQLiteStore  # noqa: F401  (对外暴露类型)
+from ..index.vector_store import KBVectorStoreFactory
 
 # 本地模块导入
 from .reader import KnowledgeReader
-from .vector_store import KBVectorStoreFactory
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +72,50 @@ def _resolve_bge_m3_model_name() -> str:
                 latest = max(snapshots, key=lambda p: p.stat().st_mtime)
                 return str(latest)
     return "BAAI/bge-m3"
+
+
+# ----------------------------------------------------------------------------
+# 进程级 BGE-M3 模型单例缓存
+# ----------------------------------------------------------------------------
+# 问题根因：HuggingFaceEmbedding 每次 KnowledgePipeline.__init__ 都会重新
+# load_weights（BGE-M3 有 391 个权重分片，冷加载约 15s）。在 Windows 上，
+# 模型冷加载期间如果进程收到 SIGINT（IDE「停止」按钮 / Ctrl+C / 后台窗口关闭），
+# load_weights 会被中断，触发 llama_index 的重试逻辑 → 又慢加载 → 又被中断，
+# 表现为「进程卡死无输出」。
+#
+# 修复：把底层 SentenceTransformer 模型做成进程级单例，第一次加载后缓存，
+# 之后所有 KnowledgePipeline 实例复用，不再重复 load_weights。这样：
+#   1) 冷加载只发生一次（即便是首跑，加载完就稳了）；
+#   2) 后续 ingest（重建索引 / 多 topic）几乎零等待，不再暴露于 SIGINT 窗口；
+#   3) pipeline 已通过 self._embedding_model._model.encode(...) 直接调用，
+#      复用同一底层模型对象完全兼容。
+# ----------------------------------------------------------------------------
+_BGE_MODEL_CACHE: dict[str, Any] = {}
+
+
+def _get_cached_bge_model(model_name: str, *, local_files_only: bool = False) -> Any:
+    """返回进程级缓存的 SentenceTransformer 实例（首次加载后复用）.
+
+    Parameters
+    ----------
+    model_name : str
+        HuggingFace 模型名或本地路径（如 ``BAAI/bge-m3`` 或离线 snapshot 路径）。
+    local_files_only : bool
+        本地优先（离线）模式，不联网解析 revision。
+    """
+    key = f"{model_name}::{local_files_only}"
+    cached = _BGE_MODEL_CACHE.get(key)
+    if cached is not None:
+        return cached
+    # 懒导入，避免未安装 sentence_transformers 时影响模块导入
+    from sentence_transformers import SentenceTransformer
+
+    load_kwargs: dict[str, Any] = {"trust_remote_code": True}
+    if local_files_only:
+        load_kwargs["local_files_only"] = True
+    model = SentenceTransformer(model_name, **load_kwargs)
+    _BGE_MODEL_CACHE[key] = model
+    return model
 
 
 def _resolve_tei_url() -> str | None:
@@ -122,6 +166,8 @@ class KnowledgePipeline:
         # 保存切分参数，供 ingest 里手动切 chunk + 逐条 embed 使用
         self._chunk_size = chunk_size
         self._chunk_overlap = chunk_overlap
+        # 记录被"更新"替换掉的旧版本 doc_id（用于清理其残留 chunks）
+        self._obsolete_doc_ids: list[str] = []
 
         # BGE-M3 本地路径（ModelScope / HuggingFace 下载缓存）
         # 不硬编码 snapshot 目录名，离线优先探测本地缓存，避免：
@@ -130,52 +176,58 @@ class KnowledgePipeline:
         #   - 本地无缓存时走联网下载（离线环境会超时/失败）。
         _bge_path = _resolve_bge_m3_model_name()
 
-        splitter = SentenceSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
-        splitter.include_metadata = True
-        splitter.include_prev_next_rel = True
-        try:
-            splitter.excluded_embed_metadata_keys = []
-            splitter.excluded_llm_metadata_keys = []
-        except Exception:
-            pass
+        # 切分：恢复 LlamaIndex 原生 SentenceSplitter 作为 IngestionPipeline 的 transformation，
+        # 由框架负责「按语义边界切 + 注入 chunk 的 prev/next 关系元数据（include_prev_next_rel）」。
+        # 这样检索端的 parent-context 展开应优先用框架内置的 node.relationships，而非手写 SQL 回拉。
+        # 保留 chunk_size / chunk_overlap 作为字符窗口参数。
+        self._chunk_size = chunk_size
+        self._chunk_overlap = chunk_overlap
 
         # 离线优先：本地缓存命中时不走网络解析 revision
-        # ⚠️ embed_batch_size 不能设太大：崩溃由"单批 encode 总 token 量"决定（机器相关阈值）。
-        #   实测本机 batch=8×(chunk 800字符)=6400 字符稳定，batch=12 即崩 KeyboardInterrupt。
-        #   设为 8 保证 llama-index 内部批量调用也远小于机器可承受量。（曾用 64 导致必崩）
-        _embed_kwargs: dict[str, Any] = {"trust_remote_code": True, "embed_batch_size": 8}
-        if _bge_path != "BAAI/bge-m3":
-            _embed_kwargs["local_files_only"] = True
+        # batch_size=64：在用户本地终端实测，BGE-M3 CPU 大 batch 吞吐更高。
+        #   （之前 8 是怀疑 KeyboardInterrupt 与大 batch 相关而保守降低；用户在终端跑
+        #    证明 KeyboardInterrupt 来自 IDE 命令环境，非 batch 大小。用 64 提升吞吐）
 
         def _build_local_model() -> HuggingFaceEmbedding:
-            """构建本地 HuggingFaceEmbedding，带 KeyboardInterrupt 重试.
+            """构建本地 HuggingFaceEmbedding，进程级缓存整个实例.
 
-            pypdf 在 Python 3.14+Windows 上解析 PDF 后会污染进程信号状态，
-            导致后续 tokenizer 加载偶发抛 KeyboardInterrupt（本质是 C 扩展崩溃）。
-            这里加重试（最多 3 次），通常第 2 次即可成功。
+            根因修复：原先每次 KnowledgePipeline.__init__ 都会让 HuggingFaceEmbedding
+            重新 load_weights（BGE-M3 共 391 个权重分片，冷加载约 15s）。Windows 上
+            模型冷加载期间若收到 SIGINT（IDE「停止」/Ctrl+C/后台窗口关闭），
+            load_weights 被中断 → llama_index 重试 → 又慢加载 → 又被中断，表现为
+            「进程卡死无输出」。
+
+            现在把整个 HuggingFaceEmbedding 实例做进程级缓存：第一次构造时完成
+            load_weights，之后所有 KnowledgePipeline 实例直接复用同一对象，彻底跳过
+            重复的权重加载与 SIGINT 暴露窗口。底层 SentenceTransformer 也走
+            _get_cached_bge_model 单例，双重保险。
             """
-            last_err: BaseException | None = None
-            for attempt in range(3):
-                try:
-                    return HuggingFaceEmbedding(model_name=_bge_path, **_embed_kwargs)
-                except KeyboardInterrupt:
-                    last_err = KeyboardInterrupt()
-                    if attempt < 2:
-                        logger.warning(
-                            "[kb] BGE-M3 加载被 KeyboardInterrupt 中断（第%d次），重试...",
-                            attempt + 1,
-                        )
-                        continue
-                    raise
-                except Exception as e:
-                    last_err = e
-                    break  # Exception 类错误不重试，直接 fallback
-            # 重试 3 次仍失败（KeyboardInterrupt）或遇到 Exception → fallback 联网下载
-            logger.warning(
-                "[kb] BGE-M3 本地加载失败 (%s)，回退联网下载模式（需可访问 HuggingFace）",
-                last_err,
-            )
-            return HuggingFaceEmbedding(model_name="BAAI/bge-m3", trust_remote_code=True, embed_batch_size=64)
+            _cache_key = f"hf::{_bge_path}::64"
+            _cached_emb = _BGE_MODEL_CACHE.get(_cache_key)
+            if _cached_emb is not None:
+                return _cached_emb
+            # 预载底层 SentenceTransformer（进程级单例，冷加载一次）
+            _cached_model = _get_cached_bge_model(_bge_path, local_files_only=(_bge_path != "BAAI/bge-m3"))
+            # 构造 HuggingFaceEmbedding 外壳
+            _hf_kwargs: dict[str, Any] = {
+                "trust_remote_code": True,
+                "embed_batch_size": 64,
+                "model_name": _bge_path,
+            }
+            if _bge_path != "BAAI/bge-m3":
+                _hf_kwargs["local_files_only"] = True
+            try:
+                _emb = HuggingFaceEmbedding(**_hf_kwargs)
+            except Exception:
+                # 极小概率：本地路径构造失败，用占位构造再换底层模型
+                _emb = HuggingFaceEmbedding(model_name="BAAI/bge-m3", trust_remote_code=True, embed_batch_size=64)
+            # 用已缓存模型对象替换外壳内部 _model，确保零重复 load_weights
+            try:
+                object.__setattr__(_emb, "_model", _cached_model)
+            except Exception:
+                _emb._model = _cached_model
+            _BGE_MODEL_CACHE[_cache_key] = _emb
+            return _emb
 
         # TEI 可选后端：仅当显式配置 TEI_URL / config.yaml embedding.tei_url 时启用。
         # 默认（未配置）走本地模型，行为与原 develop 版本完全一致。
@@ -202,24 +254,89 @@ class KnowledgePipeline:
                     _bge_path,
                 )
 
-        # IMPORTANT：IngestionPipeline **不传 vector_store 参数**。
-        # 原因：LlamaIndex IngestionPipeline 的 pydantic schema 要求 vector_store 必须是
-        # BasePydanticVectorStore 子类，但是我们自定义的 _SQLiteLlamaStoreAdapter 不是；
-        # 同时 QdrantVectorStore 的版本兼容也会有校验风险。
-        # 因此我们在这里只让它执行 transformations = [splitter, embedding]，
-        # 生成完 nodes + embedding 后手动 vs.add(nodes) 写向量库（两步走）。
+        # IngestionPipeline：切分 + 嵌入两阶段都由 LlamaIndex 原生托管。
+        #   - SentenceSplitter：按语义边界切 chunk，并自动注入 prev/next 关系
+        #     （include_prev_next_rel=True），供检索端做 parent-context 展开时
+        #     直接读 node.relationships，无需手写 SQL 回拉相邻 chunk。
+        #   - embedding：BGE-M3。
+        from llama_index.core.node_parser import SentenceSplitter
+
+        self._text_splitter = SentenceSplitter(
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
+            include_metadata=True,
+            include_prev_next_rel=True,
+        )
         self._pipeline = IngestionPipeline(
             transformations=[
-                splitter,
+                self._text_splitter,
                 self._embedding_model,
             ],
         )
         # 独立拿 LlamaIndex VectorStore 对象（KBVectorStoreFactory 负责后端路由）
         self._vector_store = self._factory.get_vector_store(topic_id)
 
+        # 幂等确保 kb_chunk 有 page_number 列（PDF 页码感知；SQLite 不支持 IF NOT EXISTS）
+        if self._store is not None:
+            try:
+                self._store.execute("ALTER TABLE kb_chunk ADD COLUMN page_number INTEGER")
+            except Exception:
+                pass
+
+        # 进程内缓存最近一次 ingest 的 nodes（供检索端 BM25Retriever 使用）
+        self._last_nodes: list = []
+
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
+
+    # ------------------------------------------------------------------
+    # PDF 感知切分（LangChain RecursiveCharacterTextSplitter）
+    # ------------------------------------------------------------------
+
+    def _split_documents_pdf_aware(self, documents: list[Document]) -> list[TextNode]:
+        """切分：委托 LlamaIndex 原生 SentenceSplitter（IngestionPipeline 同款）.
+
+        - 由框架负责「按语义边界切 + 注入 chunk 的 prev/next 关系（include_prev_next_rel）」。
+        - 在框架切出的 node 上补充业务元数据：page_number / chunk_index / chunk_count。
+          PDF：reader 已给每个 Document 注入 ``page_number``（来自 page_label），
+          我们按同 page 的 node 批注 page_number，不跨页边界。
+        - 不在此做 embedding（embedding 在 ingest 里手写批量推理以规避 Windows 子线程不稳定）。
+
+        返回 LlamaIndex TextNode 列表（与后续 embedding 双写逻辑兼容）。
+        """
+        if not documents:
+            return []
+
+        # 用与 IngestionPipeline 相同的 SentenceSplitter 在内存里切（不触发框架 embedding）。
+        nodes = self._text_splitter.get_nodes_from_documents(documents)
+
+        # 补充业务元数据：page_number 来自 Document.metadata.page_label/page_number；
+        # chunk_index / chunk_count 在同 Document 内重排。
+        by_doc: dict[str, list[TextNode]] = {}
+        for n in nodes:
+            src = n.metadata.get("doc_id") or n.metadata.get("file_path") or "_"
+            by_doc.setdefault(src, []).append(n)
+        for doc_nodes in by_doc.values():
+            chunk_count = len(doc_nodes)
+            for idx, n in enumerate(doc_nodes):
+                meta = dict(n.metadata or {})
+                # PDF 页码：reader 注入的 page_label/page_number 透传到 chunk
+                page = meta.get("page_number") or meta.get("page_label")
+                try:
+                    page_num = int(page) if page is not None else None
+                except TypeError, ValueError:
+                    page_num = None
+                meta["chunk_index"] = idx
+                meta["chunk_count"] = chunk_count
+                if page_num is not None:
+                    meta["page_number"] = page_num
+                try:
+                    object.__setattr__(n, "metadata", meta)
+                except Exception:
+                    pass
+
+        return [n for n in nodes if (n.get_content() or "").strip()]
 
     # ingest：主入口 — 对 documents 依次执行 upsert_meta → pipeline.run → 写 kb_chunk 批量入库
     def ingest(
@@ -253,6 +370,8 @@ class KnowledgePipeline:
             return {"chunks": 0, "doc_ids": [], "chunk_ids": []}
 
         # 第一步：逐个 Document 写 kb_document 元数据，拿到 doc_id
+        # 重置被"更新"替换的旧 doc_id 记录（每次 ingest 独立）
+        self._obsolete_doc_ids = []
         doc_ids: list[str] = []
         for doc in documents:
             doc_id = self._upsert_document_meta(doc)
@@ -269,17 +388,38 @@ class KnowledgePipeline:
         #   get_text_embedding()（其内部 tenacity 重试 + 子线程在 Windows 上不稳定）。
         #   挂完 chunk_id + 业务 metadata + 写 kb_chunk 后再写向量库（保证 payload 完整）。
         self._ensure_vector_store_collection()
-        splitter = SentenceSplitter(chunk_size=self._chunk_size, chunk_overlap=self._chunk_overlap)
-        splitter.include_metadata = True
-        splitter.include_prev_next_rel = True
-        nodes = splitter.get_nodes_from_documents(documents)
+
+        # 2.5 步：幂等清理 —— 删除需要重建的 doc 的旧 chunks（SQLite + Qdrant），避免重复/残留。
+        #   - 本次 doc_id（复用旧 doc_id 的重复 ingest）→ 删旧 chunks 重建，防止 376→752 翻倍
+        #   - _obsolete_doc_ids（文件内容变化时被替换的旧版本 doc_id）→ 清掉残留 chunks
+        _cleanup_ids = list(doc_ids) + list(self._obsolete_doc_ids)
+        if self._store is not None and _cleanup_ids:
+            for _doc_id in _cleanup_ids:
+                _old = self._store.fetch_all("SELECT id FROM kb_chunk WHERE document_id = ?", (_doc_id,))
+                if not _old:
+                    continue
+                with self._store.transaction():
+                    self._store.execute("DELETE FROM kb_chunk WHERE document_id = ?", (_doc_id,))
+                # 同步删 Qdrant 该文档的旧 points（QdrantVectorStore.delete 按 doc_id 过滤）
+                try:
+                    self._vector_store.delete(ref_doc_id=_doc_id)
+                except Exception:
+                    logger.warning("[kb] 清理旧 Qdrant points 失败 doc_id=%s", _doc_id)
+
+        # PDF 感知切分：每个 Document（通常对应一页或一个文件）按段落结构切成
+        # TextNode，注入 page_number / chunk_index / chunk_count，不跨页边界。
+        nodes = self._split_documents_pdf_aware(documents)
+
+        # 过滤空/极短 chunk：PDF 的封面/版权/空白页会被切成空 node，无检索价值，不应入库。
+        #   否则检索会命中这些空 chunk（正文为空），且浪费 embedding。
+        min_chunk_chars = 10
+        nodes = [n for n in nodes if len((n.get_content() or "").strip()) >= min_chunk_chars]
+
         _texts = [n.get_content() for n in nodes]
         # 分批 batch encode（主线程，绕开 llama-index tenacity 子线程）+ KeyboardInterrupt 重试。
-        #   ⚠️ 关键：崩溃由"单批 encode 的总 token 量"决定，而非 batch 条数本身。
-        #     实测本机（12 核 / torch 6 线程）单批 ~8000 字符正常、~9600 字符即崩 KeyboardInterrupt。
-        #     chunk_size=800 时 batch=8 → 单批 6400 字符，稳定（batch=64 单批 51200 必崩）。
-        #     不同机器阈值不同：应保证 单批条数 × 每条字符数 远小于机器可承受量。
-        embed_batch = min(self._embedding_model.embed_batch_size or 64, 8)
+        # batch=64：用户终端实测键盘中断来自 IDE 环境而非 batch，用大 batch 提升 CPU 吞吐。
+        # 保留 KeyboardInterrupt 重试兜底（最多 3 次）应对 IDE 环境偶发 SIGINT。
+        embed_batch = min(self._embedding_model.embed_batch_size or 64, 64)
         _embeddings: list = []
         for chunk_start in range(0, len(_texts), embed_batch):
             chunk_texts = _texts[chunk_start : chunk_start + embed_batch]
@@ -331,6 +471,12 @@ class KnowledgePipeline:
                 node_meta["chunk_count"] = chunk_count
                 node_meta["text_hash"] = text_hash
                 node_meta["topic_id"] = self.topic_id
+                # 提取 page_number（PDF 感知切分写入的元数据），写入 kb_chunk.page_number 列
+                try:
+                    _pn = node_meta.get("page_number")
+                    page_number = int(_pn) if _pn is not None else None
+                except TypeError, ValueError:
+                    page_number = None
                 try:
                     object.__setattr__(node, "metadata", node_meta)
                 except Exception:
@@ -350,6 +496,7 @@ class KnowledgePipeline:
                         text_hash,
                         preview,
                         0,
+                        page_number,
                         meta_json,
                         SQLiteStore.now_str(),
                     )
@@ -363,8 +510,8 @@ class KnowledgePipeline:
                     """
                     INSERT OR REPLACE INTO kb_chunk
                         (id, document_id, topic_id, chunk_index, chunk_count,
-                         text_hash, text_preview, token_count, meta_json, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                         text_hash, text_preview, token_count, page_number, meta_json, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     all_chunk_rows,
                 )
@@ -384,6 +531,12 @@ class KnowledgePipeline:
         #   （256 条一批，避免 Qdrant gRPC/HTTP 包过大超时）
         for i in range(0, len(nodes), 256):
             self._vector_store.add(nodes[i : i + 256])
+
+        # 缓存本次 ingest 的 nodes（进程内），供检索端构建 LlamaIndex 原生
+        # ``BM25Retriever(nodes=...)`` 使用。BM25 是 in-memory lexical 检索，
+        # 必须持有节点列表；pipeline 本就按 topic 缓存在 KnowledgeManager 里，
+        # 重建索引（clear / 再次 ingest）会覆盖此缓存。
+        self._last_nodes = list(nodes)
 
         if on_embed_progress is not None:
             try:
@@ -611,6 +764,9 @@ class KnowledgePipeline:
             if sha_row and sha_row["sha256"] == sha256:
                 return existing["id"]
             # 哈希不一致 → 软删旧版本，version + 1
+            # 记录旧 doc_id，供 ingest 清理其残留 chunks（SQLite + Qdrant）
+            if existing["id"] not in self._obsolete_doc_ids:
+                self._obsolete_doc_ids.append(existing["id"])
             now_str = SQLiteStore.now_str()
             # SQL: 软删旧版本（status=deleted + 填时间戳）
             self._store.execute(
@@ -769,6 +925,16 @@ class KnowledgePipeline:
     # ------------------------------------------------------------------
     # Internals
     # ------------------------------------------------------------------
+
+    def get_nodes(self) -> list:
+        """返回最近一次 ingest 的 nodes（进程内缓存）.
+
+        供检索端构建 LlamaIndex 原生 ``BM25Retriever(nodes=...)`` 使用（BM25 是
+        in-memory lexical 检索，需要节点列表）。clear / 重新 ingest 会刷新缓存。
+        若尚未 ingest 过则返回空列表。
+        """
+        return list(self._last_nodes)
+
     def _ensure_vector_store_collection(self):
         """保证 self._vector_store 指向最新、可写的 collection。
 

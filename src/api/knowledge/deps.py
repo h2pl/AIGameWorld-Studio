@@ -14,10 +14,11 @@ from pathlib import Path
 from fastapi import HTTPException, Request
 from fastapi import Path as FPath
 
+from ...services.knowledge.index.vector_store import KBVectorStoreFactory
+
 # ---- 业务层依赖 ----
 # KnowledgeManager 负责 KB 全流程；KBVectorStoreFactory 负责按环境变量切换向量库后端
 from ...services.knowledge.manager import KnowledgeManager
-from ...services.knowledge.vector_store import KBVectorStoreFactory
 from ...utils.sqlite_store import SQLiteStore
 
 

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from src.services.knowledge.reader import KnowledgeReader
+from src.services.knowledge.ingest.reader import KnowledgeReader
 
 
 @pytest.fixture

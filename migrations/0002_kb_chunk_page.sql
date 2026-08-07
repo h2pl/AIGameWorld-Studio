@@ -1,0 +1,12 @@
+-- =====================================================================
+-- Migration 0002: kb_chunk 增加 page_number 列
+-- 目的: PDF 感知切分后，记录每个 chunk 所属页码（1-based），
+--       便于 parent-context 回拉时保持页面边界、以及检索结果展示。
+--
+-- 说明: SQLite 不支持 `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`，
+--       若在此 .sql 文件里直接 ALTER，重复执行会因 "duplicate column"
+--       报错并使 init_schema 整体 rollback。因此 DDL 的幂等执行放在
+--       Python 端（KnowledgeManager._ensure_kb_chunk_page_column，
+--       try/except 吞掉 duplicate column 错误）。本文件仅作 schema
+--       演进的文档留痕，不在此执行破坏性 DDL。
+-- =====================================================================

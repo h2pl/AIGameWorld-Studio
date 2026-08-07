@@ -8,9 +8,14 @@ from pathlib import Path
 import pytiled_parser
 from pytiled_parser.layer import ObjectLayer, TileLayer
 
-PROJECT_ROOT = Path(__file__).parent.parent.parent
-ASSETS = PROJECT_ROOT.parent / "AIGameWorld" / "frontend" / "public" / "assets"
-AIGAME_DB = PROJECT_ROOT.parent / "AIGameWorld" / "backend" / "data" / "dev.db"
+# 定位 Studio 项目根：gen_scene.py 位于 <root>/src/services/generator/，向上 4 层到根。
+# 用锚定 src 包的方式更稳健，避免层数硬编码随目录结构调整而失效。
+_HERE = Path(__file__).resolve()
+PROJECT_ROOT = _HERE.parent.parent.parent.parent  # .../AIGameWorld-Studio
+# AIGameWorld 是与 Studio 平级的兄弟项目；素材/DB 应写入 AIGameWorld，而非 Studio 内部。
+AIGAMEWORLD_ROOT = PROJECT_ROOT.parent / "AIGameWorld"
+ASSETS = AIGAMEWORLD_ROOT / "frontend" / "public" / "assets"
+AIGAME_DB = AIGAMEWORLD_ROOT / "backend" / "data" / "dev.db"
 
 TUX_TSX_DIR = "assets/tuxemon/gfx/tilesets"
 TUX_PNG_DIR = "assets/tuxemon/gfx/tilesets"

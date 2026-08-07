@@ -147,14 +147,15 @@ async def _main() -> int:
     # ── kb: knowledge base ──────────────────────────────────────────
     kb = sub.add_parser(
         "kb",
-        help="知识库管理 / Knowledge base (index/search/clear/stats)",
+        help="知识库管理 / Knowledge base (index/search/clear/stats/eval)",
         epilog=(
             "示例:\n"
             "  aw-studio kb index my_world\n"
             "  aw-studio kb index my_world --force\n"
             '  aw-studio kb search my_world "boss 位置" -k 5 --meta\n'
             "  aw-studio kb clear my_world\n"
-            "  aw-studio kb stats my_world"
+            "  aw-studio kb stats my_world\n"
+            "  aw-studio kb eval wow_chronicle_test --top-k 10 --json"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -240,6 +241,63 @@ async def _main() -> int:
         help="ChromaDB persist 目录 (default: data/chroma)",
     )
 
+    # === kb eval 子命令：RAG 离线评估（recall@k / MRR / hit_rate@k）===
+    kb_ev = kb_sub.add_parser(
+        "eval",
+        help="RAG 离线评估 / Offline RAG evaluation (recall@k / MRR / hit_rate@k)",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            '评估集: knowledge-bases/<topic>/eval/qa.jsonl（每行 {"query":..., '
+            '"expected_doc_ids":[...]}，格式见 docs/dev/spec-rag-eval.md）\n'
+            "示例:\n"
+            "  aw-studio kb eval wow_chronicle_test\n"
+            "  aw-studio kb eval wow_chronicle_test --top-k 10\n"
+            "  aw-studio kb eval wow_chronicle_test --json"
+        ),
+    )
+    kb_ev.add_argument("world_id", type=str, help="world id / pack id / topic slug")
+    kb_ev.add_argument(
+        "-k",
+        "--top-k",
+        type=int,
+        default=5,
+        help="检索 top_k，指标基于此 (default: 5)",
+    )
+    kb_ev.add_argument(
+        "--eval-file",
+        type=Path,
+        default=None,
+        help="评估集 JSONL 路径（默认 knowledge-bases/<world_id>/eval/qa.jsonl）",
+    )
+    kb_ev.add_argument(
+        "--json",
+        action="store_true",
+        help="输出 Machine-readable JSON（便于 CI / 前后对比存档）",
+    )
+    kb_ev.add_argument(
+        "--query-rewrite",
+        action="store_true",
+        help="启用 Query 改写（multi_query，LLM 不可用时自动降级）",
+    )
+    kb_ev.add_argument(
+        "--save",
+        type=Path,
+        default=None,
+        help="把 JSON 评估报告保存到文件（供前后对比存档，建议 .json）",
+    )
+    kb_ev.add_argument(
+        "--compare",
+        type=Path,
+        default=None,
+        help="与历史 JSON 报告对比，输出指标差异（delta）",
+    )
+    kb_ev.add_argument(
+        "--chroma-path",
+        type=Path,
+        default=Path("data/chroma"),
+        help="ChromaDB persist 目录 (default: data/chroma)",
+    )
+
     # 解析命令行参数
     args = parser.parse_args()
 
@@ -260,6 +318,7 @@ async def _main() -> int:
             "search": _kb_search,
             "clear": _kb_clear,
             "stats": _kb_stats,
+            "eval": _kb_eval,
         }
         return await _kb_handlers[args.kb_command](args)
 
@@ -557,6 +616,84 @@ async def _kb_stats(args) -> int:
     kb, topic_id = _make_kb_manager(args)
     stats = kb.stats(topic_id)
     print(_json.dumps(stats, ensure_ascii=False, indent=2))
+    kb.close()
+    return 0
+
+
+# kb eval handler：RAG 离线评估（recall@k / MRR / hit_rate@k）
+async def _kb_eval(args) -> int:
+    """对指定 topic 的评估集跑 recall@k / MRR / hit_rate@k.
+
+    评估集: knowledge-bases/<world_id>/eval/qa.jsonl（每行一条 golden query）。
+    复用 KnowledgeManager.search_with_meta（min_score=0.0，与线上一致），
+    只算 doc 级召回。--json 输出 Machine-readable 供 CI / 前后对比。
+    """
+    kb, topic_id = _make_kb_manager(args)
+
+    from src.services.knowledge.eval import (
+        _default_eval_path,
+        format_report,
+        load_queries,
+    )
+
+    eval_file = args.eval_file or _default_eval_path(Path.cwd(), topic_id)
+    try:
+        queries = load_queries(eval_file)
+    except (FileNotFoundError, ValueError) as e:
+        print(f"[FAIL] {e}", file=sys.stderr)
+        kb.close()
+        return 1
+
+    # 确保 topic 已索引；未索引时给出提示
+    stats = kb.stats(topic_id)
+    chunk_count = stats.get("chunks", 0) or stats.get("total_chunks", 0)
+    if chunk_count == 0:
+        print(
+            f"[WARN] topic={topic_id} 尚无已索引 chunk（{stats.get('collection', '?')}），"
+            f"建议先运行: aw-studio kb index {topic_id} --force",
+            file=sys.stderr,
+        )
+
+    print(f"[kb] eval topic={topic_id} top_k={args.top_k} eval_file={eval_file}")
+    import json as _json
+
+    from src.services.knowledge.eval import compare_reports, evaluate
+
+    report = evaluate(
+        kb,
+        topic_id,
+        queries,
+        top_k=args.top_k,
+        query_rewrite=bool(getattr(args, "query_rewrite", False)),
+    )
+    print(format_report(report, json_out=bool(getattr(args, "json", False))))
+
+    # --compare：与历史报告对比输出 delta
+    if getattr(args, "compare", None):
+        cmp_path = args.compare
+        if not cmp_path.exists():
+            print(f"[FAIL] 对比报告不存在: {cmp_path}", file=sys.stderr)
+            kb.close()
+            return 1
+        try:
+            old = _json.loads(cmp_path.read_text(encoding="utf-8"))
+        except Exception as e:
+            print(f"[FAIL] 无法解析对比报告 {cmp_path}: {e}", file=sys.stderr)
+            kb.close()
+            return 1
+        print()
+        print(compare_reports(report, old))
+
+    # --save：保存 JSON 报告供前后对比存档
+    if getattr(args, "save", None):
+        save_path = args.save
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        save_path.write_text(
+            _json.dumps(report.to_dict(), ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        print(f"[saved] 评估报告 -> {save_path}")
+
     kb.close()
     return 0
 

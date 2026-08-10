@@ -342,6 +342,50 @@ async def _main() -> int:
         help="ChromaDB persist 目录 (default: data/chroma)",
     )
 
+    # === kb llm-eval 子命令：LLM-as-judge 检索质量评估 ===
+    kb_le = kb_sub.add_parser(
+        "llm-eval",
+        help="LLM-as-judge 检索质量评估 / LLM-as-judge retrieval quality (context_precision/relevancy)",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "用 LLM 判分检索返回的 context 质量（不依赖人工 expected，可评估真实查询）。\n"
+            "示例:\n"
+            "  aw-studio kb llm-eval wow_chronicle_test\n"
+            "  aw-studio kb llm-eval wow_chronicle_test --top-k 5 --eval-file /tmp/qa.jsonl --json"
+        ),
+    )
+    kb_le.add_argument("world_id", type=str, help="world id / pack id / topic slug")
+    kb_le.add_argument(
+        "-k",
+        "--top-k",
+        type=int,
+        default=5,
+        help="检索 top_k (default: 5)",
+    )
+    kb_le.add_argument(
+        "--eval-file",
+        type=Path,
+        default=None,
+        help="评估集 JSONL 路径（默认 knowledge-bases/<world_id>/eval/qa.jsonl）",
+    )
+    kb_le.add_argument(
+        "--max-contexts",
+        type=int,
+        default=5,
+        help="每条 query 送 LLM 判分的最大段落数 (default: 5)",
+    )
+    kb_le.add_argument(
+        "--json",
+        action="store_true",
+        help="输出 Machine-readable JSON",
+    )
+    kb_le.add_argument(
+        "--chroma-path",
+        type=Path,
+        default=Path("data/chroma"),
+        help="ChromaDB persist 目录 (default: data/chroma)",
+    )
+
     # 解析命令行参数
     args = parser.parse_args()
 
@@ -364,6 +408,7 @@ async def _main() -> int:
             "stats": _kb_stats,
             "eval": _kb_eval,
             "gen-eval-from-audit": _kb_gen_eval_from_audit,
+            "llm-eval": _kb_llm_eval,
         }
         return await _kb_handlers[args.kb_command](args)
 
@@ -790,6 +835,42 @@ async def _kb_gen_eval_from_audit(args) -> int:
             f.write(_json.dumps(rec, ensure_ascii=False) + "\n")
     print(f"[saved] 评估集 -> {out_path}（{len(queries)} 条，weak-label）")
     print("[hint] 建议人工抽检/精修 expected 后，再运行: aw-studio kb eval <topic>")
+    kb.close()
+    return 0
+
+
+# kb llm-eval handler：LLM-as-judge 检索质量评估（context_precision / relevancy）
+async def _kb_llm_eval(args) -> int:
+    """用 LLM 判分检索返回的 context 质量.
+
+    对评估集每条 query 检索，送 LLM 判分 context_precision（逐段相关）+ context_relevancy
+    （整体相关）。LLM 不可用时对应指标为 N/A，不阻塞。
+    """
+    from src.services.knowledge.eval import (
+        _default_eval_path,
+        format_llm_report,
+        llm_evaluate,
+        load_queries,
+    )
+
+    kb, topic_id = _make_kb_manager(args)
+    eval_file = args.eval_file or _default_eval_path(Path.cwd(), topic_id)
+    try:
+        queries = load_queries(eval_file)
+    except (FileNotFoundError, ValueError) as e:
+        print(f"[FAIL] {e}", file=sys.stderr)
+        kb.close()
+        return 1
+
+    print(f"[kb] llm-eval topic={topic_id} top_k={args.top_k} eval_file={eval_file}")
+    report = llm_evaluate(
+        kb,
+        topic_id,
+        queries,
+        top_k=args.top_k,
+        max_contexts=int(getattr(args, "max_contexts", 5)),
+    )
+    print(format_llm_report(report, json_out=bool(getattr(args, "json", False))))
     kb.close()
     return 0
 

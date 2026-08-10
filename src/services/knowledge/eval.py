@@ -301,3 +301,101 @@ def build_queries_from_audit(
         raise ValueError(f"从审计日志未提取到有效评估 query（topic={topic}, 日志 {len(logs)} 条, 跳过 {skipped}）")
     _log.info("[eval] 从审计日志构建评估集: %d 条 (去重后), 跳过 %d", len(queries), skipped)
     return queries
+
+
+# ---------------------------------------------------------------------------
+# LLM-as-judge 检索质量评估（context_precision / context_relevancy）
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class LLMJudgeReport:
+    """LLM-as-judge 评估报告."""
+
+    topic: str
+    top_k: int
+    queries: int
+    context_precision: float | None  # 平均 context_precision；LLM 全失败为 None
+    context_relevancy: float | None  # 平均 context_relevancy；LLM 全失败为 None
+    judged_queries: int  # 成功拿到 LLM 判分的 query 数
+    per_query: list[dict] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+def llm_evaluate(
+    manager: Any,
+    topic: str,
+    queries: list[dict],
+    *,
+    top_k: int = 5,
+    max_contexts: int = 5,
+) -> LLMJudgeReport:
+    """对每条 query 检索并用 LLM 判分检索 context 质量.
+
+    检索复用 ``manager.search_with_meta``（min_score=0.0）；判分委托
+    ``src.services.knowledge.llm_judge``。LLM 不可用时对应指标为 None（不阻塞）。
+    """
+    from .llm_judge import judge_context_precision, judge_context_relevancy
+
+    n = len(queries)
+    if n == 0:
+        raise ValueError("无评估 query")
+
+    precision_sum = 0.0
+    relevancy_sum = 0.0
+    judged_precision = 0
+    judged_relevancy = 0
+    per_query: list[dict] = []
+
+    for item in queries:
+        q = item["query"]
+        hits = manager.search_with_meta(topic, q, top_k=top_k, min_score=0.0)
+        contexts = [h.get("text") or "" for h in hits[:max_contexts]]
+        contexts = [c for c in contexts if c.strip()]
+        row: dict = {"query": q, "context_precision": None, "context_relevancy": None}
+
+        # context_precision：LLM 逐段判相关
+        prec = judge_context_precision(q, contexts) if contexts else None
+        if prec:
+            row["context_precision"] = prec["context_precision"]
+            precision_sum += prec["context_precision"]
+            judged_precision += 1
+
+        # context_relevancy：LLM 判整体相关性
+        if contexts:
+            rel = judge_context_relevancy(q, "\n\n".join(contexts[:3]))
+            if rel is not None:
+                row["context_relevancy"] = rel
+                relevancy_sum += rel
+                judged_relevancy += 1
+
+        per_query.append(row)
+
+    return LLMJudgeReport(
+        topic=topic,
+        top_k=top_k,
+        queries=n,
+        context_precision=round(precision_sum / judged_precision, 4) if judged_precision else None,
+        context_relevancy=round(relevancy_sum / judged_relevancy, 4) if judged_relevancy else None,
+        judged_queries=max(judged_precision, judged_relevancy),
+        per_query=per_query,
+    )
+
+
+def format_llm_report(report: LLMJudgeReport, *, json_out: bool = False) -> str:
+    """格式化 LLM-as-judge 报告."""
+    if json_out:
+        return json.dumps(report.to_dict(), ensure_ascii=False, indent=2)
+    lines: list[str] = []
+    lines.append(
+        f"topic={report.topic}  top_k={report.top_k}  queries={report.queries}  judged={report.judged_queries}"
+    )
+    cp = f"{report.context_precision:.4f}" if report.context_precision is not None else "N/A"
+    cr = f"{report.context_relevancy:.4f}" if report.context_relevancy is not None else "N/A"
+    lines.append(f"context_precision  = {cp}")
+    lines.append(f"context_relevancy  = {cr}")
+    if report.context_precision is None and report.context_relevancy is None:
+        lines.append("(LLM 评估全部降级：LLM 不可用或输出无法解析)")
+    return "\n".join(lines)

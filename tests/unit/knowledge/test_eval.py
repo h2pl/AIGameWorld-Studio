@@ -241,3 +241,51 @@ class TestBuildFromAudit:
         m = _FakeManager(audit_logs=logs, plan=[[_mk_hit(doc_id="", file_name="chronicle.pdf")]])
         qs = build_queries_from_audit(m, "t")
         assert qs[0]["expected"] == ["chronicle.pdf"]
+
+
+class TestLLMEvaluate:
+    """LLM-as-judge 聚合评估（mock judge 函数）."""
+
+    def test_aggregates_precision_and_relevancy(self, monkeypatch):
+        """judge 函数返回固定值 → 报告正确聚合."""
+        m = _FakeManager(
+            plan=[
+                [_mk_hit(text="context a"), _mk_hit(text="context b")],
+                [_mk_hit(text="context c")],
+            ]
+        )
+        # mock judge（patch llm_judge 模块属性；llm_evaluate 内 `from .llm_judge import` 每次执行读取）
+        monkeypatch.setattr(
+            "src.services.knowledge.llm_judge.judge_context_precision",
+            lambda q, ctx, **k: {"relevant": [1] * len(ctx), "context_precision": 0.75},
+        )
+        monkeypatch.setattr(
+            "src.services.knowledge.llm_judge.judge_context_relevancy",
+            lambda q, ctx, **k: 0.9,
+        )
+        queries = [{"query": "q1", "expected": ["x"]}, {"query": "q2", "expected": ["y"]}]
+        from src.services.knowledge.eval import llm_evaluate
+
+        rep = llm_evaluate(m, "t", queries, top_k=5)
+        assert rep.context_precision == 0.75
+        assert rep.context_relevancy == 0.9
+        assert rep.queries == 2
+        assert rep.judged_queries == 2
+
+    def test_all_judge_fail_returns_none(self, monkeypatch):
+        """judge 全部返回 None → 指标为 None，不崩溃."""
+        m = _FakeManager(plan=[[_mk_hit(text="ctx")], [_mk_hit(text="ctx")]])
+        monkeypatch.setattr(
+            "src.services.knowledge.llm_judge.judge_context_precision",
+            lambda q, ctx, **k: None,
+        )
+        monkeypatch.setattr(
+            "src.services.knowledge.llm_judge.judge_context_relevancy",
+            lambda q, ctx, **k: None,
+        )
+        from src.services.knowledge.eval import llm_evaluate
+
+        rep = llm_evaluate(m, "t", [{"query": "q", "expected": []}], top_k=5)
+        assert rep.context_precision is None
+        assert rep.context_relevancy is None
+        assert rep.judged_queries == 0

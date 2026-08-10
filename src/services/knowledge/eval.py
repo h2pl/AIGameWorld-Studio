@@ -399,3 +399,119 @@ def format_llm_report(report: LLMJudgeReport, *, json_out: bool = False) -> str:
     if report.context_precision is None and report.context_relevancy is None:
         lines.append("(LLM 评估全部降级：LLM 不可用或输出无法解析)")
     return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# 一键综合评估（assess）：确定性指标 + LLM-judge 合并报告
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class AssessReport:
+    """综合评估报告：确定性召回指标 + LLM 判分指标."""
+
+    topic: str
+    top_k: int
+    queries: int
+    # 确定性（doc 级）
+    recall_at_k: float | None
+    mrr: float | None
+    hit_rate_at_k: float | None
+    # LLM-judge（context 质量）
+    context_precision: float | None
+    context_relevancy: float | None
+    judged_queries: int
+    # 对比基线（可选）
+    delta: dict[str, float] | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+def assess(
+    manager: Any,
+    topic: str,
+    queries: list[dict],
+    *,
+    top_k: int = 5,
+    max_contexts: int = 5,
+    compare_old: dict | None = None,
+) -> AssessReport:
+    """一次性跑确定性指标 + LLM-judge，产出综合评估报告.
+
+    兼容场景：
+    - ``compare_old`` 传入历史报告 dict（来自 --save 的 JSON）时，附上各指标 delta。
+    - 确定性指标基于评估集的 expected_doc_ids；LLM 指标不依赖 expected。
+    """
+    # 确定性指标
+    try:
+        det = evaluate(manager, topic, queries, top_k=top_k)
+    except ValueError:
+        det = None
+    # LLM-judge 指标
+    try:
+        llmrep = llm_evaluate(manager, topic, queries, top_k=top_k, max_contexts=max_contexts)
+    except ValueError:
+        llmrep = None
+
+    delta: dict[str, float] | None = None
+    if compare_old:
+        delta = {}
+        if det:
+            delta["recall_at_k"] = round(det.recall_at_k - float(compare_old.get("recall_at_k", det.recall_at_k)), 4)
+            delta["mrr"] = round(det.mrr - float(compare_old.get("mrr", det.mrr)), 4)
+            delta["hit_rate_at_k"] = round(
+                det.hit_rate_at_k - float(compare_old.get("hit_rate_at_k", det.hit_rate_at_k)), 4
+            )
+        if llmrep and llmrep.context_precision is not None and llmrep.context_relevancy is not None:
+            delta["context_precision"] = round(
+                llmrep.context_precision - float(compare_old.get("context_precision", llmrep.context_precision)),
+                4,
+            )
+            delta["context_relevancy"] = round(
+                llmrep.context_relevancy - float(compare_old.get("context_relevancy", llmrep.context_relevancy)),
+                4,
+            )
+
+    return AssessReport(
+        topic=topic,
+        top_k=top_k,
+        queries=len(queries),
+        recall_at_k=det.recall_at_k if det else None,
+        mrr=det.mrr if det else None,
+        hit_rate_at_k=det.hit_rate_at_k if det else None,
+        context_precision=llmrep.context_precision if llmrep else None,
+        context_relevancy=llmrep.context_relevancy if llmrep else None,
+        judged_queries=llmrep.judged_queries if llmrep else 0,
+        delta=delta,
+    )
+
+
+def format_assess_report(report: AssessReport, *, json_out: bool = False) -> str:
+    """格式化综合评估报告."""
+    if json_out:
+        return json.dumps(report.to_dict(), ensure_ascii=False, indent=2)
+
+    def _fmt(v: float | None) -> str:
+        return f"{v:.4f}" if v is not None else "N/A"
+
+    def _delta_str(v: float | None) -> str:
+        return f" (Δ {v:+.4f})" if v is not None else ""
+
+    lines: list[str] = []
+    delta = report.delta or {}
+
+    def _kv(key: str) -> str:
+        return _delta_str(delta.get(key))
+
+    lines.append(f"topic={report.topic}  top_k={report.top_k}  queries={report.queries}")
+    lines.append("— 确定性召回指标 —")
+    lines.append(f"  recall@k    = {_fmt(report.recall_at_k)}{_kv('recall_at_k')}")
+    lines.append(f"  MRR         = {_fmt(report.mrr)}{_kv('mrr')}")
+    lines.append(f"  hit_rate@k  = {_fmt(report.hit_rate_at_k)}{_kv('hit_rate_at_k')}")
+    lines.append(f"— LLM-judge 上下文质量（judged={report.judged_queries}) —")
+    lines.append(f"  context_precision = {_fmt(report.context_precision)}{_kv('context_precision')}")
+    lines.append(f"  context_relevancy = {_fmt(report.context_relevancy)}{_kv('context_relevancy')}")
+    if report.recall_at_k is None and report.context_precision is None:
+        lines.append("(两项评估均失败：检查评估集 / LLM 配置)")
+    return "\n".join(lines)

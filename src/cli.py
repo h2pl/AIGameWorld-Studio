@@ -386,6 +386,64 @@ async def _main() -> int:
         help="ChromaDB persist 目录 (default: data/chroma)",
     )
 
+    # === kb assess 子命令：一键综合评估（确定性 + LLM-judge）===
+    kb_as = kb_sub.add_parser(
+        "assess",
+        help="一键综合评估 RAG 质量 / One-shot RAG quality assessment (recall/MRR + LLM context quality)",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "一次跑确定性召回指标（recall@k/MRR/hit_rate）+ LLM-judge 上下文质量"
+            "（context_precision/relevancy），并支持与历史基线对比。\n"
+            "示例:\n"
+            "  aw-studio kb assess wow_chronicle_test\n"
+            "  aw-studio kb assess wow_chronicle_test --save /tmp/report.json\n"
+            "  aw-studio kb assess wow_chronicle_test --compare /tmp/report.json"
+        ),
+    )
+    kb_as.add_argument("world_id", type=str, help="world id / pack id / topic slug")
+    kb_as.add_argument(
+        "-k",
+        "--top-k",
+        type=int,
+        default=5,
+        help="检索 top_k (default: 5)",
+    )
+    kb_as.add_argument(
+        "--eval-file",
+        type=Path,
+        default=None,
+        help="评估集 JSONL 路径（默认 knowledge-bases/<world_id>/eval/qa.jsonl）",
+    )
+    kb_as.add_argument(
+        "--max-contexts",
+        type=int,
+        default=5,
+        help="每条 query 送 LLM 判分的最大段落数 (default: 5)",
+    )
+    kb_as.add_argument(
+        "--save",
+        type=Path,
+        default=None,
+        help="把综合评估 JSON 报告保存到文件（供前后对比存档）",
+    )
+    kb_as.add_argument(
+        "--compare",
+        type=Path,
+        default=None,
+        help="与历史 JSON 报告对比，输出指标 delta",
+    )
+    kb_as.add_argument(
+        "--json",
+        action="store_true",
+        help="输出 Machine-readable JSON",
+    )
+    kb_as.add_argument(
+        "--chroma-path",
+        type=Path,
+        default=Path("data/chroma"),
+        help="ChromaDB persist 目录 (default: data/chroma)",
+    )
+
     # 解析命令行参数
     args = parser.parse_args()
 
@@ -409,6 +467,7 @@ async def _main() -> int:
             "eval": _kb_eval,
             "gen-eval-from-audit": _kb_gen_eval_from_audit,
             "llm-eval": _kb_llm_eval,
+            "assess": _kb_assess,
         }
         return await _kb_handlers[args.kb_command](args)
 
@@ -871,6 +930,68 @@ async def _kb_llm_eval(args) -> int:
         max_contexts=int(getattr(args, "max_contexts", 5)),
     )
     print(format_llm_report(report, json_out=bool(getattr(args, "json", False))))
+    kb.close()
+    return 0
+
+
+# kb assess handler：一键综合评估（确定性 + LLM-judge + 可选对比）
+async def _kb_assess(args) -> int:
+    """一次性跑确定性召回指标 + LLM-judge 上下文质量，并支持历史基线对比.
+
+    --save 存 JSON 报告（含全部指标），--compare 与历史报告对比输出 delta。
+    """
+    import json as _json
+
+    from src.services.knowledge.eval import (
+        _default_eval_path,
+        assess,
+        format_assess_report,
+        load_queries,
+    )
+
+    kb, topic_id = _make_kb_manager(args)
+    eval_file = args.eval_file or _default_eval_path(Path.cwd(), topic_id)
+    try:
+        queries = load_queries(eval_file)
+    except (FileNotFoundError, ValueError) as e:
+        print(f"[FAIL] {e}", file=sys.stderr)
+        kb.close()
+        return 1
+
+    compare_old = None
+    if getattr(args, "compare", None):
+        cmp_path = args.compare
+        if not cmp_path.exists():
+            print(f"[FAIL] 对比报告不存在: {cmp_path}", file=sys.stderr)
+            kb.close()
+            return 1
+        try:
+            compare_old = _json.loads(cmp_path.read_text(encoding="utf-8"))
+        except Exception as e:
+            print(f"[FAIL] 无法解析对比报告 {cmp_path}: {e}", file=sys.stderr)
+            kb.close()
+            return 1
+
+    print(f"[kb] assess topic={topic_id} top_k={args.top_k} eval_file={eval_file}")
+    report = assess(
+        kb,
+        topic_id,
+        queries,
+        top_k=args.top_k,
+        max_contexts=int(getattr(args, "max_contexts", 5)),
+        compare_old=compare_old,
+    )
+    print(format_assess_report(report, json_out=bool(getattr(args, "json", False))))
+
+    if getattr(args, "save", None):
+        save_path = args.save
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        save_path.write_text(
+            _json.dumps(report.to_dict(), ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        print(f"[saved] 综合评估报告 -> {save_path}")
+
     kb.close()
     return 0
 

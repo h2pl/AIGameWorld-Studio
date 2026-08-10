@@ -112,7 +112,7 @@ def judge_context_precision(
     if llm is None:
         return None
     try:
-        from langchain_core.messages import HumanMessage, SystemMessage
+        from langchain_core.messages import HumanMessage
 
         # 构造判分 prompt：把段落编号后拼进模板，要求 LLM 输出每段 0/1 的 JSON 数组。
         user_prompt = _PRECISION_PROMPT.format(

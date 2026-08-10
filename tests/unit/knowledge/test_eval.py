@@ -6,6 +6,7 @@ import pytest
 
 from src.services.knowledge.eval import (
     _extract_doc_ids,
+    assess,
     build_queries_from_audit,
     compare_reports,
     evaluate,
@@ -289,3 +290,66 @@ class TestLLMEvaluate:
         assert rep.context_precision is None
         assert rep.context_relevancy is None
         assert rep.judged_queries == 0
+
+
+class TestAssess:
+    """一键综合评估（确定性 + LLM-judge 合并）."""
+
+    def test_assess_combines_both_metrics(self, monkeypatch):
+        """确定性 + LLM 指标都被收集."""
+        # assess 内部 evaluate + llm_evaluate 各检索一次，plan 需覆盖两次调用
+        m = _FakeManager(
+            plan=[
+                [_mk_hit(doc_id="d1", text="ctx a")],
+                [_mk_hit(doc_id="d2", text="ctx b")],
+                [_mk_hit(doc_id="d1", text="ctx a")],
+                [_mk_hit(doc_id="d2", text="ctx b")],
+            ]
+        )
+        # 确定性：两条都命中 rank1 → recall=1, MRR=1
+        # LLM：mock 判分
+        monkeypatch.setattr(
+            "src.services.knowledge.llm_judge.judge_context_precision",
+            lambda q, ctx, **k: {"relevant": [1] * len(ctx), "context_precision": 0.8},
+        )
+        monkeypatch.setattr(
+            "src.services.knowledge.llm_judge.judge_context_relevancy",
+            lambda q, ctx, **k: 0.9,
+        )
+        from src.services.knowledge.eval import assess
+
+        rep = assess(m, "t", [{"query": "q1", "expected": ["d1"]}, {"query": "q2", "expected": ["d2"]}], top_k=5)
+        assert rep.recall_at_k == 1.0
+        assert rep.mrr == 1.0
+        assert rep.context_precision == 0.8
+        assert rep.context_relevancy == 0.9
+        assert rep.queries == 2
+
+    def test_assess_delta(self, monkeypatch):
+        """compare_old 存在时输出 delta."""
+        # evaluate + llm_evaluate 各检索一次，plan 需 4 条
+        m = _FakeManager(
+            plan=[
+                [_mk_hit(doc_id="d1", text="c")],
+                [_mk_hit(doc_id="d1", text="c")],
+                [_mk_hit(doc_id="d1", text="c")],
+                [_mk_hit(doc_id="d1", text="c")],
+            ]
+        )
+        monkeypatch.setattr(
+            "src.services.knowledge.llm_judge.judge_context_precision",
+            lambda q, ctx, **k: {"relevant": [1] * len(ctx), "context_precision": 0.8},
+        )
+        monkeypatch.setattr(
+            "src.services.knowledge.llm_judge.judge_context_relevancy",
+            lambda q, ctx, **k: 0.9,
+        )
+        from src.services.knowledge.eval import assess
+
+        old = {"recall_at_k": 0.8, "mrr": 0.7, "hit_rate_at_k": 0.8, "context_precision": 0.5, "context_relevancy": 0.6}
+        rep = assess(
+            m, "t", [{"query": "q", "expected": ["d1"]}, {"query": "q", "expected": ["d1"]}], top_k=5, compare_old=old
+        )
+        assert rep.delta is not None
+        assert rep.delta["recall_at_k"] == 0.2  # 1.0 - 0.8
+        assert rep.delta["context_precision"] == 0.3  # 0.8 - 0.5

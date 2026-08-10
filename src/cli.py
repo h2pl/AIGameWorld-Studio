@@ -298,6 +298,50 @@ async def _main() -> int:
         help="ChromaDB persist 目录 (default: data/chroma)",
     )
 
+    # === kb gen-eval-from-audit 子命令：从真实查询日志构建评估集 ===
+    kb_ge = kb_sub.add_parser(
+        "gen-eval-from-audit",
+        help="从 kb_audit 真实查询日志构建评估集（弱监督）/ Build eval set from audit logs",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "从线上检索审计日志提取真实用户 query，用检索 top1 弱标注期望文档，"
+            "写入评估集 JSONL。\n"
+            "示例:\n"
+            "  aw-studio kb gen-eval-from-audit wow_chronicle_test\n"
+            "  aw-studio kb gen-eval-from-audit wow_chronicle_test --limit 200 --out /tmp/eval.jsonl"
+        ),
+    )
+    kb_ge.add_argument("world_id", type=str, help="world id / pack id / topic slug")
+    kb_ge.add_argument(
+        "--limit",
+        type=int,
+        default=200,
+        help="最多扫描的审计日志条数 (default: 200)",
+    )
+    kb_ge.add_argument(
+        "--min-chars",
+        type=int,
+        default=2,
+        help="query 最小长度过滤 (default: 2)",
+    )
+    kb_ge.add_argument(
+        "--out",
+        type=Path,
+        default=None,
+        help="输出评估集 JSONL 路径（默认 knowledge-bases/<world_id>/eval/qa.jsonl，覆盖写）",
+    )
+    kb_ge.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="只打印构建结果，不写文件",
+    )
+    kb_ge.add_argument(
+        "--chroma-path",
+        type=Path,
+        default=Path("data/chroma"),
+        help="ChromaDB persist 目录 (default: data/chroma)",
+    )
+
     # 解析命令行参数
     args = parser.parse_args()
 
@@ -319,6 +363,7 @@ async def _main() -> int:
             "clear": _kb_clear,
             "stats": _kb_stats,
             "eval": _kb_eval,
+            "gen-eval-from-audit": _kb_gen_eval_from_audit,
         }
         return await _kb_handlers[args.kb_command](args)
 
@@ -694,6 +739,57 @@ async def _kb_eval(args) -> int:
         )
         print(f"[saved] 评估报告 -> {save_path}")
 
+    kb.close()
+    return 0
+
+
+# kb gen-eval-from-audit handler：从 kb_audit 真实查询日志构建评估集（弱监督）
+async def _kb_gen_eval_from_audit(args) -> int:
+    """从线上审计日志提取真实 query，用检索 top1 弱标注期望文档，写入评估集 JSONL.
+
+    企业级评估集第一优先来源是真实查询（比手写更贴近线上分布）。
+    注意：弱标注存在"自我印证"偏差（expected 来自检索自身 top1），建议人工抽检后使用。
+    """
+    import json as _json
+
+    from src.services.knowledge.eval import _default_eval_path, build_queries_from_audit
+
+    kb, topic_id = _make_kb_manager(args)
+
+    out_path = args.out or _default_eval_path(Path.cwd(), topic_id)
+    try:
+        queries = build_queries_from_audit(
+            kb,
+            topic_id,
+            limit=int(getattr(args, "limit", 200)),
+            min_chars=int(getattr(args, "min_chars", 2)),
+        )
+    except ValueError as e:
+        print(f"[FAIL] {e}", file=sys.stderr)
+        kb.close()
+        return 1
+
+    print(f"[kb] 从审计日志构建评估集 topic={topic_id}: {len(queries)} 条")
+
+    if getattr(args, "dry_run", False):
+        for q in queries[:20]:
+            print(f"  {q['query']!r}  ->  {q['expected']}")
+        if len(queries) > 20:
+            print(f"  ... 共 {len(queries)} 条")
+        kb.close()
+        return 0
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(out_path, "w", encoding="utf-8") as f:
+        for q in queries:
+            rec = {
+                "query": q["query"],
+                "expected_doc_ids": q["expected"],
+                "note": q.get("note", "from_audit"),
+            }
+            f.write(_json.dumps(rec, ensure_ascii=False) + "\n")
+    print(f"[saved] 评估集 -> {out_path}（{len(queries)} 条，weak-label）")
+    print("[hint] 建议人工抽检/精修 expected 后，再运行: aw-studio kb eval <topic>")
     kb.close()
     return 0
 

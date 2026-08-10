@@ -5,11 +5,12 @@ from pathlib import Path
 import pytest
 
 from src.services.knowledge.eval import (
+    _extract_doc_ids,
+    build_queries_from_audit,
+    compare_reports,
     evaluate,
     format_report,
     load_queries,
-    compare_reports,
-    _extract_doc_ids,
 )
 
 
@@ -25,16 +26,20 @@ def _mk_hit(doc_id: str = "", file_name: str = "", text: str = "x") -> dict:
 
 
 class _FakeManager:
-    """伪造 manager：按顺序返回预设 hits."""
+    """伪造 manager：按顺序返回预设 hits + 预设审计日志."""
 
-    def __init__(self, plan: list[list[dict]]):
-        self._plan = plan
+    def __init__(self, plan: list[list[dict]] | None = None, audit_logs: list[dict] | None = None):
+        self._plan = list(plan) if plan else []
+        self._audit_logs = audit_logs or []
         self.calls: list[tuple[str, str, int]] = []
 
     def search_with_meta(self, topic, query, *, top_k=5, min_score=0.0, query_rewrite=False):
         self.calls.append((topic, query, top_k))
         hits = self._plan.pop(0) if self._plan else []
         return hits
+
+    def audit_list(self, topic, *, limit=100):
+        return self._audit_logs[:limit]
 
 
 class TestMetrics:
@@ -187,3 +192,52 @@ class TestCompareReports:
         out = compare_reports(new, old)
         assert "Δ +0.1000" in out  # MRR 提升
         assert "Δ +0.0000" in out  # recall 不变
+
+
+class TestBuildFromAudit:
+    """从 kb_audit 真实查询日志构建评估集（弱监督标注）."""
+
+    def test_extracts_retrieve_queries(self):
+        """只取 op=='retrieve' 的 query，去重，弱标注 top1 的 doc_id."""
+        logs = [
+            {"op": "retrieve", "query_text": "阿尔萨斯"},
+            {"op": "retrieve", "query_text": "阿尔萨斯"},  # 重复应去重
+            {"op": "retrieve", "query_text": "燃烧军团"},
+            {"op": "index_done", "query_text": "不应被取"},  # 非 retrieve 跳过
+            {"op": "retrieve", "query_text": "a"},  # 过短跳过
+        ]
+        m = _FakeManager(
+            audit_logs=logs,
+            plan=[
+                [_mk_hit(doc_id="d_arthas")],
+                [_mk_hit(doc_id="d_burning")],
+            ],
+        )
+        qs = build_queries_from_audit(m, "t", min_chars=2)
+        # "阿尔萨斯" 去重后 1 条 + "燃烧军团" 1 条 = 2 条
+        assert len(qs) == 2
+        assert qs[0]["query"] == "阿尔萨斯"
+        assert qs[0]["expected"] == ["d_arthas"]
+        assert qs[1]["query"] == "燃烧军团"
+        assert qs[1]["expected"] == ["d_burning"]
+        assert qs[0]["note"] == "from_audit(weak-label)"
+
+    def test_skips_query_with_no_hits(self):
+        """检索无命中的 query 跳过（无法弱标注 expected）."""
+        logs = [{"op": "retrieve", "query_text": "不存在的内容"}]
+        m = _FakeManager(audit_logs=logs, plan=[[]])
+        with pytest.raises(ValueError):
+            build_queries_from_audit(m, "t")
+
+    def test_empty_audit_raises(self):
+        """无审计日志或无有效 query → 抛 ValueError."""
+        m = _FakeManager(audit_logs=[], plan=[])
+        with pytest.raises(ValueError):
+            build_queries_from_audit(m, "t")
+
+    def test_uses_file_name_when_no_doc_id(self):
+        """top1 无 doc_id 时用 file_name 作弱标注."""
+        logs = [{"op": "retrieve", "query_text": "泰坦"}]
+        m = _FakeManager(audit_logs=logs, plan=[[_mk_hit(doc_id="", file_name="chronicle.pdf")]])
+        qs = build_queries_from_audit(m, "t")
+        assert qs[0]["expected"] == ["chronicle.pdf"]

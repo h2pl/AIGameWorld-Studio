@@ -234,3 +234,70 @@ def compare_reports(new: EvalReport, old: dict | EvalReport) -> str:
     lines.append(f"  MRR           {old_mrr} -> {new.mrr}   (Δ {new.mrr - old_mrr:+.4f})")
     lines.append(f"  hit_rate@{new.top_k} {old_hit} -> {new.hit_rate_at_k}   (Δ {new.hit_rate_at_k - old_hit:+.4f})")
     return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# 从线上审计日志构建评估集（真实查询弱监督）
+# ---------------------------------------------------------------------------
+
+
+def build_queries_from_audit(
+    manager: Any,
+    topic: str,
+    *,
+    limit: int = 200,
+    min_chars: int = 2,
+    top_hits: int = 1,
+) -> list[dict]:
+    """从 kb_audit 真实查询日志构建评估集（弱监督标注）.
+
+    企业级评估集的第一优先来源是**真实用户查询**（比手写/LLM 合成更贴近线上分布）。
+
+    - 从 ``manager.audit_list(topic)`` 取 ``op == 'retrieve'`` 的 query_text，去重。
+    - 对每条 query 用 ``search_with_meta(top_k=top_hits)`` 取 top 命中文档作**弱 expected**：
+      假设"用户搜了这个 query，说明该内容存在于知识库且应被召回"，top1 即为弱标注。
+    - 仅保留检索有命中的 query（无命中则无法标注 expected，跳过并计入 skipped）。
+    - 返回与 ``load_queries`` 兼容的 dict 列表，可直接写回 qa.jsonl 或喂给 ``evaluate``。
+
+    .. note::
+        这是**弱监督**基线：expected 来自检索自身 top 命中，存在"自我印证"偏差（指标天然偏高）。
+        建议人工抽检/精修后使用，或作为回归冒烟集而非严格质量门槛。
+    """
+    logs = manager.audit_list(topic, limit=limit) if hasattr(manager, "audit_list") else []
+    seen: set[str] = set()
+    queries: list[dict] = []
+    skipped = 0
+
+    for row in logs or []:
+        op = row.get("op") or ""
+        q = (row.get("query_text") or "").strip()
+        if op != "retrieve" or not q or len(q) < min_chars or q in seen:
+            continue
+        seen.add(q)
+        # 弱标注：取检索 top1 的 doc_id（优先）或 file_name
+        try:
+            hits = manager.search_with_meta(topic, q, top_k=top_hits, min_score=0.0)
+        except Exception as e:
+            _log.warning("[eval] query=%r 检索失败，跳过: %s", q[:50], e)
+            skipped += 1
+            continue
+        if not hits:
+            skipped += 1
+            continue
+        doc_id, file_name = _extract_doc_ids(hits[0])
+        expected = [doc_id] if doc_id else ([file_name] if file_name else [])
+        if not expected:
+            skipped += 1
+            continue
+        queries.append(
+            {
+                "query": q,
+                "expected": expected,
+                "note": "from_audit(weak-label)",
+            }
+        )
+
+    if not queries:
+        raise ValueError(f"从审计日志未提取到有效评估 query（topic={topic}, 日志 {len(logs)} 条, 跳过 {skipped}）")
+    _log.info("[eval] 从审计日志构建评估集: %d 条 (去重后), 跳过 %d", len(queries), skipped)
+    return queries
